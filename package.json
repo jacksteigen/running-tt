@@ -1,0 +1,35 @@
+{
+  "name": "running-tt",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@opennextjs/cloudflare": "^1.18.0",
+    "next": "^16.1.7",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "stripe": "^21.0.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260331.1",
+    "@tailwindcss/postcss": "^4.2.1",
+    "@types/node": "^25.5.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "postcss": "^8.5.8",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.79.0"
+  }
+}
