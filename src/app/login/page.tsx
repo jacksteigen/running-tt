@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { CLEAN_SPORT_DECLARATION } from "@/lib/declaration";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
+  const [declared, setDeclared] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -46,10 +48,12 @@ export default function LoginPage() {
             &larr; Home
           </Link>
           <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-            Sign in
+            Sign in or sign up
           </h1>
-          <p className="mt-3 text-stone/60">
-            Enter your email and we will send you a sign-in link.
+          <p className="mt-3 text-stone/60 max-w-md">
+            One field for both. Enter your email and we will send you a
+            sign-in link. First time here? Your account gets created
+            automatically.
           </p>
         </div>
       </section>
@@ -100,6 +104,20 @@ export default function LoginPage() {
                 className="w-full border border-stone/40 px-4 py-3 text-sm bg-bone/50 focus:outline-none focus:border-terracotta transition-colors"
               />
 
+              {/* Clean sport declaration */}
+              <label className="flex items-start gap-3 cursor-pointer select-none mt-5">
+                <input
+                  type="checkbox"
+                  checked={declared}
+                  onChange={(e) => setDeclared(e.target.checked)}
+                  required
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[#C4593A]"
+                />
+                <span className="text-xs text-midnight/70 leading-relaxed">
+                  {CLEAN_SPORT_DECLARATION}
+                </span>
+              </label>
+
               {error && (
                 <p className="mt-3 text-sm text-terracotta">{error}</p>
               )}
@@ -107,13 +125,14 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-4 bg-terracotta text-white text-sm font-medium py-3 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
+                className="w-full mt-5 bg-terracotta text-white text-sm font-medium py-3 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
               >
                 {loading ? "Sending..." : "Send sign-in link"}
               </button>
 
               <p className="mt-4 text-xs text-dust text-center">
-                No account yet? We will create one when you sign in.
+                No password to remember. New here? We create your account when
+                you click the link.
               </p>
             </form>
           )}

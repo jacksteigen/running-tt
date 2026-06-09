@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { CLEAN_SPORT_DECLARATION } from "@/lib/declaration";
 
 interface EnterEventButtonProps {
   eventId: string;
@@ -20,8 +21,15 @@ export default function EnterEventButton({
 }: EnterEventButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [declared, setDeclared] = useState(false);
+  const [showDeclareNudge, setShowDeclareNudge] = useState(false);
 
   async function handleEnter() {
+    if (!declared) {
+      setShowDeclareNudge(true);
+      return;
+    }
+
     if (!isLoggedIn) {
       router.push("/login");
       return;
@@ -76,12 +84,39 @@ export default function EnterEventButton({
     entryFeeCents > 0 ? ` · $${(entryFeeCents / 100).toFixed(0)}` : "";
 
   return (
-    <button
-      onClick={handleEnter}
-      disabled={loading}
-      className="w-full bg-terracotta text-white text-sm font-medium py-3 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
-    >
-      {loading ? "Processing..." : `Enter now${feeDisplay}`}
-    </button>
+    <div>
+      {/* Clean sport declaration */}
+      <label className="flex items-start gap-3 cursor-pointer select-none mb-4">
+        <input
+          type="checkbox"
+          checked={declared}
+          onChange={(e) => {
+            setDeclared(e.target.checked);
+            if (e.target.checked) setShowDeclareNudge(false);
+          }}
+          className="mt-0.5 h-4 w-4 shrink-0 accent-[#C4593A]"
+        />
+        <span className="text-xs text-midnight/70 leading-relaxed">
+          {CLEAN_SPORT_DECLARATION}
+        </span>
+      </label>
+      {showDeclareNudge && (
+        <p className="text-xs text-terracotta mb-3">
+          You need to make the declaration before you can enter.
+        </p>
+      )}
+
+      <button
+        onClick={handleEnter}
+        disabled={loading}
+        className={`w-full text-white text-sm font-medium py-3 transition-colors disabled:opacity-50 ${
+          declared
+            ? "bg-terracotta hover:bg-terracotta/90"
+            : "bg-midnight/30 hover:bg-midnight/40"
+        }`}
+      >
+        {loading ? "Processing..." : `Enter now${feeDisplay}`}
+      </button>
+    </div>
   );
 }
