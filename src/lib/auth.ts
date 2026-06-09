@@ -81,7 +81,10 @@ export async function getSession(db: D1Database) {
 
   const session = await db
     .prepare(
-      `SELECT s.id as session_id, s.expires_at, u.id, u.email, u.name, u.location, u.strava_athlete_id, u.garmin_user_id, u.created_at
+      `SELECT s.id as session_id, s.expires_at, u.id, u.email, u.name, u.location,
+              u.strava_athlete_id, u.garmin_user_id, u.created_at,
+              u.bio, u.photo_url, u.instagram, u.strava_url, u.tiktok, u.website,
+              u.sponsors, u.sponsor_interests, u.open_to_sponsorship
        FROM sessions s
        JOIN users u ON s.user_id = u.id
        WHERE s.id = ? AND s.expires_at > datetime('now')`
@@ -97,6 +100,15 @@ export async function getSession(db: D1Database) {
       strava_athlete_id: string | null;
       garmin_user_id: string | null;
       created_at: string;
+      bio: string | null;
+      photo_url: string | null;
+      instagram: string | null;
+      strava_url: string | null;
+      tiktok: string | null;
+      website: string | null;
+      sponsors: string | null;
+      sponsor_interests: string | null;
+      open_to_sponsorship: number;
     }>();
 
   if (!session) return null;
@@ -111,6 +123,15 @@ export async function getSession(db: D1Database) {
       stravaAthleteId: session.strava_athlete_id,
       garminUserId: session.garmin_user_id,
       createdAt: session.created_at,
+      bio: session.bio,
+      photoUrl: session.photo_url,
+      instagram: session.instagram,
+      stravaUrl: session.strava_url,
+      tiktok: session.tiktok,
+      website: session.website,
+      sponsors: session.sponsors,
+      sponsorInterests: session.sponsor_interests,
+      openToSponsorship: session.open_to_sponsorship,
     },
   };
 }

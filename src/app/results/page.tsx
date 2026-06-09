@@ -74,6 +74,44 @@ export default async function ResultsPage() {
     podiumsByEvent.set(p.event_id, list);
   }
 
+  // All-time records: fastest time per distance across every RTT result.
+  interface RecordRow {
+    time_display: string;
+    time_seconds: number;
+    verified: number;
+    user_id: string;
+    user_name: string;
+    distance: string;
+    event_name: string;
+    event_slug: string;
+    date: string;
+  }
+  const allTimes = await db
+    .prepare(
+      `SELECT r.time_display, r.time_seconds, r.verified,
+              u.id as user_id, u.name as user_name,
+              ev.distance, ev.name as event_name, ev.slug as event_slug, ev.date
+       FROM results r
+       JOIN users u ON r.user_id = u.id
+       JOIN events ev ON r.event_id = ev.id
+       ORDER BY r.time_seconds ASC`
+    )
+    .all() as unknown as { results: RecordRow[] };
+
+  const recordOrder = ["Mile", "3K", "5K", "10K"];
+  const recordsByDistance = new Map<string, RecordRow>();
+  for (const row of allTimes.results) {
+    if (!recordsByDistance.has(row.distance)) {
+      recordsByDistance.set(row.distance, row);
+    }
+  }
+  const records = recordOrder
+    .filter((d) => recordsByDistance.has(d))
+    .concat(
+      [...recordsByDistance.keys()].filter((d) => !recordOrder.includes(d))
+    )
+    .map((d) => recordsByDistance.get(d) as RecordRow);
+
   // Aggregate stats across past events
   const totalRaces = past.results.length;
   const totalFinishersRes = await db
@@ -140,6 +178,67 @@ export default async function ResultsPage() {
           </div>
         </div>
       </section>
+
+      {/* All-time records */}
+      {records.length > 0 && (
+        <section className="bg-stone border-b border-stone/40">
+          <div className="mx-auto max-w-6xl px-6 py-14 md:py-20">
+            <div className="flex items-end justify-between mb-8">
+              <div>
+                <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
+                  All-time
+                </p>
+                <h2 className="text-2xl font-semibold tracking-tight">
+                  Running TT records
+                </h2>
+              </div>
+              <p className="hidden sm:block text-sm text-dust max-w-xs text-right">
+                Fastest time ever recorded at a Running TT event, per distance.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {records.map((rec) => (
+                <div
+                  key={rec.distance}
+                  className="bg-white border border-stone/40 overflow-hidden"
+                >
+                  <div className="bg-midnight text-white px-4 py-2 flex items-center justify-between">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.2em]">
+                      {rec.distance}
+                    </p>
+                    {rec.verified === 1 && (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] text-trail"
+                        title="Verified"
+                      >
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-trail" />
+                        verified
+                      </span>
+                    )}
+                  </div>
+                  <div className="px-4 py-5">
+                    <p className="text-3xl font-mono font-semibold tracking-tight tabular-nums text-gold">
+                      {rec.time_display}
+                    </p>
+                    <Link
+                      href={`/athletes/${rec.user_id}`}
+                      className="block mt-2 font-medium hover:text-terracotta transition-colors"
+                    >
+                      {rec.user_name}
+                    </Link>
+                    <Link
+                      href={`/events/${rec.event_slug}`}
+                      className="block text-xs text-midnight/50 hover:text-terracotta transition-colors mt-1"
+                    >
+                      {rec.event_name}
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="bg-bone">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">

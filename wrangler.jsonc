@@ -14,6 +14,12 @@
       "database_id": "9261b474-6d82-4a07-9828-ddcebcb380b1"
     }
   ],
+  "r2_buckets": [
+    {
+      "binding": "PHOTOS",
+      "bucket_name": "running-tt-photos"
+    }
+  ],
   "vars": {
     "STRIPE_SECRET_KEY": "",
     "STRIPE_WEBHOOK_SECRET": "",

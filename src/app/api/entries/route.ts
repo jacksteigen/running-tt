@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { getSession, generateId } from "@/lib/auth";
 import { createCheckoutSession } from "@/lib/stripe";
+import { CLEAN_SPORT_DECLARATION } from "@/lib/declaration";
 
 export async function POST(request: NextRequest) {
   const db = await getDB();
@@ -11,7 +12,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const { eventId } = (await request.json()) as { eventId: string };
+  const { eventId, declared } = (await request.json()) as {
+    eventId: string;
+    declared?: boolean;
+  };
+
+  if (!declared) {
+    return NextResponse.json(
+      { error: "The clean-sport declaration is required to enter" },
+      { status: 400 }
+    );
+  }
 
   const event = await db
     .prepare("SELECT * FROM events WHERE id = ?")
@@ -46,6 +57,20 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Record the clean-sport declaration against this entry.
+  await db
+    .prepare(
+      "INSERT INTO declarations (id, user_id, email, context, event_id, declaration_text) VALUES (?, ?, ?, 'entry', ?, ?)"
+    )
+    .bind(
+      `dec_${generateId()}`,
+      session.user.id,
+      session.user.email,
+      eventId,
+      CLEAN_SPORT_DECLARATION
+    )
+    .run();
 
   const baseUrl = new URL(request.url).origin;
 
