@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { getDB } from "@/lib/db";
 import EventCard from "@/components/EventCard";
-import AustraliaFlightMap from "@/components/AustraliaFlightMap";
+import GlobeMap from "@/components/GlobeMap";
 import { displayStatus } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Events · Running TT",
   description:
-    "Upcoming and past Running TT time trial events in Geelong and Melbourne.",
+    "Upcoming and past Running TT time trial events, held on certified tracks and road courses worldwide.",
 };
 
 interface EventRow {
@@ -62,8 +62,8 @@ export default async function EventsPage() {
             Events
           </h1>
           <p className="mt-4 text-stone/60 max-w-lg">
-            Time trials across Geelong and Melbourne. Rolling heats of 8, live
-            leaderboard, prize money for the top 3.
+            Time trial events held around the world. Rolling heats and prize
+            money for the top 3 at every race.
           </p>
         </div>
       </section>
@@ -145,7 +145,7 @@ export default async function EventsPage() {
         </div>
       </section>
 
-      <AustraliaFlightMap />
+      <GlobeMap />
     </>
   );
 }

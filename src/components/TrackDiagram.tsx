@@ -1,10 +1,11 @@
 /**
- * Stylised 400 m athletics track with eight runners lined up at the start,
- * plus a big mono race clock above. Intended as a visual hero for /format.
+ * Stylised venue diagram with a small heat lined up at the start, plus a big
+ * mono race clock above. Generic enough to read as either a track or a road
+ * loop. Used as a visual hero for /format.
  */
 export default function TrackDiagram() {
-  // The track is drawn as two concentric rounded rectangles to show lanes.
-  // Eight runners sit on the straight near the start line.
+  // Drawn as two concentric rounded rectangles to suggest lanes or a loop.
+  // A small heat sits on the straight near the start line.
   const runners = Array.from({ length: 8 }, (_, i) => ({
     x: 180 + i * 55,
     y: 270,
@@ -34,7 +35,7 @@ export default function TrackDiagram() {
         viewBox="0 0 900 500"
         className="w-full h-auto"
         role="img"
-        aria-label="Running track with 8 runners lined up at the start"
+        aria-label="Race venue with a heat lined up at the start"
       >
         {/* Outer track surface */}
         <rect
@@ -164,7 +165,7 @@ export default function TrackDiagram() {
             opacity="0.5"
             letterSpacing="2"
           >
-            HEAT 04 · 8 RUNNERS
+            HEAT 04 · ON DECK
           </text>
           <text
             x="710"
@@ -190,7 +191,7 @@ export default function TrackDiagram() {
           opacity="0.6"
           letterSpacing="3"
         >
-          400m
+          THE LOOP
         </text>
       </svg>
     </div>

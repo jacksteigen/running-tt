@@ -6,53 +6,57 @@ import HeatsTimeline from "@/components/HeatsTimeline";
 export const metadata: Metadata = {
   title: "The Format · Running TT",
   description:
-    "How a Running TT event unfolds. Rolling heats of 8 on a certified 400m track, live leaderboard, prize money for the top 3.",
+    "How a Running TT event unfolds. Rolling heats, every time recorded, prize money for the top 3.",
 };
 
 const steps = [
   {
     number: "01",
     title: "Check in",
-    body: "Arrive anytime in the 3-hour window. Show your QR, get your bib, pick up your timing chip. Warm up on the infield.",
+    body: "Arrive anytime in the event window. Pick up your bib and warm up before your heat is called.",
   },
   {
     number: "02",
-    title: "Line up in a heat of 8",
-    body: "Heats roll off about every 13 minutes. When your number is called, walk onto the start line. No wave starts, no mass corrals.",
+    title: "Line up in a small heat",
+    body: "Heats roll off continuously. When your number is called, walk onto the start line. No wave starts, no mass corrals.",
   },
   {
     number: "03",
     title: "Run the clock",
-    body: "Gun goes. You run your distance. Times are captured by chip and verified at the finish.",
+    body: "Gun goes. You run your distance. Your time gets recorded at the finish.",
   },
   {
     number: "04",
-    title: "Leaderboard updates live",
-    body: "Your time hits the live leaderboard within seconds. Watch the standings shift as the field comes through.",
+    title: "Times posted",
+    body: "Times go up on the event page as the race wraps. Your run stays on the page afterwards.",
   },
   {
     number: "05",
-    title: "Podium + payout",
+    title: "Podium and payout",
     body: "After the final heat closes, the top 3 collect prize money on the day. Everyone else keeps their time on the page, forever.",
   },
 ];
 
 const rules = [
   {
-    label: "Track",
-    body: "Certified 400m athletics tracks only. Proper surface, accurate distance, fair conditions.",
+    label: "Venue",
+    body: "Tracks, road courses, anywhere a good race can be held. The venue is announced with the race.",
   },
   {
     label: "Distances",
-    body: "The Mile, 3K, 5K and 10K rotate through each city calendar year.",
+    body: "The Mile, 3K, 5K and 10K are the staple distances. Each event picks what's on offer, announced with the race.",
   },
   {
     label: "Timing",
-    body: "Chip-timed by default. Apple Watch, Garmin and Strava links verify splits and ratify records.",
+    body: "Every time gets recorded at the finish. How depends on the venue, and is announced with the race.",
+  },
+  {
+    label: "Entry fee",
+    body: "A flat $15 to enter, every event, every distance. No tiers, no surprises.",
   },
   {
     label: "Prize money",
-    body: "$2,000 · $1,000 · $500 for the top 3 in every event. No conditions, no minimums.",
+    body: "$2,000 · $1,000 · $500 for the top 3 in every event. The purse is funded by entry fees plus cash from our sponsors.",
   },
 ];
 
@@ -77,9 +81,9 @@ export default function FormatPage() {
             Race against the clock. Not each other.
           </h1>
           <p className="mt-5 text-lg text-stone/70 max-w-2xl leading-relaxed">
-            A time trial series run on certified tracks, in rolling heats of
-            eight, under a live leaderboard. Built to be fast, fair, and
-            honest.
+            Time trial events run in rolling heats, with every time recorded
+            and prize money on the line. Built to be honest, fair, and worth
+            your time.
           </p>
         </div>
       </section>
@@ -93,12 +97,12 @@ export default function FormatPage() {
                 On the line
               </p>
               <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-5">
-                Eight runners. One clock. One honest line.
+                Small heats. One clock. One honest line.
               </h2>
               <p className="text-midnight/60 leading-relaxed">
-                Every heat runs eight abreast on a certified 400m track. No
-                waves, no pacers, no corrals. You line up, the gun fires, and
-                the clock decides.
+                Every heat lines up together at the same start. No waves, no
+                pacers, no corrals. You line up, the gun fires, and the clock
+                decides.
               </p>
             </div>
             <div className="lg:col-span-2 pt-12 lg:pt-0">
@@ -146,16 +150,16 @@ export default function FormatPage() {
               Rolling heats
             </p>
             <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-4">
-              A new heat every 13 minutes
+              A steady rolling start
             </h2>
             <p className="text-midnight/60 leading-relaxed">
-              Heats are spread across a three-hour window. That means short
-              queues at the start, a steady rhythm across the morning, and a
-              leaderboard that keeps shifting until the final gun.
+              Heats are spread across the event window. That means short
+              queues at the start, a steady rhythm through the day, and a
+              full record of times by the end.
             </p>
           </div>
 
-          <div className="bg-bone border border-stone/40 p-8 md:p-12">
+          <div className="bg-bone border border-stone/40 p-5 sm:p-8 md:p-12">
             <HeatsTimeline />
           </div>
         </div>

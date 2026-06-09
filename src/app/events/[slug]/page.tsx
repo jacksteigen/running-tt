@@ -365,7 +365,7 @@ export default async function EventPage({
                 </h3>
                 <p className="text-sm text-midnight/60 mb-4">
                   {eventStatus === "Open"
-                    ? `${entryCount?.count ?? 0} runners have locked in. Heats of 8, first in best dressed.`
+                    ? `${entryCount?.count ?? 0} runners have locked in. Rolling heats, first in best dressed.`
                     : "Entries will open soon."}
                 </p>
                 <EnterEventButton
@@ -375,6 +375,10 @@ export default async function EventPage({
                   isLoggedIn={!!session}
                   alreadyEntered={alreadyEntered}
                 />
+                <p className="mt-3 text-xs text-midnight/50 leading-relaxed">
+                  Flat $15 entry at every event. Entry fees and sponsor cash
+                  fund the prize purse.
+                </p>
               </div>
             )}
 

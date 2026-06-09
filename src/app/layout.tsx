@@ -17,7 +17,7 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: "Running TT · You. The clock. Nothing else.",
   description:
-    "Running time trial events in Geelong and Melbourne. Rolling heats, live leaderboards, prize money at every event.",
+    "Time trial running events held around the world. Rolling heats and real prize money at every race.",
   icons: {
     icon: "/favicon.png",
     apple: "/icon-192.png",

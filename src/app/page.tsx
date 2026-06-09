@@ -4,6 +4,7 @@ import { getDB } from "@/lib/db";
 import LiveClock from "@/components/LiveClock";
 import Countdown from "@/components/Countdown";
 import EventCard from "@/components/EventCard";
+import Sponsors from "@/components/Sponsors";
 import { displayStatus } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
@@ -18,21 +19,21 @@ const stats = [
 const steps = [
   {
     number: "01",
-    title: "Book a track",
+    title: "Book a race",
     description:
-      "We secure certified athletics tracks in Geelong and Melbourne. Proper facilities, proper timing.",
+      "Races are announced when they're locked in. Tracks, road courses, anywhere a good race can be held.",
   },
   {
     number: "02",
-    title: "Rolling heats of 8",
+    title: "Rolling heats",
     description:
-      "Runners go off in heats of 8, continuously, over a 3-hour window. Show up, warm up, race when you're ready.",
+      "Runners go off in small heats across the event window. Show up, warm up, race when your number is called.",
   },
   {
     number: "03",
-    title: "Live leaderboard",
+    title: "Times posted",
     description:
-      "Every time goes up on the live leaderboard immediately. Watch the standings shift in real time.",
+      "Every time gets recorded at the finish and posted to the event page. Your run lives there afterwards.",
   },
   {
     number: "04",
@@ -107,17 +108,22 @@ export default async function Home() {
         <div className="mx-auto max-w-6xl px-6 py-20 md:py-28 relative">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
             <div>
-              <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-6">
-                Running TT · Geelong · Melbourne
-              </p>
+              <div className="mb-7">
+                <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta">
+                  Running TT
+                </p>
+                <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/50 mt-1.5">
+                  Worldwide time trials
+                </p>
+              </div>
               <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.05]">
                 You. The clock.
                 <br />
                 <span className="text-stone/60">Nothing else.</span>
               </h1>
               <p className="mt-6 text-lg text-stone/70 max-w-lg leading-relaxed">
-                A time trial series on certified tracks. Rolling heats, live
-                leaderboards, real prize money at every event.
+                Time trial events held around the world. Rolling heats and
+                real prize money at every race.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <Link
@@ -194,7 +200,7 @@ export default async function Home() {
         <div className="relative w-full h-[320px] md:h-[460px] lg:h-[540px] overflow-hidden">
           <Image
             src="/images/athlete-track-lane.jpg"
-            alt="Runner warming up on a certified blue 400m athletics track"
+            alt="Runner warming up at a Running TT venue"
             fill
             priority
             sizes="100vw"
@@ -204,11 +210,6 @@ export default async function Home() {
             aria-hidden
             className="absolute inset-0 bg-gradient-to-t from-midnight/80 via-midnight/10 to-transparent"
           />
-          <div className="absolute inset-x-0 bottom-0 mx-auto max-w-6xl px-6 pb-8 md:pb-10">
-            <p className="font-mono text-[10px] md:text-xs uppercase tracking-[0.25em] text-white/70">
-              Landy Field · Geelong
-            </p>
-          </div>
         </div>
       </section>
 
@@ -318,9 +319,15 @@ export default async function Home() {
                 Prize money. Always.
               </h2>
               <p className="text-stone/70 leading-relaxed">
-                Every Running TT event pays out prize money. No sponsorship
-                thresholds, no minimum field sizes, no conditions. You show up,
-                you race, the fastest three get paid. That simple.
+                Every Running TT event pays out prize money. No qualifying
+                standards, no conditions. You show up, you race, the fastest
+                three get paid. That simple.
+              </p>
+              <p className="text-stone/70 leading-relaxed mt-4">
+                Entry is a flat{" "}
+                <span className="font-mono text-white">$15</span>, every event,
+                every distance. The purse is funded by entry fees plus cash
+                from our sponsors.
               </p>
             </div>
             <div className="grid grid-cols-3 gap-4">
@@ -347,6 +354,8 @@ export default async function Home() {
           </div>
         </div>
       </section>
+
+      <Sponsors />
     </>
   );
 }

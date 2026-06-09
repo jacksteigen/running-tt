@@ -62,7 +62,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
             type="text"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. Geelong, VIC"
+            placeholder="e.g. London, UK"
             className="w-full border border-stone/40 px-3 py-2 text-sm bg-bone/50 focus:outline-none focus:border-terracotta transition-colors"
           />
         </div>

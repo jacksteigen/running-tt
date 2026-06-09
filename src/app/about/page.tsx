@@ -4,7 +4,7 @@ import Image from "next/image";
 export const metadata: Metadata = {
   title: "About · Running TT",
   description:
-    "What Running TT is, how the format works, and why we started a time trial series.",
+    "What Running TT is, how the format works, and why we started running these events.",
 };
 
 export default function AboutPage() {
@@ -49,10 +49,9 @@ export default function AboutPage() {
             </h2>
             <div className="space-y-4 text-midnight/70 leading-relaxed">
               <p>
-                Running TT is a time trial event series based in Geelong and
-                Melbourne. We book a running track, run heats of 8 continuously
-                over 3 hours, put every time on a live leaderboard, and pay
-                prize money to the top 3.
+                Running TT is a programme of time trial events held around
+                the world. We secure venues, run small heats across the event
+                window, record every time, and pay prize money to the top 3.
               </p>
               <p>
                 The time trial format means you are racing against the clock,
@@ -83,32 +82,32 @@ export default function AboutPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 max-w-4xl">
             <div>
               <h3 className="font-semibold tracking-tight mb-2">
-                Heats of 8
+                Rolling heats
               </h3>
               <p className="text-sm text-midnight/60 leading-relaxed">
-                Runners go off in groups of 8 on a rolling basis. You check in,
-                get assigned a heat, and line up when your number is called.
-                Heats run continuously from the start of the event.
+                Runners go off in small heats on a rolling basis. You check
+                in, get assigned a heat, and line up when your number is
+                called. Heats run continuously from the start of the event.
               </p>
             </div>
             <div>
               <h3 className="font-semibold tracking-tight mb-2">
-                3-hour window
+                Event window
               </h3>
               <p className="text-sm text-midnight/60 leading-relaxed">
-                The event runs over a 3-hour window. Early heats go first, but
-                the leaderboard stays open until the final heat crosses the
-                line. Late starters can still win.
+                Each event runs across a set window. Early heats go first,
+                but the leaderboard stays open until the final heat crosses
+                the line. Late starters can still win.
               </p>
             </div>
             <div>
               <h3 className="font-semibold tracking-tight mb-2">
-                Live leaderboard
+                Times posted
               </h3>
               <p className="text-sm text-midnight/60 leading-relaxed">
-                Every time is recorded and posted to the leaderboard
-                immediately. Runners, spectators, and anyone online can watch
-                the standings shift in real time throughout the morning.
+                Every time gets recorded at the finish and added to the event
+                page as the race wraps. Your run stays on the record after
+                the event closes.
               </p>
             </div>
             <div>
@@ -133,19 +132,20 @@ export default function AboutPage() {
               Distances
             </p>
             <h2 className="text-2xl font-semibold tracking-tight mb-6">
-              Distance rotation
+              The distances
             </h2>
             <p className="text-midnight/70 leading-relaxed mb-8">
-              Running TT events rotate through four distances. Each one tests
-              something different. Each one has its own leaderboard and records.
+              Running TT runs four classic distances. Each one tests something
+              different. What&apos;s on offer at a given event gets announced
+              with the race.
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 max-w-3xl">
             {[
-              { distance: "Mile", laps: "4 laps", character: "Speed and guts" },
-              { distance: "3K", laps: "7.5 laps", character: "Sharp and honest" },
-              { distance: "5K", laps: "12.5 laps", character: "The benchmark" },
-              { distance: "10K", laps: "25 laps", character: "Patience and pain" },
+              { distance: "Mile", length: "1.609 km", character: "Speed and guts" },
+              { distance: "3K", length: "3 km", character: "Sharp and honest" },
+              { distance: "5K", length: "5 km", character: "The benchmark" },
+              { distance: "10K", length: "10 km", character: "Patience and pain" },
             ].map((d) => (
               <div
                 key={d.distance}
@@ -154,7 +154,7 @@ export default function AboutPage() {
                 <p className="text-2xl font-semibold tracking-tight">
                   {d.distance}
                 </p>
-                <p className="text-xs text-dust font-mono mt-1">{d.laps}</p>
+                <p className="text-xs text-dust font-mono mt-1">{d.length}</p>
                 <p className="text-xs text-midnight/50 mt-2">{d.character}</p>
               </div>
             ))}

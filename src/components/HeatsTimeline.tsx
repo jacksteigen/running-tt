@@ -1,51 +1,46 @@
 /**
- * Horizontal timeline showing how rolling heats unfold across the 3-hour
- * event window. Each tick is a heat of 8 going off.
+ * Abstract horizontal timeline showing heats rolling off across the event
+ * window. Deliberately keeps off specific clock times or heat counts because
+ * those vary per event. Responsive: shows fewer dots on mobile so labels
+ * don't collide.
  */
 export default function HeatsTimeline() {
-  const heats = Array.from({ length: 14 }, (_, i) => {
-    const minute = i * 13; // heat every ~13 minutes
-    const hours = Math.floor(minute / 60);
-    const mins = minute % 60;
-    return {
-      num: i + 1,
-      label: `${String(8 + hours).padStart(2, "0")}:${String(mins).padStart(2, "0")}`,
-    };
-  });
+  // Twelve dots on desktop, but every other one is hidden on mobile (so six show).
+  const heats = Array.from({ length: 12 }, (_, i) => i + 1);
 
   return (
     <div className="w-full">
-      {/* Clock axis */}
-      <div className="relative">
-        <div className="h-px bg-stone/30 w-full" />
-        <div className="flex justify-between mt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-dust">
-          <span>08:00</span>
-          <span>09:00</span>
-          <span>10:00</span>
-          <span>11:00</span>
-        </div>
+      <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.2em] text-dust mb-4">
+        <span>Event opens</span>
+        <span>Event closes</span>
       </div>
 
-      {/* Heat ticks */}
-      <div className="mt-8 relative">
+      <div className="relative">
         <div className="h-px bg-midnight/15 w-full absolute top-1/2" />
         <div className="flex justify-between relative">
-          {heats.map((h) => (
-            <div key={h.num} className="flex flex-col items-center">
-              <span className="font-mono text-[10px] text-dust mb-1">
-                H{h.num}
-              </span>
-              <span className="inline-block w-2 h-2 bg-terracotta rounded-full" />
-              <span className="font-mono text-[10px] text-midnight/60 mt-2 tabular-nums">
-                {h.label}
-              </span>
-            </div>
-          ))}
+          {heats.map((num, i) => {
+            // Hide every other dot on mobile to give labels room to breathe.
+            const hideOnMobile =
+              i !== 0 && i !== heats.length - 1 && i % 2 !== 0;
+            return (
+              <div
+                key={num}
+                className={`flex flex-col items-center ${
+                  hideOnMobile ? "hidden sm:flex" : ""
+                }`}
+              >
+                <span className="font-mono text-[9px] sm:text-[10px] text-dust mb-1">
+                  H{num}
+                </span>
+                <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 bg-terracotta rounded-full" />
+              </div>
+            );
+          })}
         </div>
       </div>
 
-      <p className="mt-8 text-sm text-midnight/60 text-center">
-        A heat goes off roughly every 13 minutes across a 3-hour window.
+      <p className="mt-6 text-sm text-midnight/60 text-center">
+        Heats roll off continuously across the event window.
       </p>
     </div>
   );
