@@ -9,7 +9,7 @@ export async function sendMagicLinkEmail(
   const RESEND_API_KEY = (env as unknown as Record<string, string>).RESEND_API_KEY;
   const FROM_EMAIL =
     (env as unknown as Record<string, string>).FROM_EMAIL ||
-    "Running TT <noreply@runningtt.com.au>";
+    "Running TT <noreply@runningtt.com>";
 
   const verifyUrl = `${baseUrl}/api/auth/verify?token=${token}`;
 

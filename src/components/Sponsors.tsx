@@ -58,7 +58,7 @@ export default function Sponsors() {
 
               {/* Become a sponsor */}
               <a
-                href="mailto:partners@runningtt.com.au?subject=Sponsoring%20Running%20TT"
+                href="mailto:partners@runningtt.com?subject=Sponsoring%20Running%20TT"
                 className="border border-dashed border-dust/50 hover:border-terracotta px-8 py-6 transition-colors group"
               >
                 <p className="text-sm font-medium text-midnight/70 group-hover:text-terracotta transition-colors">
