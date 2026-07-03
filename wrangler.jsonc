@@ -3,6 +3,10 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-03-31",
   "compatibility_flags": ["nodejs_compat"],
+  "routes": [
+    { "pattern": "runningtt.com", "custom_domain": true },
+    { "pattern": "www.runningtt.com", "custom_domain": true }
+  ],
   "assets": {
     "directory": ".open-next/assets",
     "binding": "ASSETS"
