@@ -63,7 +63,15 @@ export default function Footer() {
             </a>{" "}
             initiative
           </p>
-          <p className="text-xs">&copy; {new Date().getFullYear()} Running TT</p>
+          <div className="flex items-center gap-4 text-xs">
+            <Link href="/terms" className="hover:text-white transition-colors">
+              Terms of entry
+            </Link>
+            <Link href="/privacy" className="hover:text-white transition-colors">
+              Privacy
+            </Link>
+            <span>&copy; {new Date().getFullYear()} Running TT</span>
+          </div>
         </div>
       </div>
     </footer>

@@ -377,7 +377,14 @@ export default async function EventPage({
                 />
                 <p className="mt-3 text-xs text-midnight/50 leading-relaxed">
                   Flat $15 entry at every event. Entry fees and sponsor cash
-                  fund the prize purse.
+                  fund the prize purse. By entering you agree to the{" "}
+                  <Link
+                    href="/terms"
+                    className="underline underline-offset-2 hover:text-terracotta transition-colors"
+                  >
+                    terms of entry
+                  </Link>
+                  .
                 </p>
               </div>
             )}
