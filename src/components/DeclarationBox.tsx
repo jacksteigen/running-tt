@@ -48,15 +48,26 @@ export default function DeclarationBox({
       {/* Document */}
       <div className="border border-stone/60 bg-white">
         {/* Header */}
-        <div className="border-b border-stone/40 px-5 pt-5 pb-4 text-center">
-          <p
-            className={`${script.className} text-4xl md:text-5xl text-midnight leading-none`}
-          >
-            Declaration
-          </p>
-          <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-dust mt-3">
-            Running TT · Clean sport
-          </p>
+        <div className="relative overflow-hidden bg-midnight px-5 pt-6 pb-5 text-center">
+          <div
+            aria-hidden
+            className="absolute inset-0 opacity-[0.05]"
+            style={{
+              backgroundImage:
+                "repeating-linear-gradient(90deg, transparent 0 39px, #F5F2EC 39px 40px)",
+            }}
+          />
+          <div className="relative">
+            <p
+              className={`${script.className} text-4xl md:text-5xl text-bone leading-none`}
+            >
+              Declaration
+            </p>
+            <div className="mx-auto mt-4 h-px w-16 bg-terracotta" />
+            <p className="font-mono text-[9px] uppercase tracking-[0.3em] text-stone/50 mt-3">
+              Running TT · Clean sport
+            </p>
+          </div>
         </div>
 
         {/* Scrollable body */}
@@ -70,7 +81,7 @@ export default function DeclarationBox({
           </p>
 
           <p className="text-xs text-midnight/60 leading-relaxed">
-            I make this declaration freely, before my god, my family, my
+            I make this declaration freely, before my God, my family, my
             friends, and every athlete who lines up beside me.
           </p>
           <p className="text-xs text-midnight/60 leading-relaxed">
