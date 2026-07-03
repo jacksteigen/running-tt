@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { CLEAN_SPORT_DECLARATION } from "@/lib/declaration";
+import DeclarationBox from "@/components/DeclarationBox";
 
 interface EnterEventButtonProps {
   eventId: string;
@@ -86,23 +86,19 @@ export default function EnterEventButton({
   return (
     <div>
       {/* Clean sport declaration */}
-      <label className="flex items-start gap-3 cursor-pointer select-none mb-4">
-        <input
-          type="checkbox"
-          checked={declared}
-          onChange={(e) => {
-            setDeclared(e.target.checked);
-            if (e.target.checked) setShowDeclareNudge(false);
+      <div className="mb-4">
+        <DeclarationBox
+          declared={declared}
+          onDeclaredChange={(value) => {
+            setDeclared(value);
+            if (value) setShowDeclareNudge(false);
           }}
-          className="mt-0.5 h-4 w-4 shrink-0 accent-[#C4593A]"
+          maxHeightClass="max-h-36"
         />
-        <span className="text-xs text-midnight/70 leading-relaxed">
-          {CLEAN_SPORT_DECLARATION}
-        </span>
-      </label>
+      </div>
       {showDeclareNudge && (
         <p className="text-xs text-terracotta mb-3">
-          You need to make the declaration before you can enter.
+          You need to sign the declaration before you can enter.
         </p>
       )}
 

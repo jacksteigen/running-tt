@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { CLEAN_SPORT_DECLARATION } from "@/lib/declaration";
+import DeclarationBox from "@/components/DeclarationBox";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -105,18 +105,12 @@ export default function LoginPage() {
               />
 
               {/* Clean sport declaration */}
-              <label className="flex items-start gap-3 cursor-pointer select-none mt-5">
-                <input
-                  type="checkbox"
-                  checked={declared}
-                  onChange={(e) => setDeclared(e.target.checked)}
-                  required
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-[#C4593A]"
+              <div className="mt-5">
+                <DeclarationBox
+                  declared={declared}
+                  onDeclaredChange={setDeclared}
                 />
-                <span className="text-xs text-midnight/70 leading-relaxed">
-                  {CLEAN_SPORT_DECLARATION}
-                </span>
-              </label>
+              </div>
 
               {error && (
                 <p className="mt-3 text-sm text-terracotta">{error}</p>
@@ -124,7 +118,7 @@ export default function LoginPage() {
 
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !declared}
                 className="w-full mt-5 bg-terracotta text-white text-sm font-medium py-3 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
               >
                 {loading ? "Sending..." : "Send sign-in link"}
