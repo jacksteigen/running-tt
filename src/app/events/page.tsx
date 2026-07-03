@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { getDB } from "@/lib/db";
 import EventCard from "@/components/EventCard";
 import GlobeMap from "@/components/GlobeMap";
@@ -70,6 +71,28 @@ export default async function EventsPage() {
 
       <section className="bg-bone">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
+          {upcoming.length === 0 && past.length === 0 && (
+            <div className="bg-white border border-stone/40 p-10 md:p-16 text-center mb-20">
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-3">
+                On the start line
+              </p>
+              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-4">
+                The first event is being locked in.
+              </h2>
+              <p className="text-sm text-midnight/60 max-w-md mx-auto mb-8">
+                Events are announced as venues are confirmed, anywhere in the
+                world. Create your athlete profile now and you&apos;ll be
+                ready the moment entries open.
+              </p>
+              <Link
+                href="/login"
+                className="inline-block bg-terracotta text-white text-sm font-medium px-7 py-3 hover:bg-terracotta/90 transition-colors"
+              >
+                Create your profile
+              </Link>
+            </div>
+          )}
+
           {upcoming.length > 0 && (
             <div className="mb-20">
               <div className="flex items-end justify-between mb-8">
@@ -135,13 +158,13 @@ export default async function EventsPage() {
                 ))}
               </div>
             </div>
-          ) : (
+          ) : upcoming.length > 0 ? (
             <div className="border border-stone/40 bg-white p-12 text-center">
               <p className="text-dust text-sm">
                 No past events yet. The first one is coming.
               </p>
             </div>
-          )}
+          ) : null}
         </div>
       </section>
 

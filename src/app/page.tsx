@@ -10,10 +10,10 @@ import { displayStatus } from "@/lib/events";
 export const dynamic = "force-dynamic";
 
 const stats = [
-  { value: "320", label: "athletes" },
-  { value: "4", label: "events run" },
-  { value: "2", label: "cities" },
-  { value: "$14,000", label: "in prize money awarded" },
+  { value: "$15", label: "flat entry, every event" },
+  { value: "$3,500", label: "prize purse at every event" },
+  { value: "4", label: "distances: Mile, 3K, 5K, 10K" },
+  { value: "3", label: "podium places paid" },
 ];
 
 const steps = [
@@ -248,22 +248,44 @@ export default async function Home() {
               View all →
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {upcomingEvents.results.map((event) => (
-              <EventCard
-                key={event.id}
-                slug={event.slug}
-                name={event.name}
-                distance={event.distance}
-                date={event.date}
-                location={event.location}
-                venue={event.venue}
-                status={displayStatus(event.status, event.date)}
-                entryCount={countMap.get(event.id) ?? 0}
-                entryFeeCents={event.entry_fee_cents}
-              />
-            ))}
-          </div>
+          {upcomingEvents.results.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {upcomingEvents.results.map((event) => (
+                <EventCard
+                  key={event.id}
+                  slug={event.slug}
+                  name={event.name}
+                  distance={event.distance}
+                  date={event.date}
+                  location={event.location}
+                  venue={event.venue}
+                  status={displayStatus(event.status, event.date)}
+                  entryCount={countMap.get(event.id) ?? 0}
+                  entryFeeCents={event.entry_fee_cents}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white border border-stone/40 p-10 md:p-14 text-center">
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-3">
+                On the start line
+              </p>
+              <h3 className="text-xl md:text-2xl font-semibold tracking-tight mb-3">
+                The first event is being locked in.
+              </h3>
+              <p className="text-sm text-midnight/60 max-w-md mx-auto mb-6">
+                Events are announced as venues are confirmed. Create your
+                athlete profile now and you&apos;ll be ready the moment
+                entries open.
+              </p>
+              <Link
+                href="/login"
+                className="inline-block bg-terracotta text-white text-sm font-medium px-7 py-3 hover:bg-terracotta/90 transition-colors"
+              >
+                Create your profile
+              </Link>
+            </div>
+          )}
         </div>
       </section>
 
