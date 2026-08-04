@@ -1,16 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
-import { createMagicLink, generateId } from "@/lib/auth";
+import { createMagicLink } from "@/lib/auth";
 import { sendMagicLinkEmail } from "@/lib/email";
-import { CLEAN_SPORT_DECLARATION } from "@/lib/declaration";
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export async function POST(request: NextRequest) {
-  const { email, declared } = (await request.json()) as {
-    email: string;
-    declared?: boolean;
-  };
+  let email = "";
+  let declared = false;
+  try {
+    const body = (await request.json()) as {
+      email?: string;
+      declared?: boolean;
+    };
+    email = typeof body.email === "string" ? body.email.trim() : "";
+    declared = body.declared === true;
+  } catch {
+    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
 
-  if (!email || typeof email !== "string" || !email.includes("@")) {
+  if (!email || email.length > 254 || !EMAIL_RE.test(email)) {
     return NextResponse.json({ error: "Valid email required" }, { status: 400 });
   }
 
@@ -23,18 +32,25 @@ export async function POST(request: NextRequest) {
 
   const db = await getDB();
 
-  // Record the declaration against the email; the account may not exist yet.
-  await db
-    .prepare(
-      "INSERT INTO declarations (id, email, context, declaration_text) VALUES (?, ?, 'signup', ?)"
-    )
-    .bind(`dec_${generateId()}`, email.toLowerCase(), CLEAN_SPORT_DECLARATION)
-    .run();
-
-  const token = await createMagicLink(db, email);
+  // The declaration is recorded when the link is confirmed and the email is
+  // proven to be the signer's; the flag travels with the link until then.
+  const token = await createMagicLink(db, email, declared);
   const baseUrl = new URL(request.url).origin;
 
-  await sendMagicLinkEmail(email, token, baseUrl);
+  try {
+    const sent = await sendMagicLinkEmail(email, token, baseUrl);
+    if (!sent.success) {
+      return NextResponse.json(
+        { error: "We could not send the email. Try again in a minute." },
+        { status: 502 }
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      { error: "We could not send the email. Try again in a minute." },
+      { status: 502 }
+    );
+  }
 
   return NextResponse.json({ success: true });
 }

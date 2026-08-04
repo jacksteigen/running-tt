@@ -15,38 +15,54 @@ export function generateToken(): string {
   return Array.from(array, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-export async function createMagicLink(db: D1Database, email: string) {
+export async function createMagicLink(
+  db: D1Database,
+  email: string,
+  declared: boolean
+) {
   const id = generateId();
   const token = generateToken();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 min
+  const normalised = email.trim().toLowerCase();
+
+  // Only one live link per email: issuing a new one retires the others.
+  await db
+    .prepare("UPDATE magic_links SET used = 1 WHERE email = ? AND used = 0")
+    .bind(normalised)
+    .run();
 
   await db
     .prepare(
-      "INSERT INTO magic_links (id, email, token, expires_at) VALUES (?, ?, ?, ?)"
+      "INSERT INTO magic_links (id, email, token, expires_at, declared) VALUES (?, ?, ?, ?, ?)"
     )
-    .bind(id, email.toLowerCase(), token, expiresAt)
+    .bind(id, normalised, token, expiresAt, declared ? 1 : 0)
     .run();
 
   return token;
 }
 
-export async function verifyMagicLink(db: D1Database, token: string) {
-  const link = await db
+/**
+ * Check a token without consuming it. Used by the confirmation page so that
+ * email security scanners that prefetch the link cannot burn it; only the
+ * explicit button press (POST) consumes the token.
+ */
+export async function peekMagicLink(db: D1Database, token: string) {
+  return db
     .prepare(
-      "SELECT * FROM magic_links WHERE token = ? AND used = 0 AND expires_at > datetime('now')"
+      "SELECT id, email, declared FROM magic_links WHERE token = ? AND used = 0 AND expires_at > datetime('now')"
     )
     .bind(token)
-    .first<{ id: string; email: string }>();
+    .first<{ id: string; email: string; declared: number }>();
+}
 
-  if (!link) return null;
-
-  // Mark as used
-  await db
-    .prepare("UPDATE magic_links SET used = 1 WHERE token = ?")
+/** Atomically consume a token; returns null if already used or expired. */
+export async function consumeMagicLink(db: D1Database, token: string) {
+  return db
+    .prepare(
+      "UPDATE magic_links SET used = 1 WHERE token = ? AND used = 0 AND expires_at > datetime('now') RETURNING id, email, declared"
+    )
     .bind(token)
-    .run();
-
-  return link;
+    .first<{ id: string; email: string; declared: number }>();
 }
 
 export async function createSession(db: D1Database, userId: string) {
@@ -84,7 +100,8 @@ export async function getSession(db: D1Database) {
       `SELECT s.id as session_id, s.expires_at, u.id, u.email, u.name, u.location,
               u.strava_athlete_id, u.garmin_user_id, u.created_at,
               u.bio, u.photo_url, u.instagram, u.strava_url, u.tiktok, u.website,
-              u.sponsors, u.sponsor_interests, u.open_to_sponsorship
+              u.sponsors, u.sponsor_interests, u.open_to_sponsorship,
+              (u.password_hash IS NOT NULL) as has_password
        FROM sessions s
        JOIN users u ON s.user_id = u.id
        WHERE s.id = ? AND s.expires_at > datetime('now')`
@@ -109,6 +126,7 @@ export async function getSession(db: D1Database) {
       sponsors: string | null;
       sponsor_interests: string | null;
       open_to_sponsorship: number;
+      has_password: number;
     }>();
 
   if (!session) return null;
@@ -132,6 +150,7 @@ export async function getSession(db: D1Database) {
       sponsors: session.sponsors,
       sponsorInterests: session.sponsor_interests,
       openToSponsorship: session.open_to_sponsorship,
+      hasPassword: !!session.has_password,
     },
   };
 }
@@ -145,20 +164,86 @@ export async function destroySession(db: D1Database) {
   }
 }
 
-export async function findOrCreateUser(db: D1Database, email: string) {
+export async function findOrCreateUser(
+  db: D1Database,
+  email: string
+): Promise<{ id: string; created: boolean }> {
+  const normalised = email.trim().toLowerCase();
   const existing = await db
-    .prepare("SELECT * FROM users WHERE email = ?")
-    .bind(email.toLowerCase())
+    .prepare("SELECT id FROM users WHERE email = ?")
+    .bind(normalised)
     .first<{ id: string }>();
 
-  if (existing) return existing.id;
+  if (existing) return { id: existing.id, created: false };
 
   const id = `usr_${generateId()}`;
-  const name = email.split("@")[0];
+  const name = normalised.split("@")[0];
   await db
     .prepare("INSERT INTO users (id, email, name) VALUES (?, ?, ?)")
-    .bind(id, email.toLowerCase(), name)
+    .bind(id, normalised, name)
     .run();
 
-  return id;
+  return { id, created: true };
+}
+
+// --- Password sign-in (optional, set after first email verification) ---
+
+const PBKDF2_ITERATIONS = 100_000;
+
+async function derivePasswordBits(
+  password: string,
+  salt: Uint8Array,
+  iterations: number
+) {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+  return crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: salt as BufferSource, iterations },
+    key,
+    256
+  );
+}
+
+function bytesToB64(bytes: Uint8Array) {
+  return btoa(String.fromCharCode(...bytes));
+}
+
+function b64ToBytes(s: string) {
+  return Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const bits = await derivePasswordBits(password, salt, PBKDF2_ITERATIONS);
+  return `v1$${PBKDF2_ITERATIONS}$${bytesToB64(salt)}$${bytesToB64(new Uint8Array(bits))}`;
+}
+
+export async function verifyPassword(
+  password: string,
+  stored: string
+): Promise<boolean> {
+  const parts = stored.split("$");
+  if (parts.length !== 4 || parts[0] !== "v1") return false;
+  const iterations = parseInt(parts[1], 10);
+  if (!Number.isFinite(iterations) || iterations < 1) return false;
+  let salt: Uint8Array;
+  let expected: Uint8Array;
+  try {
+    salt = b64ToBytes(parts[2]);
+    expected = b64ToBytes(parts[3]);
+  } catch {
+    return false;
+  }
+  const bits = new Uint8Array(
+    await derivePasswordBits(password, salt, iterations)
+  );
+  if (bits.length !== expected.length) return false;
+  let diff = 0;
+  for (let i = 0; i < bits.length; i++) diff |= bits[i] ^ expected[i];
+  return diff === 0;
 }

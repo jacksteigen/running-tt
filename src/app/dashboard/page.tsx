@@ -7,6 +7,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import LogoutButton from "@/components/LogoutButton";
 import ProfileForm from "@/components/ProfileForm";
+import PasswordCard from "@/components/PasswordCard";
 import PBCard from "@/components/PBCard";
 import ResultsTable from "@/components/ResultsTable";
 import Countdown from "@/components/Countdown";
@@ -375,6 +376,8 @@ export default async function DashboardPage() {
           {/* Sidebar */}
           <div className="space-y-8">
             <ProfileForm user={user} />
+
+            <PasswordCard hasPassword={user.hasPassword} />
 
             {/* Connected accounts */}
             <div className="bg-white border border-stone/40 p-6">
