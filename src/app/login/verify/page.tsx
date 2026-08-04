@@ -65,11 +65,6 @@ export default async function VerifyPage({
               >
                 Complete sign in
               </button>
-              <p className="mt-5 text-xs text-dust leading-relaxed">
-                This extra press keeps automated email scanners from using
-                your link before you do. If you did not request this email,
-                just close this page.
-              </p>
             </form>
           ) : (
             <div className="bg-white border border-stone/40 p-8 text-center">
