@@ -13,6 +13,7 @@ interface ProfileFormProps {
     name: string;
     location: string | null;
     bio?: string | null;
+    story?: string | null;
     photoUrl?: string | null;
     instagram?: string | null;
     stravaUrl?: string | null;
@@ -41,6 +42,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
   const [name, setName] = useState(user.name);
   const [location, setLocation] = useState(user.location || "");
   const [bio, setBio] = useState(user.bio || "");
+  const [story, setStory] = useState(user.story || "");
   const [instagram, setInstagram] = useState(user.instagram || "");
   const [stravaUrl, setStravaUrl] = useState(user.stravaUrl || "");
   const [tiktok, setTiktok] = useState(user.tiktok || "");
@@ -109,6 +111,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
         name,
         location,
         bio,
+        story,
         instagram,
         stravaUrl,
         tiktok,
@@ -204,17 +207,38 @@ export default function ProfileForm({ user }: ProfileFormProps) {
 
         <div>
           <label htmlFor="bio" className={labelCls}>
-            About you
+            Short intro
           </label>
           <textarea
             id="bio"
             value={bio}
             onChange={(e) => setBio(e.target.value)}
-            rows={4}
+            rows={3}
             maxLength={600}
             placeholder="Who you are, what you're chasing."
             className={inputCls}
           />
+          <p className="text-[11px] text-midnight/40 mt-1">
+            The line that sits under your name.
+          </p>
+        </div>
+
+        <div>
+          <label htmlFor="story" className={labelCls}>
+            Your story
+          </label>
+          <textarea
+            id="story"
+            value={story}
+            onChange={(e) => setStory(e.target.value)}
+            rows={8}
+            maxLength={4000}
+            placeholder="Where you started, what you have run, what you are working towards, who you train with. Anyone looking at your profile reads this."
+            className={inputCls}
+          />
+          <p className="text-[11px] text-midnight/40 mt-1">
+            {story.length} / 4000 characters. Take your time with it.
+          </p>
         </div>
 
         {/* Socials */}
@@ -255,10 +279,11 @@ export default function ProfileForm({ user }: ProfileFormProps) {
               </label>
               <input
                 id="stravaUrl"
-                type="url"
+                type="text"
+                inputMode="url"
                 value={stravaUrl}
                 onChange={(e) => setStravaUrl(e.target.value)}
-                placeholder="https://www.strava.com/athletes/..."
+                placeholder="www.strava.com/athletes/..."
                 className={inputCls}
               />
             </div>
@@ -268,12 +293,16 @@ export default function ProfileForm({ user }: ProfileFormProps) {
               </label>
               <input
                 id="website"
-                type="url"
+                type="text"
+                inputMode="url"
                 value={website}
                 onChange={(e) => setWebsite(e.target.value)}
-                placeholder="https://..."
+                placeholder="www.yoursite.com"
                 className={inputCls}
               />
+              <p className="text-[11px] text-midnight/40 mt-1">
+                No need to type https, just the address.
+              </p>
             </div>
           </div>
         </div>
@@ -292,13 +321,16 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                   value={s.name}
                   onChange={(e) => updateSponsor(i, "name", e.target.value)}
                   placeholder="Sponsor name"
+                  aria-label="Sponsor name"
                   className={inputCls}
                 />
                 <input
-                  type="url"
+                  type="text"
+                  inputMode="url"
                   value={s.url}
                   onChange={(e) => updateSponsor(i, "url", e.target.value)}
-                  placeholder="https://..."
+                  placeholder="www.sponsor.com"
+                  aria-label="Sponsor website"
                   className={inputCls}
                 />
                 <button

@@ -8,6 +8,7 @@ import type { Metadata } from "next";
 import LogoutButton from "@/components/LogoutButton";
 import ProfileForm from "@/components/ProfileForm";
 import PasswordCard from "@/components/PasswordCard";
+import PhotoAlbum from "@/components/PhotoAlbum";
 import PBCard from "@/components/PBCard";
 import ResultsTable from "@/components/ResultsTable";
 import Countdown from "@/components/Countdown";
@@ -110,6 +111,22 @@ export default async function DashboardPage() {
     )
     .bind(user.id)
     .all() as unknown as { results: PBRow[] };
+
+  // Album photos
+  const photoRows = await db
+    .prepare(
+      "SELECT id, r2_key, caption FROM user_photos WHERE user_id = ? ORDER BY sort_order, created_at"
+    )
+    .bind(user.id)
+    .all() as unknown as {
+    results: { id: string; r2_key: string; caption: string | null }[];
+  };
+
+  const albumPhotos = photoRows.results.map((p) => ({
+    id: p.id,
+    url: `/api/photos/${p.r2_key}`,
+    caption: p.caption ?? "",
+  }));
 
   const initials = user.name
     .split(" ")
@@ -371,6 +388,9 @@ export default async function DashboardPage() {
                 </div>
               </div>
             )}
+
+            {/* Album */}
+            <PhotoAlbum initialPhotos={albumPhotos} />
           </div>
 
           {/* Sidebar */}

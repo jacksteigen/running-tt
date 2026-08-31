@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { normaliseUrl } from "@/lib/urls";
 
 interface SponsorRef {
   name: string;
@@ -11,6 +12,7 @@ interface ProfilePatch {
   name?: string;
   location?: string;
   bio?: string;
+  story?: string;
   instagram?: string;
   stravaUrl?: string;
   tiktok?: string;
@@ -24,10 +26,11 @@ const TEXT_LIMITS: Record<string, number> = {
   name: 80,
   location: 80,
   bio: 600,
+  story: 4000,
   instagram: 60,
-  stravaUrl: 200,
+  stravaUrl: 300,
   tiktok: 60,
-  website: 200,
+  website: 300,
   sponsorInterests: 300,
 };
 
@@ -67,32 +70,55 @@ export async function PATCH(request: NextRequest) {
     updates.push("bio = ?");
     values.push(clean(body.bio, TEXT_LIMITS.bio));
   }
+  if (body.story !== undefined) {
+    updates.push("story = ?");
+    values.push(clean(body.story, TEXT_LIMITS.story));
+  }
   if (body.instagram !== undefined) {
     updates.push("instagram = ?");
     values.push(clean(body.instagram, TEXT_LIMITS.instagram).replace(/^@/, ""));
   }
   if (body.stravaUrl !== undefined) {
+    const strava = normaliseUrl(clean(body.stravaUrl, TEXT_LIMITS.stravaUrl));
+    if (strava === null) {
+      return NextResponse.json(
+        { error: "That Strava link does not look like a web address" },
+        { status: 400 }
+      );
+    }
     updates.push("strava_url = ?");
-    values.push(clean(body.stravaUrl, TEXT_LIMITS.stravaUrl));
+    values.push(strava);
   }
   if (body.tiktok !== undefined) {
     updates.push("tiktok = ?");
     values.push(clean(body.tiktok, TEXT_LIMITS.tiktok).replace(/^@/, ""));
   }
   if (body.website !== undefined) {
+    const website = normaliseUrl(clean(body.website, TEXT_LIMITS.website));
+    if (website === null) {
+      return NextResponse.json(
+        { error: "That website link does not look like a web address" },
+        { status: 400 }
+      );
+    }
     updates.push("website = ?");
-    values.push(clean(body.website, TEXT_LIMITS.website));
+    values.push(website);
   }
   if (body.sponsors !== undefined) {
-    const sponsors = Array.isArray(body.sponsors)
-      ? body.sponsors
-          .map((s) => ({
-            name: clean(s?.name, 60),
-            url: clean(s?.url, 200),
-          }))
-          .filter((s) => s.name)
-          .slice(0, 10)
-      : [];
+    const raw = Array.isArray(body.sponsors) ? body.sponsors.slice(0, 10) : [];
+    const sponsors: SponsorRef[] = [];
+    for (const s of raw) {
+      const name = clean(s?.name, 60);
+      if (!name) continue;
+      const url = normaliseUrl(clean(s?.url, 300));
+      if (url === null) {
+        return NextResponse.json(
+          { error: `The link for "${name}" does not look like a web address` },
+          { status: 400 }
+        );
+      }
+      sponsors.push({ name, url });
+    }
     updates.push("sponsors = ?");
     values.push(JSON.stringify(sponsors));
   }

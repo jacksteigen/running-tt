@@ -99,7 +99,7 @@ export async function getSession(db: D1Database) {
     .prepare(
       `SELECT s.id as session_id, s.expires_at, u.id, u.email, u.name, u.location,
               u.strava_athlete_id, u.garmin_user_id, u.created_at,
-              u.bio, u.photo_url, u.instagram, u.strava_url, u.tiktok, u.website,
+              u.bio, u.story, u.photo_url, u.instagram, u.strava_url, u.tiktok, u.website,
               u.sponsors, u.sponsor_interests, u.open_to_sponsorship,
               (u.password_hash IS NOT NULL) as has_password
        FROM sessions s
@@ -118,6 +118,7 @@ export async function getSession(db: D1Database) {
       garmin_user_id: string | null;
       created_at: string;
       bio: string | null;
+      story: string | null;
       photo_url: string | null;
       instagram: string | null;
       strava_url: string | null;
@@ -142,6 +143,7 @@ export async function getSession(db: D1Database) {
       garminUserId: session.garmin_user_id,
       createdAt: session.created_at,
       bio: session.bio,
+      story: session.story,
       photoUrl: session.photo_url,
       instagram: session.instagram,
       stravaUrl: session.strava_url,

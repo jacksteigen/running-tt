@@ -13,6 +13,7 @@ interface UserRow {
   location: string | null;
   created_at: string;
   bio: string | null;
+  story: string | null;
   photo_url: string | null;
   instagram: string | null;
   strava_url: string | null;
@@ -107,6 +108,15 @@ export default async function AthletePage({
     )
     .bind(user.id)
     .all() as unknown as { results: ResultRow[] };
+
+  const albumRows = await db
+    .prepare(
+      "SELECT id, r2_key, caption FROM user_photos WHERE user_id = ? ORDER BY sort_order, created_at"
+    )
+    .bind(user.id)
+    .all() as unknown as {
+    results: { id: string; r2_key: string; caption: string | null }[];
+  };
 
   const initials = user.name
     .split(" ")
@@ -305,6 +315,67 @@ export default async function AthletePage({
                       time={pb.time_display}
                       verified={pb.verified === 1}
                     />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Story */}
+            {user.story && (
+              <div>
+                <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
+                  In their words
+                </p>
+                <h2 className="text-xl font-semibold tracking-tight mb-6">
+                  My story
+                </h2>
+                <div className="bg-white border border-stone/40 p-6 md:p-8">
+                  {user.story
+                    .split(/\n{2,}/)
+                    .filter((para) => para.trim())
+                    .map((para, i) => (
+                      <p
+                        key={i}
+                        className="text-sm text-midnight/75 leading-relaxed whitespace-pre-line mb-4 last:mb-0"
+                      >
+                        {para.trim()}
+                      </p>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Album */}
+            {albumRows.results.length > 0 && (
+              <div>
+                <div className="flex items-end justify-between mb-6">
+                  <div>
+                    <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
+                      The album
+                    </p>
+                    <h2 className="text-xl font-semibold tracking-tight">
+                      Photos
+                    </h2>
+                  </div>
+                  <p className="text-sm text-dust font-mono">
+                    {albumRows.results.length}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {albumRows.results.map((photo) => (
+                    <figure key={photo.id}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`/api/photos/${photo.r2_key}`}
+                        alt={photo.caption || `Photo of ${user.name}`}
+                        className="w-full aspect-square object-cover border border-stone/40 bg-stone/20"
+                      />
+                      {photo.caption && (
+                        <figcaption className="mt-1.5 text-xs text-midnight/60 leading-snug">
+                          {photo.caption}
+                        </figcaption>
+                      )}
+                    </figure>
                   ))}
                 </div>
               </div>
