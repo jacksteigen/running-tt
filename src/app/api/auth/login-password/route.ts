@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   const db = await getDB();
   const user = await db
     .prepare(
-      "SELECT id, password_hash, failed_logins, lock_until FROM users WHERE email = ?"
+      "SELECT id, password_hash, failed_logins, lock_until, profile_completed FROM users WHERE email = ?"
     )
     .bind(email)
     .first<{
@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
       password_hash: string | null;
       failed_logins: number;
       lock_until: string | null;
+      profile_completed: number;
     }>();
 
   if (!user || !user.password_hash) {
@@ -83,5 +84,8 @@ export async function POST(request: NextRequest) {
 
   await createSession(db, user.id);
 
-  return NextResponse.json({ success: true });
+  return NextResponse.json({
+    success: true,
+    next: user.profile_completed === 1 ? "/dashboard" : "/welcome",
+  });
 }

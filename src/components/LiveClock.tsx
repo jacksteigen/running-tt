@@ -8,8 +8,15 @@ function pad(n: number) {
 
 export default function LiveClock() {
   const [now, setNow] = useState<Date | null>(null);
+  const [zone, setZone] = useState("");
 
   useEffect(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      setZone(tz.split("/").pop()?.replace(/_/g, " ") ?? "");
+    } catch {
+      setZone("");
+    }
     setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
@@ -46,7 +53,7 @@ export default function LiveClock() {
       </div>
       <div className="mt-4 flex items-center gap-2 text-[10px] sm:text-xs uppercase tracking-[0.2em] text-stone/50">
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-terracotta animate-pulse" />
-        <span>Live · AEST</span>
+        <span>Live{zone ? ` · ${zone}` : ""}</span>
       </div>
     </div>
   );

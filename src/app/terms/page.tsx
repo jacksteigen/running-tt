@@ -18,7 +18,7 @@ const sections = [
   {
     heading: "Clean sport declaration",
     body: [
-      `Every athlete makes the following declaration at sign-up and at every event entry: "${CLEAN_SPORT_DECLARATION}"`,
+      `Every athlete makes the following declaration when they create their account, and it covers every event they enter: "${CLEAN_SPORT_DECLARATION}"`,
       "We record when you make this declaration. Breaching it can lead to removal of results, forfeiture of prize money, and exclusion from future events.",
     ],
   },

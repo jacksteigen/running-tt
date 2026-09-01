@@ -27,8 +27,13 @@ export default async function VerifyPage({
 
   return (
     <>
-      <section className="bg-midnight text-white">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
+      <section className="bg-midnight text-white relative overflow-hidden">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.04]"
+          style={{ backgroundImage: "repeating-linear-gradient(90deg, transparent 0 79px, #F5F2EC 79px 80px)" }}
+        />
+        <div className="relative mx-auto max-w-6xl px-6 py-16 md:py-20 motion-safe:animate-fade-up">
           <Link
             href="/"
             className="text-xs text-stone/60 hover:text-stone/80 transition-colors mb-4 inline-block"

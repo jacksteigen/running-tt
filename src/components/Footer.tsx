@@ -42,10 +42,17 @@ export default function Footer() {
           </div>
 
           <div>
-            <p className="text-white text-sm font-medium mb-3">Connect</p>
+            <p className="text-white text-sm font-medium mb-3">Athletes</p>
             <div className="flex flex-col gap-2">
-              <span className="text-sm">Instagram</span>
-              <span className="text-sm">Strava Club</span>
+              <Link href="/login" className="text-sm hover:text-white transition-colors">
+                Create your profile
+              </Link>
+              <Link href="/dashboard" className="text-sm hover:text-white transition-colors">
+                Your dashboard
+              </Link>
+              <a href="mailto:partners@runningtt.com" className="text-sm hover:text-white transition-colors">
+                Partner with us
+              </a>
             </div>
           </div>
         </div>

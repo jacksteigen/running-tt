@@ -5,7 +5,8 @@ import LiveClock from "@/components/LiveClock";
 import Countdown from "@/components/Countdown";
 import EventCard from "@/components/EventCard";
 import Sponsors from "@/components/Sponsors";
-import { displayStatus } from "@/lib/events";
+import Reveal from "@/components/Reveal";
+import { displayStatus, todayInMelbourne } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -71,9 +72,8 @@ export default async function Home() {
   // "Upcoming" means the event's date is today or later. This lets an event
   // automatically shift from upcoming to past without any manual status change.
   const upcomingEvents = await db
-    .prepare(
-      "SELECT * FROM events WHERE date >= date('now') ORDER BY date ASC"
-    )
+    .prepare("SELECT * FROM events WHERE date >= ? ORDER BY date ASC")
+    .bind(todayInMelbourne())
     .all() as unknown as { results: EventRow[] };
 
   const entryCounts = await db
@@ -94,46 +94,48 @@ export default async function Home() {
   return (
     <>
       {/* Hero */}
-      <section className="bg-midnight text-white relative overflow-hidden">
-        {/* subtle track-line decoration */}
-        <div
+      <section className="relative bg-midnight text-white overflow-hidden min-h-[86vh] md:min-h-[92vh] flex items-end">
+        <Image
+          src="/images/athlete-track-lane.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center opacity-55 motion-safe:animate-slow-zoom"
           aria-hidden
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, transparent 0 79px, #F5F2EC 79px 80px)",
-          }}
         />
-        <div className="mx-auto max-w-6xl px-6 py-20 md:py-28 relative">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div>
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-midnight via-midnight/60 to-midnight/10" />
+        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-midnight/80 via-midnight/20 to-transparent" />
+        <div className="relative mx-auto max-w-6xl px-6 w-full pb-14 pt-36 md:pb-24 md:pt-48">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 lg:gap-8 items-end">
+            <div className="lg:col-span-3 motion-safe:animate-fade-up">
               <div className="mb-7">
                 <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta">
                   Running TT
                 </p>
-                <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/50 mt-1.5">
+                <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/60 mt-1.5">
                   Worldwide time trials
                 </p>
               </div>
-              <h1 className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tight leading-[1.05]">
+              <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-semibold tracking-[-0.03em] leading-[0.98]">
                 You. The clock.
                 <br />
                 <span className="text-stone/60">Nothing else.</span>
               </h1>
-              <p className="mt-6 text-lg text-stone/70 max-w-lg leading-relaxed">
+              <p className="mt-7 text-lg md:text-xl text-stone/80 max-w-lg leading-relaxed">
                 Time trial events held around the world. Rolling heats and
                 real prize money at every race.
               </p>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+              <div className="mt-9 flex flex-wrap items-center gap-3">
                 <Link
                   href="/events"
-                  className="inline-block bg-terracotta text-white font-medium px-7 py-3.5 text-sm hover:bg-terracotta/90 transition-colors"
+                  className="inline-block bg-terracotta text-white font-medium px-8 py-4 text-sm hover:bg-terracotta/90 transition-colors"
                 >
                   Find an event
                 </Link>
                 <Link
                   href="/format"
-                  className="inline-block border border-stone/20 text-white px-7 py-3.5 text-sm hover:border-stone/40 transition-colors"
+                  className="inline-block border border-white/25 text-white px-8 py-4 text-sm hover:border-white/60 hover:bg-white/5 transition-colors"
                 >
                   How it works
                 </Link>
@@ -141,8 +143,8 @@ export default async function Home() {
             </div>
 
             {/* Live clock */}
-            <div className="lg:pl-8 lg:border-l lg:border-stone/10">
-              <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/40 mb-5">
+            <div className="lg:col-span-2 lg:justify-self-end motion-safe:animate-fade-up [animation-delay:180ms]">
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/50 mb-4">
                 Race clock
               </p>
               <LiveClock />
@@ -168,7 +170,9 @@ export default async function Home() {
                 </p>
                 <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-white/80">
                   <span className="font-mono">
-                    ${(nextOpen.entry_fee_cents / 100).toFixed(0)} entry
+                    {nextOpen.entry_fee_cents > 0
+                      ? `$${(nextOpen.entry_fee_cents / 100).toFixed(0)} entry`
+                      : "Free entry"}
                   </span>
                   <span className="text-white/40">·</span>
                   <span className="font-mono">
@@ -198,8 +202,8 @@ export default async function Home() {
       <section className="bg-midnight">
         <div className="relative w-full h-[320px] md:h-[460px] lg:h-[540px] overflow-hidden">
           <Image
-            src="/images/athlete-track-lane.jpg"
-            alt="Runner warming up at a Running TT venue"
+            src="/images/athlete-sock-bench.jpg"
+            alt="Athlete lacing up before a Running TT heat"
             fill
             priority
             sizes="100vw"
@@ -212,6 +216,7 @@ export default async function Home() {
         </div>
       </section>
 
+      <Reveal>
       {/* Stats */}
       <section className="bg-bone border-y border-stone/40">
         <div className="mx-auto max-w-6xl px-6 py-10">
@@ -227,7 +232,9 @@ export default async function Home() {
           </div>
         </div>
       </section>
+      </Reveal>
 
+      <Reveal>
       {/* Upcoming Events */}
       <section className="bg-bone">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
@@ -287,7 +294,9 @@ export default async function Home() {
           )}
         </div>
       </section>
+      </Reveal>
 
+      <Reveal>
       {/* How it works */}
       <section className="bg-stone">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
@@ -327,7 +336,9 @@ export default async function Home() {
           </div>
         </div>
       </section>
+      </Reveal>
 
+      <Reveal>
       {/* Prize Money */}
       <section className="bg-midnight text-white">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
@@ -366,6 +377,7 @@ export default async function Home() {
           </div>
         </div>
       </section>
+      </Reveal>
 
       <Sponsors />
     </>

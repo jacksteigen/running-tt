@@ -101,6 +101,7 @@ export async function getSession(db: D1Database) {
               u.strava_athlete_id, u.garmin_user_id, u.created_at,
               u.bio, u.story, u.photo_url, u.instagram, u.strava_url, u.tiktok, u.website,
               u.sponsors, u.sponsor_interests, u.open_to_sponsorship, u.is_admin,
+              u.first_name, u.middle_name, u.last_name, u.date_of_birth, u.profile_completed,
               (u.password_hash IS NOT NULL) as has_password
        FROM sessions s
        JOIN users u ON s.user_id = u.id
@@ -128,6 +129,11 @@ export async function getSession(db: D1Database) {
       sponsor_interests: string | null;
       open_to_sponsorship: number;
       is_admin: number;
+      first_name: string | null;
+      middle_name: string | null;
+      last_name: string | null;
+      date_of_birth: string | null;
+      profile_completed: number;
       has_password: number;
     }>();
 
@@ -154,6 +160,11 @@ export async function getSession(db: D1Database) {
       sponsorInterests: session.sponsor_interests,
       openToSponsorship: session.open_to_sponsorship,
       isAdmin: session.is_admin === 1,
+      firstName: session.first_name,
+      middleName: session.middle_name,
+      lastName: session.last_name,
+      dateOfBirth: session.date_of_birth,
+      profileCompleted: session.profile_completed === 1,
       hasPassword: !!session.has_password,
     },
   };

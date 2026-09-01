@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { id: userId } = await findOrCreateUser(db, link.email);
+  const { id: userId, created } = await findOrCreateUser(db, link.email);
 
   // Record the signed declaration against the now-proven account, once.
   if (link.declared) {
@@ -77,5 +77,18 @@ export async function POST(request: NextRequest) {
 
   await createSession(db, userId);
 
-  return NextResponse.redirect(new URL("/dashboard", request.url), 303);
+  // New athletes, and anyone who has not finished their profile, set it up first.
+  let completed = false;
+  if (!created) {
+    const row = await db
+      .prepare("SELECT profile_completed FROM users WHERE id = ?")
+      .bind(userId)
+      .first<{ profile_completed: number }>();
+    completed = row?.profile_completed === 1;
+  }
+
+  return NextResponse.redirect(
+    new URL(completed ? "/dashboard" : "/welcome", request.url),
+    303
+  );
 }

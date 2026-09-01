@@ -37,7 +37,12 @@ function formatLongDate(dateStr: string) {
   });
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ welcome?: string; entered?: string }>;
+}) {
+  const sp = await searchParams;
   const db = await getDB();
   const session = await getSession(db);
 
@@ -46,6 +51,11 @@ export default async function DashboardPage() {
   }
 
   const { user } = session;
+
+  // Everyone fills in their athlete profile once before the dashboard opens.
+  if (!user.profileCompleted) {
+    redirect("/welcome");
+  }
 
   interface EntryRow {
     entry_id: string;
@@ -179,7 +189,19 @@ export default async function DashboardPage() {
                 <p className="text-sm text-stone/60 mt-1">{user.email}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link
+                href={`/athletes/${user.id}`}
+                className="text-xs font-medium text-white border border-white/20 px-4 py-2 hover:border-white/50 transition-colors"
+              >
+                Public profile
+              </Link>
+              <Link
+                href="#profile"
+                className="text-xs font-medium text-white border border-white/20 px-4 py-2 hover:border-white/50 transition-colors"
+              >
+                Edit profile
+              </Link>
               {user.isAdmin && (
                 <Link
                   href="/admin"
@@ -229,6 +251,19 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {(sp.welcome || sp.entered) && (
+        <section className="bg-trail text-white">
+          <div className="mx-auto max-w-6xl px-6 py-4 flex items-center gap-3">
+            <span className="inline-block w-2 h-2 rounded-full bg-white/80" />
+            <p className="text-sm">
+              {sp.entered
+                ? "You are in. Your entry is confirmed and your spot on the start list is locked."
+                : `Welcome to Running TT, ${user.firstName ?? user.name}. Your profile is live.`}
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* Next race spotlight */}
       {soonestUpcoming && (
@@ -405,7 +440,9 @@ export default async function DashboardPage() {
 
           {/* Sidebar */}
           <div className="space-y-8">
-            <ProfileForm user={user} />
+            <div id="profile" className="scroll-mt-24">
+              <ProfileForm user={user} />
+            </div>
 
             <PasswordCard hasPassword={user.hasPassword} />
 

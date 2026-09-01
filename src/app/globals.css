@@ -6,11 +6,57 @@
   --color-stone: #E8E2D6;
   --color-bone: #F5F2EC;
   --color-trail: #2D5A3D;
-  --color-dust: #8B7355;
+  --color-dust: #7A644A;
   --color-gold: #D4A84B;
 
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  --animate-fade-up: fade-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-page-in: page-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-slow-zoom: slow-zoom 28s ease-out both;
+  --animate-loading-bar: loading-bar 1.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes slow-zoom {
+    from {
+      transform: scale(1.04);
+    }
+    to {
+      transform: scale(1.14);
+    }
+  }
+  @keyframes loading-bar {
+    from {
+      transform: scaleX(0);
+    }
+    to {
+      transform: scaleX(1);
+    }
+  }
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -18,4 +64,42 @@ body {
   background-color: var(--color-bone);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior-y: none;
+}
+
+::selection {
+  background: var(--color-terracotta);
+  color: #fff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-terracotta);
+  outline-offset: 3px;
+}
+
+/* Scroll-triggered reveal. Content is visible without JS or with reduced motion. */
+.reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.8s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.8s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce), (scripting: none) {
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
+/* Room for the mobile tab bar, including the home indicator on iOS. */
+@media (max-width: 767px) {
+  .has-tab-bar {
+    padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
 }

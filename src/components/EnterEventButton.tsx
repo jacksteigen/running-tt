@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import DeclarationBox from "@/components/DeclarationBox";
 
 interface EnterEventButtonProps {
   eventId: string;
   eventStatus: string;
   entryFeeCents: number;
   isLoggedIn: boolean;
+  profileCompleted: boolean;
   alreadyEntered: boolean;
 }
 
@@ -17,43 +18,41 @@ export default function EnterEventButton({
   eventStatus,
   entryFeeCents,
   isLoggedIn,
+  profileCompleted,
   alreadyEntered,
 }: EnterEventButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [declared, setDeclared] = useState(false);
-  const [showDeclareNudge, setShowDeclareNudge] = useState(false);
+  const [error, setError] = useState("");
 
   async function handleEnter() {
-    if (!declared) {
-      setShowDeclareNudge(true);
-      return;
-    }
-
-    if (!isLoggedIn) {
-      router.push("/login");
-      return;
-    }
-
     setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId, declared }),
+        body: JSON.stringify({ eventId }),
       });
 
-      const data = (await res.json()) as { checkoutUrl?: string; success?: boolean; error?: string };
+      const data = (await res.json()) as {
+        checkoutUrl?: string;
+        success?: boolean;
+        error?: string;
+        next?: string;
+      };
 
       if (data.checkoutUrl) {
         window.location.href = data.checkoutUrl;
       } else if (data.success) {
         router.refresh();
+      } else if (data.next) {
+        router.push(data.next);
       } else {
-        alert(data.error || "Something went wrong");
+        setError(data.error || "Something went wrong");
       }
     } catch {
-      alert("Could not connect. Try again.");
+      setError("Could not connect. Try again.");
     } finally {
       setLoading(false);
     }
@@ -61,7 +60,7 @@ export default function EnterEventButton({
 
   if (alreadyEntered) {
     return (
-      <div className="w-full bg-trail/10 text-trail text-sm font-medium py-3 text-center">
+      <div className="w-full bg-trail/10 text-trail text-sm font-medium py-3.5 text-center">
         You are entered
       </div>
     );
@@ -71,48 +70,52 @@ export default function EnterEventButton({
     return (
       <button
         disabled
-        className="w-full bg-midnight/20 text-white text-sm font-medium py-3 cursor-not-allowed"
+        className="w-full bg-midnight/20 text-white text-sm font-medium py-3.5 cursor-not-allowed"
       >
-        {eventStatus === "Coming Soon"
-          ? "Entries opening soon"
-          : eventStatus}
+        {eventStatus === "Coming Soon" ? "Entries opening soon" : eventStatus}
       </button>
     );
   }
 
   const feeDisplay =
-    entryFeeCents > 0 ? ` · $${(entryFeeCents / 100).toFixed(0)}` : "";
+    entryFeeCents > 0 ? ` · $${(entryFeeCents / 100).toFixed(0)}` : " · Free";
+
+  if (!isLoggedIn) {
+    return (
+      <Link
+        href="/login"
+        className="block w-full bg-terracotta text-white text-sm font-medium py-3.5 text-center hover:bg-terracotta/90 transition-colors"
+      >
+        Sign in to enter{feeDisplay}
+      </Link>
+    );
+  }
+
+  if (!profileCompleted) {
+    return (
+      <Link
+        href="/welcome"
+        className="block w-full bg-terracotta text-white text-sm font-medium py-3.5 text-center hover:bg-terracotta/90 transition-colors"
+      >
+        Set up your profile to enter
+      </Link>
+    );
+  }
 
   return (
     <div>
-      {/* Clean sport declaration */}
-      <div className="mb-4">
-        <DeclarationBox
-          declared={declared}
-          onDeclaredChange={(value) => {
-            setDeclared(value);
-            if (value) setShowDeclareNudge(false);
-          }}
-          maxHeightClass="max-h-36"
-        />
-      </div>
-      {showDeclareNudge && (
-        <p className="text-xs text-terracotta mb-3">
-          You need to sign the declaration before you can enter.
-        </p>
-      )}
-
       <button
         onClick={handleEnter}
         disabled={loading}
-        className={`w-full text-white text-sm font-medium py-3 transition-colors disabled:opacity-50 ${
-          declared
-            ? "bg-terracotta hover:bg-terracotta/90"
-            : "bg-midnight/30 hover:bg-midnight/40"
-        }`}
+        className="w-full bg-terracotta text-white text-sm font-medium py-3.5 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
       >
-        {loading ? "Processing..." : `Enter now${feeDisplay}`}
+        {loading ? "Entering..." : `Enter now${feeDisplay}`}
       </button>
+      {error && (
+        <p role="alert" className="mt-3 text-xs text-terracotta">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

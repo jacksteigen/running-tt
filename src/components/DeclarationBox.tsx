@@ -95,8 +95,8 @@ export default function DeclarationBox({
             Running TT events.
           </p>
           <p className="text-xs text-midnight/60 leading-relaxed">
-            This declaration is recorded against my account, and again with
-            every event I enter.
+            This declaration is recorded against my account and covers every
+            event I enter.
           </p>
 
           <div className="pt-2 border-t border-stone/40">
