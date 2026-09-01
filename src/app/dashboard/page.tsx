@@ -179,7 +179,17 @@ export default async function DashboardPage() {
                 <p className="text-sm text-stone/60 mt-1">{user.email}</p>
               </div>
             </div>
-            <LogoutButton />
+            <div className="flex items-center gap-3">
+              {user.isAdmin && (
+                <Link
+                  href="/admin"
+                  className="text-xs font-medium bg-terracotta text-white px-4 py-2 hover:bg-terracotta/90 transition-colors"
+                >
+                  Admin
+                </Link>
+              )}
+              <LogoutButton />
+            </div>
           </div>
 
           {/* Stats */}

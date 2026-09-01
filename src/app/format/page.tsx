@@ -6,7 +6,7 @@ import HeatsTimeline from "@/components/HeatsTimeline";
 export const metadata: Metadata = {
   title: "The Format · Running TT",
   description:
-    "How a Running TT event unfolds. Rolling heats, every time recorded, prize money for the top 3.",
+    "How a Running TT event unfolds. Rolling heats, every time recorded, prize money at every race.",
 };
 
 const steps = [
@@ -32,8 +32,8 @@ const steps = [
   },
   {
     number: "05",
-    title: "Podium and payout",
-    body: "After the final heat closes, the top 3 collect prize money on the day. Everyone else keeps their time on the page, forever.",
+    title: "Payout",
+    body: "After the final heat closes, prize money is handed out on the day. Everyone else keeps their time on the record.",
   },
 ];
 
@@ -43,8 +43,8 @@ const rules = [
     body: "Tracks, road courses, anywhere a good race can be held. The venue is announced with the race.",
   },
   {
-    label: "Distances",
-    body: "The Mile, 3K, 5K and 10K are the staple distances. Each event picks what's on offer, announced with the race.",
+    label: "Distance",
+    body: "One distance per event, announced with the race. Often a Mile, 3K, 5K or 10K, sometimes something stranger, like 400m up a hill. If it can be timed, it can be raced.",
   },
   {
     label: "Timing",
@@ -52,11 +52,11 @@ const rules = [
   },
   {
     label: "Entry fee",
-    body: "A flat $15 to enter, every event, every distance. No tiers, no surprises.",
+    body: "A flat $15 to enter. No tiers, no surprises. If an event is free, the event page says so before you enter.",
   },
   {
     label: "Prize money",
-    body: "$2,000 · $1,000 · $500 for the top 3 in every event. The purse is funded by entry fees plus cash from our sponsors.",
+    body: "Every event pays out. The purse and how it is split gets announced with the race and is listed on the event page before you enter. The money comes from entry fees plus cash from our sponsors.",
   },
 ];
 
@@ -172,7 +172,7 @@ export default function FormatPage() {
             Ground rules
           </p>
           <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-10">
-            Fair game, fast tracks
+            Fair game, fast courses
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 max-w-4xl">
             {rules.map((r) => (

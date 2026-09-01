@@ -5,6 +5,7 @@ import Link from "next/link";
 import EnterEventButton from "@/components/EnterEventButton";
 import Countdown from "@/components/Countdown";
 import { displayStatus } from "@/lib/events";
+import { parsePrizes } from "@/lib/racetime";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +26,7 @@ interface EventRow {
   what_to_bring: string | null;
   course_record: string | null;
   course_record_holder: string | null;
+  prizes: string | null;
 }
 
 function formatDate(dateStr: string) {
@@ -81,6 +83,8 @@ export default async function EventPage({
       </div>
     );
   }
+
+  const eventPrizes = parsePrizes(event.prizes);
 
   // Get entry count
   const entryCount = await db
@@ -328,31 +332,38 @@ export default async function EventPage({
             )}
 
             {/* Prize Money */}
-            <div className="mt-10">
-              <p className="text-xs text-dust uppercase tracking-wide mb-2">
-                Purse
-              </p>
-              <h2 className="text-xl font-semibold tracking-tight mb-6">
-                Prize money
-              </h2>
-              <div className="grid grid-cols-3 gap-4">
-                {[
-                  { place: "1st", amount: "$2,000" },
-                  { place: "2nd", amount: "$1,000" },
-                  { place: "3rd", amount: "$500" },
-                ].map((prize) => (
-                  <div
-                    key={prize.place}
-                    className="bg-white border border-stone/40 p-5 text-center"
-                  >
-                    <p className="text-xs text-dust mb-1">{prize.place}</p>
-                    <p className="text-2xl font-mono font-semibold text-gold">
-                      {prize.amount}
-                    </p>
-                  </div>
-                ))}
+            {eventPrizes.length > 0 && (
+              <div className="mt-10">
+                <p className="text-xs text-dust uppercase tracking-wide mb-2">
+                  Purse
+                </p>
+                <h2 className="text-xl font-semibold tracking-tight mb-6">
+                  Prize money
+                </h2>
+                <div
+                  className={`grid gap-4 ${
+                    eventPrizes.length >= 3
+                      ? "grid-cols-1 sm:grid-cols-3"
+                      : "grid-cols-1 sm:grid-cols-2"
+                  }`}
+                >
+                  {eventPrizes.map((prize) => (
+                    <div
+                      key={prize.label}
+                      className="bg-white border border-stone/40 p-5 text-center"
+                    >
+                      <p className="text-xs text-dust mb-1">{prize.label}</p>
+                      <p className="text-2xl font-mono font-semibold text-gold">
+                        {prize.amount}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-4 text-xs text-midnight/50">
+                  Handed out on the day, at the finish.
+                </p>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Sidebar */}

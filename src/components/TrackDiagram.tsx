@@ -6,11 +6,16 @@
 export default function TrackDiagram() {
   // Drawn as two concentric rounded rectangles to suggest lanes or a loop.
   // A small heat sits on the straight near the start line.
-  const runners = Array.from({ length: 8 }, (_, i) => ({
-    x: 180 + i * 55,
-    y: 270,
-    lane: i + 1,
-  }));
+  // A loose cluster on the start line rather than numbered lanes: runners set
+  // off together, and the venue is not always a lane-marked track.
+  const runners = [
+    { x: 196, y: 262 },
+    { x: 232, y: 276 },
+    { x: 262, y: 258 },
+    { x: 296, y: 272 },
+    { x: 330, y: 262 },
+    { x: 358, y: 278 },
+  ];
 
   return (
     <div className="relative w-full">
@@ -117,29 +122,11 @@ export default function TrackDiagram() {
           START
         </text>
 
-        {/* Runners */}
-        {runners.map((r) => (
-          <g key={r.lane}>
-            {/* Runner dot */}
-            <circle
-              cx={r.x}
-              cy={r.y}
-              r="8"
-              fill="#C4593A"
-              opacity={0.35 + r.lane * 0.08}
-            />
-            <circle cx={r.x} cy={r.y} r="4" fill="#F5F2EC" />
-            <text
-              x={r.x}
-              y={r.y + 24}
-              textAnchor="middle"
-              fontFamily="JetBrains Mono, monospace"
-              fontSize="10"
-              fill="#F5F2EC"
-              opacity="0.5"
-            >
-              {r.lane}
-            </text>
+        {/* Runners on the line */}
+        {runners.map((r, i) => (
+          <g key={i}>
+            <circle cx={r.x} cy={r.y} r="8" fill="#C4593A" opacity="0.75" />
+            <circle cx={r.x} cy={r.y} r="3.5" fill="#F5F2EC" />
           </g>
         ))}
 

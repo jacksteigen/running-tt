@@ -10,10 +10,9 @@ import { displayStatus } from "@/lib/events";
 export const dynamic = "force-dynamic";
 
 const stats = [
-  { value: "$15", label: "flat entry, every event" },
-  { value: "$3,500", label: "prize purse at every event" },
-  { value: "4", label: "distances: Mile, 3K, 5K, 10K" },
-  { value: "3", label: "podium places paid" },
+  { value: "$15", label: "standard entry fee" },
+  { value: "Cash", label: "prize money at every event" },
+  { value: "1", label: "distance per event, announced with the race" },
 ];
 
 const steps = [
@@ -37,9 +36,9 @@ const steps = [
   },
   {
     number: "04",
-    title: "Prize money for top 3",
+    title: "Prize money",
     description:
-      "1st takes $2,000. 2nd takes $1,000. 3rd takes $500. Every event, no exceptions.",
+      "Every event pays out prize money. The purse and how it splits is announced with the race.",
   },
 ];
 
@@ -216,7 +215,7 @@ export default async function Home() {
       {/* Stats */}
       <section className="bg-bone border-y border-stone/40">
         <div className="mx-auto max-w-6xl px-6 py-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {stats.map((stat) => (
               <div key={stat.label}>
                 <p className="text-2xl md:text-3xl font-semibold tracking-tight font-mono">
@@ -332,7 +331,7 @@ export default async function Home() {
       {/* Prize Money */}
       <section className="bg-midnight text-white">
         <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-end">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <p className="text-xs text-gold uppercase tracking-[0.2em] mb-3">
                 Every event
@@ -342,36 +341,27 @@ export default async function Home() {
               </h2>
               <p className="text-stone/70 leading-relaxed">
                 Every Running TT event pays out prize money. No qualifying
-                standards, no conditions. You show up, you race, the fastest
-                three get paid. That simple.
+                standards, no conditions. You show up, you race, and the
+                running gets paid for.
               </p>
               <p className="text-stone/70 leading-relaxed mt-4">
-                Entry is a flat{" "}
-                <span className="font-mono text-white">$15</span>, every event,
-                every distance. The purse is funded by entry fees plus cash
-                from our sponsors.
+                What the purse is and how it gets split is announced with each
+                race, because no two events are the same. The money comes from
+                entry fees plus cash from our sponsors.
               </p>
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { place: "1st", amount: "$2,000" },
-                { place: "2nd", amount: "$1,000" },
-                { place: "3rd", amount: "$500" },
-              ].map((prize, i) => (
-                <div
-                  key={prize.place}
-                  className={`border border-white/10 p-5 md:p-6 ${
-                    i === 0 ? "bg-gold/5" : ""
-                  }`}
-                >
-                  <p className="text-xs text-stone/50 mb-2 font-mono uppercase tracking-wider">
-                    {prize.place}
-                  </p>
-                  <p className="text-2xl md:text-3xl font-mono font-semibold text-gold">
-                    {prize.amount}
-                  </p>
-                </div>
-              ))}
+            <div className="border border-white/10 p-8 md:p-10">
+              <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/60 mb-4">
+                On the day
+              </p>
+              <p className="text-xl md:text-2xl font-semibold tracking-tight text-gold leading-snug">
+                Run fast, get paid.
+              </p>
+              <p className="mt-4 text-sm text-stone/70 leading-relaxed">
+                Prize money is handed out at the finish, in person, once the
+                last runner is home. Every event page lists exactly what is on
+                offer before you enter.
+              </p>
             </div>
           </div>
         </div>

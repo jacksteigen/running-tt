@@ -51,7 +51,7 @@ export default function AboutPage() {
               <p>
                 Running TT is a programme of time trial events held around
                 the world. We secure venues, run small heats across the event
-                window, record every time, and pay prize money to the top 3.
+                window, record every time, and pay out prize money.
               </p>
               <p>
                 The time trial format means you are racing against the clock,
@@ -115,9 +115,9 @@ export default function AboutPage() {
                 Prize money
               </h3>
               <p className="text-sm text-midnight/60 leading-relaxed">
-                1st place takes $2,000. 2nd takes $1,000. 3rd takes $500. Every
-                event, guaranteed. Prize money is awarded on the day, at the
-                track.
+                Every event pays out prize money. What the purse is and how it
+                is split gets announced with each race and listed on the event
+                page. It is handed out on the day, at the finish.
               </p>
             </div>
           </div>
@@ -135,9 +135,9 @@ export default function AboutPage() {
               The distances
             </h2>
             <p className="text-midnight/70 leading-relaxed mb-8">
-              Running TT runs four classic distances. Each one tests something
-              different. What&apos;s on offer at a given event gets announced
-              with the race.
+              One distance per event, announced with the race. Usually one of
+              the classics, sometimes something odd we think will make a good
+              race. If it can be timed, it can be raced.
             </p>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-5 max-w-3xl">
@@ -145,7 +145,11 @@ export default function AboutPage() {
               { distance: "Mile", length: "1.609 km", character: "Speed and guts" },
               { distance: "3K", length: "3 km", character: "Sharp and honest" },
               { distance: "5K", length: "5 km", character: "The benchmark" },
-              { distance: "10K", length: "10 km", character: "Patience and pain" },
+              {
+                distance: "Or else",
+                length: "you tell us",
+                character: "400m up a hill, if it makes a race",
+              },
             ].map((d) => (
               <div
                 key={d.distance}

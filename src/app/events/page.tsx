@@ -64,7 +64,7 @@ export default async function EventsPage() {
           </h1>
           <p className="mt-4 text-stone/60 max-w-lg">
             Time trial events held around the world. Rolling heats and prize
-            money for the top 3 at every race.
+            money at every race.
           </p>
         </div>
       </section>
