@@ -3,6 +3,7 @@ import { getDB } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { ageGroupOn, isValidDob } from "@/lib/agegroups";
 import { composeLocation, isKnownCountry } from "@/lib/countries";
+import { recomputeForAthlete } from "@/lib/standings";
 
 function clean(value: unknown, limit: number): string {
   return typeof value === "string" ? value.trim().slice(0, limit) : "";
@@ -64,7 +65,8 @@ export async function PATCH(
       `UPDATE users
        SET first_name = ?, middle_name = ?, last_name = ?, name = ?,
            date_of_birth = ?, city = ?, country = ?, location = ?, bio = ?, is_admin = ?,
-           profile_completed = ?, updated_at = datetime('now')
+           profile_completed = CASE WHEN profile_completed = 1 THEN 1 ELSE ? END,
+           updated_at = datetime('now')
        WHERE id = ?`
     )
     .bind(
@@ -96,6 +98,8 @@ export async function PATCH(
       .bind(ageGroupOn(dateOfBirth || null, entry.date), entry.id)
       .run();
   }
+
+  await recomputeForAthlete(db, id);
 
   return NextResponse.json({ success: true });
 }

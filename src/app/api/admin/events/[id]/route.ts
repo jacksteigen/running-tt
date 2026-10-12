@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/adminAuth";
 import { parseEventInput, slugify } from "@/lib/eventInput";
 import { ageGroupOn } from "@/lib/agegroups";
 import { OCCUPYING_SQL } from "@/lib/heats";
+import { recompute } from "@/lib/standings";
 
 /** Update an event. Refuses changes that would strand booked athletes. */
 export async function PATCH(
@@ -23,9 +24,9 @@ export async function PATCH(
   }
 
   const current = await db
-    .prepare("SELECT id, slug, date FROM events WHERE id = ?")
+    .prepare("SELECT id, slug, date, prizes FROM events WHERE id = ?")
     .bind(id)
-    .first<{ id: string; slug: string; date: string }>();
+    .first<{ id: string; slug: string; date: string; prizes: string | null }>();
   if (!current) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
   const parsed = parseEventInput(body);
@@ -107,6 +108,12 @@ export async function PATCH(
         .bind(ageGroupOn(r.date_of_birth, f.date), r.id)
         .run();
     }
+  }
+
+  // Results carry prize money and age group places; rebuild them when the
+  // purse or the date (and so age groups) change after times are in.
+  if (f.prizes !== current.prizes || f.date !== current.date) {
+    await recompute(db, id);
   }
 
   return NextResponse.json({ success: true, slug });

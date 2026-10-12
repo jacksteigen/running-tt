@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { requireAdmin } from "@/lib/adminAuth";
 import { OCCUPYING_SQL, type HeatConfig } from "@/lib/heats";
-import { sendHeatChangedEmail } from "@/lib/bookings";
+import { confirmPaidCheckout, sendHeatChangedEmail } from "@/lib/bookings";
+import { expireCheckoutSession, retrieveCheckoutSession } from "@/lib/stripe";
 
 /**
  * Move an athlete to another heat. This is how heat change requests are
@@ -94,10 +95,37 @@ export async function DELETE(
   if (auth.denied) return auth.denied;
 
   const entry = await db
-    .prepare("SELECT id, event_id, user_id FROM entries WHERE id = ?")
+    .prepare("SELECT id, event_id, user_id, status, stripe_payment_id FROM entries WHERE id = ?")
     .bind(id)
-    .first<{ id: string; event_id: string; user_id: string }>();
+    .first<{ id: string; event_id: string; user_id: string; status: string; stripe_payment_id: string | null }>();
   if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+
+  // Someone part way through paying: close their checkout first so it can
+  // never be paid after the entry is gone. If they had already paid, keep
+  // them in and say so.
+  if (entry.status === "pending" && entry.stripe_payment_id) {
+    const outcome = await expireCheckoutSession(entry.stripe_payment_id);
+    if (outcome === "paid") {
+      const checkout = await retrieveCheckoutSession(entry.stripe_payment_id).catch(() => null);
+      if (checkout) {
+        await confirmPaidCheckout(db, {
+          id: checkout.id,
+          payment_status: checkout.payment_status,
+          metadata: (checkout.metadata ?? null) as Record<string, string> | null,
+        });
+      }
+      return NextResponse.json(
+        { error: "This athlete has just paid, so their entry is now confirmed. Refund in Stripe first if they should not race.", code: "PAID" },
+        { status: 409 }
+      );
+    }
+    if (outcome === "unknown") {
+      return NextResponse.json(
+        { error: "Could not reach Stripe to close their checkout. Try again in a minute." },
+        { status: 502 }
+      );
+    }
+  }
 
   const result = await db
     .prepare("SELECT id FROM results WHERE event_id = ? AND user_id = ?")

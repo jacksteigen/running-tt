@@ -35,7 +35,8 @@ export async function POST(request: NextRequest) {
       payment_status: s.payment_status,
       metadata: (s.metadata ?? null) as Record<string, string> | null,
     });
-    // Ask Stripe to retry if the entry is missing; it may be a timing gap.
+    // Missing metadata is the only case nothing can repair; let Stripe retry
+    // so it stays visible in the dashboard. Duplicates have alerted admins.
     if (outcome === "not_found") {
       return NextResponse.json({ error: "Entry not found" }, { status: 500 });
     }

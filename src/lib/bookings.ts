@@ -1,11 +1,14 @@
 import { generateId } from "@/lib/auth";
 import { ageGroupOn } from "@/lib/agegroups";
 import { formatEventDate, isDateTbc } from "@/lib/dates";
-import { todayInMelbourne } from "@/lib/events";
-import { sendBookingEmail } from "@/lib/email";
+import { nowClockInMelbourne, todayInMelbourne } from "@/lib/events";
+import { sendAdminAlertEmail, sendBookingEmail } from "@/lib/email";
+import { formatFee } from "@/lib/money";
 import {
   OCCUPYING_SQL,
+  buildHeats,
   hasHeats,
+  heatHasStarted,
   heatLabel,
   type HeatConfig,
 } from "@/lib/heats";
@@ -50,7 +53,7 @@ export function bookingRef(entryId: string): string {
 
 export function changeFeeText(cents: number | null | undefined): string {
   return cents && cents > 0
-    ? ` and carry a $${(cents / 100).toFixed(cents % 100 ? 2 : 0)} admin fee`
+    ? ` and carry a ${formatFee(cents)} admin fee`
     : " and an admin fee applies";
 }
 
@@ -62,7 +65,21 @@ export function bookingClosedReason(event: BookableEvent): string | null {
   if (event.status === "Sold Out") return "This event is sold out.";
   if (event.status !== "Open") return "Bookings are closed.";
   if (hasHeats(event) && !event.first_heat_time) return "Heat times are being finalised.";
+  if (hasHeats(event)) {
+    const heats = buildHeats(event);
+    const last = heats[heats.length - 1];
+    if (last && heatHasStarted(event, last.number, todayInMelbourne(), nowClockInMelbourne())) {
+      return "Bookings have closed. The last heat has started.";
+    }
+  }
   return null;
+}
+
+async function adminEmails(db: D1Database): Promise<string[]> {
+  const rows = (await db
+    .prepare("SELECT email FROM users WHERE is_admin = 1")
+    .all()) as unknown as { results: { email: string }[] };
+  return rows.results.map((r) => r.email);
 }
 
 /**
@@ -96,14 +113,17 @@ export async function createBooking(
       return fail(400, "HEAT_REQUIRED", "Pick a heat to book.");
     }
     heat = heatNumber as number;
+    if (heatHasStarted(event, heat, todayInMelbourne(), nowClockInMelbourne())) {
+      return fail(400, "HEAT_STARTED", "That heat has already started. Pick a later one.");
+    }
   }
 
   const existing = await db
     .prepare(
-      "SELECT id, status, stripe_payment_id FROM entries WHERE event_id = ? AND user_id = ?"
+      "SELECT id, status, stripe_payment_id, created_at FROM entries WHERE event_id = ? AND user_id = ?"
     )
     .bind(event.id, user.id)
-    .first<{ id: string; status: string; stripe_payment_id: string | null }>();
+    .first<{ id: string; status: string; stripe_payment_id: string | null; created_at: string }>();
 
   if (existing?.status === "confirmed") {
     return fail(
@@ -115,24 +135,28 @@ export async function createBooking(
     );
   }
 
-  // A pending row means an unfinished checkout. If Stripe says it was in
-  // fact paid (the webhook just has not landed yet), confirm it rather than
-  // throwing away a paid entry. Otherwise close it and start again so nobody
-  // is ever locked out by an abandoned payment page.
+  // A pending row means an unfinished checkout. It is only ever removed once
+  // Stripe confirms that checkout is closed and unpaid; if it was paid (the
+  // webhook just has not landed), the entry is confirmed instead. If Stripe
+  // cannot be reached, nothing is touched and the athlete is asked to retry.
   if (existing) {
-    if (existing.stripe_payment_id) {
-      let paidCheckout: Awaited<ReturnType<typeof retrieveCheckoutSession>> | null = null;
-      try {
-        paidCheckout = await retrieveCheckoutSession(existing.stripe_payment_id);
-      } catch {
-        paidCheckout = null;
+    if (!existing.stripe_payment_id) {
+      // A checkout still being created by another request (a second tab).
+      const ageMs = Date.now() - Date.parse(existing.created_at.replace(" ", "T") + "Z");
+      if (Number.isFinite(ageMs) && ageMs < 60_000) {
+        return fail(409, "IN_PROGRESS", "Your booking is already being set up. Give it a moment.");
       }
-      if (paidCheckout && paidCheckout.payment_status === "paid") {
-        await confirmPaidCheckout(db, {
-          id: paidCheckout.id,
-          payment_status: paidCheckout.payment_status,
-          metadata: (paidCheckout.metadata ?? null) as Record<string, string> | null,
-        });
+    } else {
+      const outcome = await expireCheckoutSession(existing.stripe_payment_id);
+      if (outcome === "paid") {
+        const checkout = await retrieveCheckoutSession(existing.stripe_payment_id).catch(() => null);
+        if (checkout) {
+          await confirmPaidCheckout(db, {
+            id: checkout.id,
+            payment_status: checkout.payment_status,
+            metadata: (checkout.metadata ?? null) as Record<string, string> | null,
+          });
+        }
         return fail(
           409,
           "ALREADY_BOOKED",
@@ -141,22 +165,14 @@ export async function createBooking(
             : "Your payment went through and you are entered."
         );
       }
-      await expireCheckoutSession(existing.stripe_payment_id);
+      if (outcome === "unknown") {
+        return fail(502, "PAYMENT_UNAVAILABLE", "Payments are unavailable right now. Try again shortly.");
+      }
     }
     await db
       .prepare("DELETE FROM entries WHERE id = ? AND status = 'pending'")
       .bind(existing.id)
       .run();
-  }
-
-  if (!withHeats && event.max_entries) {
-    const count = await db
-      .prepare(`SELECT COUNT(*) as n FROM entries WHERE event_id = ? AND ${OCCUPYING_SQL}`)
-      .bind(event.id)
-      .first<{ n: number }>();
-    if ((count?.n ?? 0) >= event.max_entries) {
-      return fail(409, "EVENT_FULL", "This event is full.");
-    }
   }
 
   const paid = event.entry_fee_cents > 0;
@@ -188,11 +204,14 @@ export async function createBooking(
         .run();
       inserted = res.meta.changes ?? 0;
     } else {
+      // The event-wide limit, checked in the same statement as the insert.
       const res = await db
         .prepare(
-          "INSERT INTO entries (id, event_id, user_id, status, age_group) VALUES (?, ?, ?, ?, ?)"
+          `INSERT INTO entries (id, event_id, user_id, status, age_group)
+           SELECT ?, ?, ?, ?, ?
+           WHERE (SELECT COUNT(*) FROM entries WHERE event_id = ? AND ${OCCUPYING_SQL}) < ?`
         )
-        .bind(entryId, event.id, user.id, status, ageGroup)
+        .bind(entryId, event.id, user.id, status, ageGroup, event.id, event.max_entries ?? 1_000_000)
         .run();
       inserted = res.meta.changes ?? 0;
     }
@@ -202,7 +221,9 @@ export async function createBooking(
   }
 
   if (!inserted) {
-    return fail(409, "HEAT_FULL", "That heat has just filled up. Pick another one.");
+    return withHeats
+      ? fail(409, "HEAT_FULL", "That heat has just filled up. Pick another one.")
+      : fail(409, "EVENT_FULL", "This event is full.");
   }
 
   if (!paid) {
@@ -213,6 +234,7 @@ export async function createBooking(
   try {
     const checkout = await createCheckoutSession({
       entryId,
+      heatNumber: heat,
       eventId: event.id,
       eventName: event.name,
       heatText: heatLabel(event, heat),
@@ -223,10 +245,15 @@ export async function createBooking(
       cancelUrl: `${SITE_URL}/events/${event.slug}/book?cancelled=1`,
     });
 
-    await db
-      .prepare("UPDATE entries SET stripe_payment_id = ? WHERE id = ?")
+    const linked = await db
+      .prepare("UPDATE entries SET stripe_payment_id = ? WHERE id = ? AND status = 'pending'")
       .bind(checkout.id, entryId)
       .run();
+    if (!(linked.meta.changes ?? 0)) {
+      // The row was replaced by a booking from another tab meanwhile.
+      await expireCheckoutSession(checkout.id);
+      return fail(409, "IN_PROGRESS", "Your booking was started in another tab. Refresh and try again.");
+    }
 
     return { ok: true, entryId, confirmed: false, checkoutUrl: checkout.url ?? undefined };
   } catch (err) {
@@ -248,7 +275,7 @@ export async function confirmPaidCheckout(
     payment_status: string | null;
     metadata: Record<string, string> | null;
   }
-): Promise<"confirmed" | "already" | "unpaid" | "not_found"> {
+): Promise<"confirmed" | "already" | "unpaid" | "recovered" | "duplicate" | "not_found"> {
   if (checkout.payment_status !== "paid") return "unpaid";
 
   const entry = await db
@@ -256,18 +283,81 @@ export async function confirmPaidCheckout(
     .bind(checkout.id)
     .first<{ id: string; status: string }>();
 
-  if (!entry) {
-    console.error("Paid checkout with no matching entry", checkout.id);
+  if (entry) {
+    const res = await db
+      .prepare("UPDATE entries SET status = 'confirmed' WHERE id = ? AND status = 'pending'")
+      .bind(entry.id)
+      .run();
+    await sendConfirmationOnce(db, entry.id);
+    return (res.meta.changes ?? 0) > 0 ? "confirmed" : "already";
+  }
+
+  // The athlete paid but their entry row is gone (replaced by a later
+  // attempt, or removed). The payment is the source of truth: rebuild it.
+  const eventId = checkout.metadata?.event_id;
+  const userId = checkout.metadata?.user_id;
+  if (!eventId || !userId) {
+    console.error("Paid checkout without booking metadata", checkout.id);
+    return "not_found";
+  }
+  const heatNumber = Number(checkout.metadata?.heat_number) || null;
+
+  const current = await db
+    .prepare("SELECT id, status, stripe_payment_id FROM entries WHERE event_id = ? AND user_id = ?")
+    .bind(eventId, userId)
+    .first<{ id: string; status: string; stripe_payment_id: string | null }>();
+
+  if (current?.status === "confirmed") {
+    // Paid twice for one place. A person needs to refund one of them.
+    console.error("Duplicate paid checkout", checkout.id);
+    const admins = await adminEmails(db);
+    if (admins.length) {
+      await sendAdminAlertEmail(admins, "Duplicate payment needs a refund", [
+        `Stripe checkout ${checkout.id} was paid by an athlete who already has a confirmed entry.`,
+        `Event ${eventId}, athlete ${userId}.`,
+        "Refund this checkout in the Stripe dashboard.",
+      ]).catch(() => undefined);
+    }
+    return "duplicate";
+  }
+
+  const owner = await db
+    .prepare(
+      "SELECT u.date_of_birth, ev.date FROM users u, events ev WHERE u.id = ? AND ev.id = ?"
+    )
+    .bind(userId, eventId)
+    .first<{ date_of_birth: string | null; date: string }>();
+  if (!owner) {
+    console.error("Paid checkout for a missing athlete or event", checkout.id);
     return "not_found";
   }
 
-  const res = await db
-    .prepare("UPDATE entries SET status = 'confirmed' WHERE id = ? AND status = 'pending'")
-    .bind(entry.id)
-    .run();
+  let entryId: string;
+  if (current) {
+    // A newer unpaid attempt exists: this payment wins, close that checkout.
+    if (current.stripe_payment_id && current.stripe_payment_id !== checkout.id) {
+      await expireCheckoutSession(current.stripe_payment_id);
+    }
+    entryId = current.id;
+    await db
+      .prepare(
+        "UPDATE entries SET status = 'confirmed', stripe_payment_id = ?, heat_number = COALESCE(?, heat_number) WHERE id = ?"
+      )
+      .bind(checkout.id, heatNumber, entryId)
+      .run();
+  } else {
+    entryId = `ent_${generateId()}`;
+    await db
+      .prepare(
+        "INSERT INTO entries (id, event_id, user_id, status, heat_number, age_group, stripe_payment_id) VALUES (?, ?, ?, 'confirmed', ?, ?, ?)"
+      )
+      .bind(entryId, eventId, userId, heatNumber, ageGroupOn(owner.date_of_birth, owner.date), checkout.id)
+      .run();
+  }
 
-  await sendConfirmationOnce(db, entry.id);
-  return (res.meta.changes ?? 0) > 0 ? "confirmed" : "already";
+  console.error("Recovered a paid entry from checkout metadata", checkout.id);
+  await sendConfirmationOnce(db, entryId);
+  return "recovered";
 }
 
 /** Release the spot held by a checkout that expired unpaid. */
@@ -281,7 +371,7 @@ export async function releaseExpiredCheckout(db: D1Database, checkoutId: string)
 async function loadEntryForEmail(db: D1Database, entryId: string) {
   return db
     .prepare(
-      `SELECT e.id, e.status, e.heat_number, e.user_id, u.email, u.name,
+      `SELECT e.id, e.status, e.heat_number, e.user_id, e.stripe_payment_id, u.email, u.name,
               ev.slug, ev.name as event_name, ev.distance, ev.date, ev.venue, ev.location,
               ev.entry_fee_cents, ev.change_fee_cents,
               ev.first_heat_time, ev.heat_interval_minutes, ev.heat_count, ev.heat_capacity
@@ -297,6 +387,7 @@ async function loadEntryForEmail(db: D1Database, entryId: string) {
         status: string;
         heat_number: number | null;
         user_id: string;
+        stripe_payment_id: string | null;
         email: string;
         name: string;
         slug: string;
@@ -330,9 +421,11 @@ async function sendFor(
         venue: row.venue,
         location: row.location,
         amountText:
-          row.entry_fee_cents > 0
-            ? `$${(row.entry_fee_cents / 100).toFixed(0)} AUD, paid`
-            : "Free entry",
+          row.entry_fee_cents <= 0
+            ? "Free entry"
+            : row.stripe_payment_id
+              ? `${formatFee(row.entry_fee_cents)} AUD, paid`
+              : "Entered by Running TT",
         bookingRef: bookingRef(row.id),
         changeFeeText: changeFeeText(row.change_fee_cents),
         manageUrl: `${SITE_URL}/events/${row.slug}/booked`,

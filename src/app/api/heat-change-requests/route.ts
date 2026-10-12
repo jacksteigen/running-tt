@@ -4,6 +4,8 @@ import { getSession, generateId } from "@/lib/auth";
 import { heatLabel, type HeatConfig } from "@/lib/heats";
 import { sendHeatChangeRequestEmail } from "@/lib/email";
 import { SITE_URL } from "@/lib/site";
+import { todayInMelbourne } from "@/lib/events";
+import { isDateTbc } from "@/lib/dates";
 
 /**
  * An athlete asks to move heats. Changes are made by the team (and carry an
@@ -29,15 +31,18 @@ export async function POST(request: NextRequest) {
 
   const entry = await db
     .prepare(
-      `SELECT e.id, e.event_id, e.heat_number, ev.name as event_name, ev.slug,
+      `SELECT e.id, e.event_id, e.heat_number, ev.name as event_name, ev.slug, ev.date,
               ev.first_heat_time, ev.heat_interval_minutes, ev.heat_count, ev.heat_capacity
        FROM entries e JOIN events ev ON ev.id = e.event_id
        WHERE e.id = ? AND e.user_id = ? AND e.status = 'confirmed'`
     )
     .bind(entryId, session.user.id)
-    .first<HeatConfig & { id: string; event_id: string; heat_number: number | null; event_name: string; slug: string }>();
+    .first<HeatConfig & { id: string; event_id: string; heat_number: number | null; event_name: string; slug: string; date: string }>();
 
   if (!entry) return NextResponse.json({ error: "Booking not found" }, { status: 404 });
+  if (!isDateTbc(entry.date) && entry.date < todayInMelbourne()) {
+    return NextResponse.json({ error: "This event has finished, so heats can no longer change" }, { status: 400 });
+  }
 
   if (requestedHeat !== null && (requestedHeat < 1 || requestedHeat > (entry.heat_count ?? 0))) {
     return NextResponse.json({ error: "That heat does not exist" }, { status: 400 });

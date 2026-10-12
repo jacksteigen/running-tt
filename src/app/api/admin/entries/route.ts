@@ -4,7 +4,8 @@ import { generateId } from "@/lib/auth";
 import { requireAdmin } from "@/lib/adminAuth";
 import { ageGroupOn } from "@/lib/agegroups";
 import { OCCUPYING_SQL, type HeatConfig } from "@/lib/heats";
-import { sendConfirmationOnce } from "@/lib/bookings";
+import { confirmPaidCheckout, sendConfirmationOnce } from "@/lib/bookings";
+import { expireCheckoutSession, retrieveCheckoutSession } from "@/lib/stripe";
 
 /**
  * Add an athlete to an event by hand (walk-ups, comps, fixes). Respects heat
@@ -70,15 +71,43 @@ export async function POST(request: NextRequest) {
 
   const ageGroup = ageGroupOn(user.date_of_birth, event.date);
   const existing = await db
-    .prepare("SELECT id FROM entries WHERE event_id = ? AND user_id = ?")
+    .prepare("SELECT id, status, stripe_payment_id FROM entries WHERE event_id = ? AND user_id = ?")
     .bind(eventId, userId)
-    .first<{ id: string }>();
+    .first<{ id: string; status: string; stripe_payment_id: string | null }>();
 
   let entryId: string;
   if (existing) {
     entryId = existing.id;
+    // An abandoned checkout: close it so the athlete cannot also pay, and
+    // drop its id so the start list does not show them as paid online.
+    let clearCheckout = false;
+    if (existing.status === "pending" && existing.stripe_payment_id) {
+      const outcome = await expireCheckoutSession(existing.stripe_payment_id);
+      if (outcome === "paid") {
+        const checkout = await retrieveCheckoutSession(existing.stripe_payment_id).catch(() => null);
+        if (checkout) {
+          await confirmPaidCheckout(db, {
+            id: checkout.id,
+            payment_status: checkout.payment_status,
+            metadata: (checkout.metadata ?? null) as Record<string, string> | null,
+          });
+        }
+        return NextResponse.json({ success: true, entryId, note: "They had already paid online." });
+      }
+      if (outcome === "unknown") {
+        return NextResponse.json(
+          { error: "Could not reach Stripe to close their checkout. Try again in a minute." },
+          { status: 502 }
+        );
+      }
+      clearCheckout = true;
+    }
     await db
-      .prepare("UPDATE entries SET status = 'confirmed', age_group = ?, heat_number = ? WHERE id = ?")
+      .prepare(
+        `UPDATE entries SET status = 'confirmed', age_group = ?, heat_number = ?${
+          clearCheckout ? ", stripe_payment_id = NULL" : ""
+        } WHERE id = ?`
+      )
       .bind(ageGroup, heatNumber, entryId)
       .run();
   } else {

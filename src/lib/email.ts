@@ -281,3 +281,20 @@ export async function sendHeatChangeRequestEmail(
   );
   return { success: results.every((r) => r.success) };
 }
+
+/** A plain operational alert to the admins, for things that need a human. */
+export async function sendAdminAlertEmail(to: string[], subject: string, lines: string[]) {
+  const html = emailShell({
+    heading: subject,
+    bodyHtml: lines
+      .map(
+        (l) =>
+          `<p style="margin: 0 0 10px 0; color: #1A1A18; font-size: 14px; line-height: 1.6;">${escapeHtml(l)}</p>`
+      )
+      .join(""),
+  });
+  const results = await Promise.all(
+    to.map((addr) => sendEmail(addr, subject, html, [subject, "", ...lines].join("\n")))
+  );
+  return { success: results.every((r) => r.success) };
+}

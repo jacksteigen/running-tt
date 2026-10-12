@@ -11,10 +11,10 @@ export async function GET(
   const db = await getDB();
   const event = await db
     .prepare(
-      "SELECT id, first_heat_time, heat_interval_minutes, heat_count, heat_capacity FROM events WHERE id = ?"
+      "SELECT id, date, first_heat_time, heat_interval_minutes, heat_count, heat_capacity FROM events WHERE id = ?"
     )
     .bind(id)
-    .first<HeatConfig & { id: string }>();
+    .first<HeatConfig & { id: string; date: string }>();
 
   if (!event) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
@@ -30,6 +30,8 @@ export async function GET(
         booked: h.booked,
         remaining: h.remaining,
         full: h.full,
+        closed: h.closed,
+        bookable: h.bookable,
       })),
     },
     { headers: { "Cache-Control": "no-store" } }

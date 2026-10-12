@@ -29,6 +29,7 @@ export async function isStripeTestMode(): Promise<boolean> {
 
 export async function createCheckoutSession({
   entryId,
+  heatNumber,
   eventId,
   eventName,
   heatText,
@@ -39,6 +40,7 @@ export async function createCheckoutSession({
   cancelUrl,
 }: {
   entryId: string;
+  heatNumber: number | null;
   eventId: string;
   eventName: string;
   heatText: string;
@@ -77,6 +79,7 @@ export async function createCheckoutSession({
       entry_id: entryId,
       event_id: eventId,
       user_id: userId,
+      heat_number: heatNumber ? String(heatNumber) : "",
     },
   });
 }
@@ -86,12 +89,29 @@ export async function retrieveCheckoutSession(id: string) {
   return stripe.checkout.sessions.retrieve(id);
 }
 
-/** Close an abandoned checkout so it can never be paid after its spot is gone. */
-export async function expireCheckoutSession(id: string) {
+/**
+ * Close an abandoned checkout so it can never be paid after its spot is
+ * gone. Returns "closed" only when Stripe confirms the session is expired
+ * and unpaid, "paid" when it turns out to have been paid, and "unknown"
+ * when Stripe could not be reached, so callers never discard a payment.
+ */
+export async function expireCheckoutSession(
+  id: string
+): Promise<"closed" | "paid" | "unknown"> {
   try {
     const stripe = await getStripe();
     await stripe.checkout.sessions.expire(id);
+    return "closed";
   } catch {
-    // Already expired, completed or unknown: nothing to do.
+    // Expire refuses sessions that are already complete or expired. Ask.
+    try {
+      const session = await retrieveCheckoutSession(id);
+      if (session.payment_status === "paid") return "paid";
+      if (session.status === "expired") return "closed";
+      if (session.status === "complete") return "paid";
+      return "unknown";
+    } catch {
+      return "unknown";
+    }
   }
 }

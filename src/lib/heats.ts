@@ -32,6 +32,25 @@ export interface HeatAvailability extends Heat {
   booked: number;
   remaining: number;
   full: boolean;
+  /** The heat has already started (race day, past its start time). */
+  closed: boolean;
+  /** Has space and has not started. */
+  bookable: boolean;
+}
+
+/**
+ * True once a heat's start time has passed on race day (Melbourne time).
+ * Heats close at their start time; earlier heats can still be booked.
+ */
+export function heatHasStarted(
+  e: HeatConfig & { date?: string | null },
+  heatNumber: number,
+  today: string,
+  nowClock: string
+): boolean {
+  if (!e.date || e.date !== today) return false;
+  const heat = buildHeats(e).find((h) => h.number === heatNumber);
+  return !!heat?.startTime && heat.startTime <= nowClock;
 }
 
 export function hasHeats(e: Partial<HeatConfig> | null | undefined): boolean {
@@ -101,10 +120,13 @@ export function heatWindow(e: HeatConfig): string | null {
 
 export async function getHeatAvailability(
   db: D1Database,
-  event: HeatConfig & { id: string }
+  event: HeatConfig & { id: string; date?: string | null }
 ): Promise<HeatAvailability[]> {
   const heats = buildHeats(event);
   if (!heats.length) return [];
+  const { todayInMelbourne, nowClockInMelbourne } = await import("@/lib/events");
+  const today = todayInMelbourne();
+  const now = nowClockInMelbourne();
 
   const counts = (await db
     .prepare(
@@ -119,6 +141,7 @@ export async function getHeatAvailability(
   return heats.map((h) => {
     const booked = byHeat.get(h.number) ?? 0;
     const remaining = Math.max(0, h.capacity - booked);
-    return { ...h, booked, remaining, full: remaining === 0 };
+    const closed = heatHasStarted(event, h.number, today, now);
+    return { ...h, booked, remaining, full: remaining === 0, closed, bookable: remaining > 0 && !closed };
   });
 }

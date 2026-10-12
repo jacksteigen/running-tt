@@ -3,6 +3,7 @@ import { getDB } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { ageGroupOn, isValidDob } from "@/lib/agegroups";
 import { composeLocation, isKnownCountry } from "@/lib/countries";
+import { recomputeForAthlete } from "@/lib/standings";
 
 function clean(value: unknown, limit: number): string {
   return typeof value === "string" ? value.trim().slice(0, limit) : "";
@@ -19,6 +20,11 @@ export async function POST(request: NextRequest) {
 
   if (!session) {
     return NextResponse.json({ error: "Not signed in" }, { status: 401 });
+  }
+  // First run only. Later changes go through the profile editor, and date of
+  // birth corrections through an admin, so past age group places stay put.
+  if (session.user.profileCompleted) {
+    return NextResponse.json({ error: "Your profile is already set up" }, { status: 409 });
   }
 
   let body: Record<string, unknown> = {};
@@ -102,6 +108,8 @@ export async function POST(request: NextRequest) {
       .bind(ageGroupOn(dateOfBirth, entry.date), entry.id)
       .run();
   }
+
+  await recomputeForAthlete(db, session.user.id);
 
   return NextResponse.json({ success: true, name });
 }
