@@ -10,7 +10,7 @@ import {
   bookingClosedReason,
   type BookableEvent,
 } from "@/lib/bookings";
-import { OCCUPYING_SQL, hasHeats, heatWindow } from "@/lib/heats";
+import { OCCUPYING_SQL, getHeatAvailability, hasHeats, heatWindow } from "@/lib/heats";
 import { DATE_TBC } from "@/lib/dates";
 import Onboarding from "@/components/Onboarding";
 
@@ -24,15 +24,9 @@ export const metadata: Metadata = {
 /** Whether an event still has a spot for one more athlete. */
 async function hasSpace(db: D1Database, event: BookableEvent): Promise<boolean> {
   if (hasHeats(event)) {
-    const capacity = (event.heat_count ?? 0) * (event.heat_capacity && event.heat_capacity > 0 ? event.heat_capacity : 10);
-    const taken = await db
-      .prepare(
-        `SELECT COUNT(*) as n FROM entries
-         WHERE event_id = ? AND heat_number IS NOT NULL AND ${OCCUPYING_SQL}`
-      )
-      .bind(event.id)
-      .first<{ n: number }>();
-    return (taken?.n ?? 0) < capacity;
+    // A heat counts only if it has space and has not started yet.
+    const heats = await getHeatAvailability(db, event);
+    return heats.some((h) => h.bookable);
   }
   if (!event.max_entries) return true;
   const taken = await db

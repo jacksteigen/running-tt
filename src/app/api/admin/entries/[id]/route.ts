@@ -86,7 +86,7 @@ export async function PATCH(
 
 /** Remove an entry. A recorded result has to be cleared first. */
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -99,6 +99,26 @@ export async function DELETE(
     .bind(id)
     .first<{ id: string; event_id: string; user_id: string; status: string; stripe_payment_id: string | null }>();
   if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+
+  let confirmPaid = false;
+  try {
+    const body = (await request.json()) as { confirmPaid?: boolean };
+    confirmPaid = body.confirmPaid === true;
+  } catch {
+    confirmPaid = false;
+  }
+
+  // They paid online (perhaps since this page was loaded). Removing them
+  // needs a deliberate yes, and the refund happens in Stripe.
+  if (entry.status === "confirmed" && entry.stripe_payment_id && !confirmPaid) {
+    return NextResponse.json(
+      {
+        error: "This athlete paid online. Refund them in Stripe, then confirm the removal.",
+        code: "PAID",
+      },
+      { status: 409 }
+    );
+  }
 
   // Someone part way through paying: close their checkout first so it can
   // never be paid after the entry is gone. If they had already paid, keep

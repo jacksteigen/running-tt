@@ -11,8 +11,10 @@ import {
   confirmPaidCheckout,
   type BookableEvent,
 } from "@/lib/bookings";
-import { formatEventDate } from "@/lib/dates";
+import { formatEventDate, isDateTbc } from "@/lib/dates";
+import { todayInMelbourne } from "@/lib/events";
 import { buildHeats, getHeatAvailability, hasHeats } from "@/lib/heats";
+import { formatFee } from "@/lib/money";
 import { retrieveCheckoutSession } from "@/lib/stripe";
 import BookingTicket, { BookingSteps } from "@/components/BookingTicket";
 import HeatChangeRequest from "@/components/HeatChangeRequest";
@@ -29,6 +31,9 @@ interface EntryRow {
   id: string;
   status: string;
   heat_number: number | null;
+  /** Set only when the athlete paid online. Entries added by the team have none. */
+  stripe_payment_id: string | null;
+  confirmation_sent_at: string | null;
 }
 
 export default async function BookedPage({
@@ -53,7 +58,10 @@ export default async function BookedPage({
 
   const loadEntry = () =>
     db
-      .prepare("SELECT id, status, heat_number FROM entries WHERE event_id = ? AND user_id = ?")
+      .prepare(
+        `SELECT id, status, heat_number, stripe_payment_id, confirmation_sent_at
+         FROM entries WHERE event_id = ? AND user_id = ?`
+      )
       .bind(event.id, session.user.id)
       .first<EntryRow>();
 
@@ -87,8 +95,19 @@ export default async function BookedPage({
     ? buildHeats(event).find((h) => h.number === entry.heat_number) ?? null
     : null;
 
+  // "$15 AUD, paid" only when Stripe took the money. Entries added by the
+  // team were never paid online.
+  const entryText = free
+    ? "Free entry"
+    : entry.stripe_payment_id
+      ? `${formatFee(event.entry_fee_cents)} AUD, paid`
+      : "Entered by Running TT";
+
+  // Heat changes are only for a race that is still ahead (race day included).
+  const eventAhead = isDateTbc(event.date) || event.date >= todayInMelbourne();
+
   let changeSection: React.ReactNode = null;
-  if (confirmed && withHeats) {
+  if (confirmed && withHeats && eventAhead) {
     const [availability, openRequest] = await Promise.all([
       getHeatAvailability(db, event),
       db
@@ -100,7 +119,9 @@ export default async function BookedPage({
       <HeatChangeRequest
         entryId={entry.id}
         currentHeat={entry.heat_number}
-        heats={availability.map((h) => ({ number: h.number, label: h.label, full: h.full }))}
+        heats={availability
+          .filter((h) => !h.closed)
+          .map((h) => ({ number: h.number, label: h.label, full: h.full }))}
         changeFeeText={changeFeeText(event.change_fee_cents)}
         hasOpenRequest={!!openRequest}
       />
@@ -159,11 +180,8 @@ export default async function BookedPage({
               heatNumber={entry.heat_number}
               heatLabel={heat?.label ?? null}
               heatStart={heat?.startTime ?? null}
-              entryText={
-                free
-                  ? "Free entry"
-                  : `$${(event.entry_fee_cents / 100).toFixed(event.entry_fee_cents % 100 ? 2 : 0)} AUD, paid`
-              }
+              entryText={entryText}
+              emailed={!!entry.confirmation_sent_at}
             />
             {changeSection}
           </>

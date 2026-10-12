@@ -13,8 +13,9 @@ import { displayStatus, todayInMelbourne } from "@/lib/events";
 import { parsePrizes } from "@/lib/racetime";
 import { AGE_GROUPS } from "@/lib/agegroups";
 import { formatEventDate, isDateTbc } from "@/lib/dates";
-import { getHeatAvailability, hasHeats, heatLabel, heatWindow } from "@/lib/heats";
+import { getHeatAvailability, hasHeats, heatLabel, heatWindow, isValidClock } from "@/lib/heats";
 import { bookingClosedReason, changeFeeText } from "@/lib/bookings";
+import { formatFee } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -164,11 +165,26 @@ export default async function EventPage({
   const bookHref = `/events/${event.slug}/book`;
   const bookedHref = `/events/${event.slug}/booked`;
   const myHeat = myEntry?.heat_number ? heatLabel(event, myEntry.heat_number) : "";
-  const spotsLeft = heats.reduce((sum, h) => sum + h.remaining, 0);
-  const feeLabel =
-    event.entry_fee_cents > 0
-      ? `$${(event.entry_fee_cents / 100).toFixed(event.entry_fee_cents % 100 ? 2 : 0)}`
-      : "Free";
+  const freeEntry = event.entry_fee_cents <= 0;
+  const feeLabel = freeEntry ? "Free" : formatFee(event.entry_fee_cents);
+
+  // Heats that have started (race day) are out of the running for spots.
+  const heatsToRun = heats.filter((h) => !h.closed);
+  const spotsLeft = heatsToRun.reduce((sum, h) => sum + h.remaining, 0);
+  const someStarted = heatsToRun.length < heats.length;
+  // Every heat still to run is full (or none are left to run).
+  const allFull = heats.length > 0 && heats.every((h) => !h.bookable);
+  const spotsCopy = someStarted
+    ? `${spotsLeft} ${spotsLeft === 1 ? "spot" : "spots"} left in the ${
+        heatsToRun.length === 1 ? "last heat" : `${heatsToRun.length} heats still to run`
+      }.`
+    : `${spotsLeft} of ${heats.length * (heats[0]?.capacity ?? 0)} spots left across ${heats.length} heats.`;
+  const fullCopy = someStarted
+    ? "Every heat still to run is full right now. Spots can free up as unfinished checkouts expire."
+    : "Every heat is full right now. Spots can free up as unfinished checkouts expire.";
+
+  // The first heat sets the countdown, not a generic morning start.
+  const firstHeatTime = withHeats && isValidClock(event.first_heat_time) ? event.first_heat_time : null;
 
   const whatToBring: string[] = event.what_to_bring
     ? JSON.parse(event.what_to_bring)
@@ -186,12 +202,21 @@ export default async function EventPage({
   const isUpcoming = eventStatus === "Open" || eventStatus === "Coming Soon";
   const isRaceDay = event.date === today;
   const dateTbc = isDateTbc(event.date);
-  const closedCta =
-    !dateTbc && event.date < today
+  // Closed for now (bookings will open) versus closed for good.
+  const bookingsSoon =
+    dateTbc ||
+    (event.date >= today &&
+      (event.status === "Coming Soon" || (withHeats && event.status === "Open" && !event.first_heat_time)));
+  const closedCta = bookingsSoon
+    ? "Booking opens soon"
+    : event.date < today
       ? "Event finished"
       : event.status === "Sold Out"
         ? "Sold out"
-        : "Booking opens soon";
+        : "Bookings closed";
+  // Bookings are open and this athlete has no heat yet.
+  const bookingOpen = withHeats && isUpcoming && !closedReason && !myEntry;
+  const canBook = bookingOpen && !allFull;
 
   // Age group standings, in band order, only for groups with a finisher.
   const groups = AGE_GROUPS.map((group) => ({
@@ -209,19 +234,23 @@ export default async function EventPage({
           <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">Rolling start</p>
           <h2 className="text-xl font-semibold tracking-tight">Heats</h2>
         </div>
-        {isUpcoming && !closedReason && !myEntry && (
+        {canBook ? (
           <Link
             href={bookHref}
-            className="text-sm font-medium text-terracotta hover:text-midnight transition-colors py-2"
+            className="inline-flex min-h-11 items-center text-sm font-medium text-terracotta hover:text-midnight transition-colors"
           >
             Choose your heat &rarr;
           </Link>
-        )}
+        ) : bookingOpen && allFull ? (
+          <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-midnight/50 pb-1">
+            Heats full
+          </p>
+        ) : null}
       </div>
       <HeatSchedule
         heats={heats}
         timeWindow={timeWindow}
-        bookHref={isUpcoming && !closedReason && !myEntry ? bookHref : null}
+        bookHref={canBook ? bookHref : null}
         showSpots={isUpcoming}
       />
     </div>
@@ -247,7 +276,7 @@ export default async function EventPage({
         <div className="relative mx-auto max-w-6xl px-6 pt-10 pb-14 md:pt-14 md:pb-20">
           <Link
             href="/events"
-            className="text-xs text-stone/60 hover:text-white transition-colors mb-8 inline-block font-mono uppercase tracking-[0.2em]"
+            className="text-xs text-stone/60 hover:text-white transition-colors mb-8 inline-flex items-center min-h-11 font-mono uppercase tracking-[0.2em]"
           >
             &larr; All events
           </Link>
@@ -291,6 +320,13 @@ export default async function EventPage({
                       </span>
                       <span className="text-sm text-stone/70">View booking &rarr;</span>
                     </Link>
+                  ) : allFull ? (
+                    <div className="border border-white/15 bg-white/5 backdrop-blur-sm px-5 py-3.5">
+                      <span className="block font-mono text-[10px] uppercase tracking-[0.25em] text-stone/60">
+                        Heats full
+                      </span>
+                      <span className="block text-sm text-stone/80 mt-1 leading-snug">{fullCopy}</span>
+                    </div>
                   ) : (
                     <Link
                       href={bookHref}
@@ -306,9 +342,9 @@ export default async function EventPage({
             {isUpcoming && !isRaceDay && !dateTbc && (
               <div className="lg:border-l lg:border-white/10 lg:pl-8">
                 <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/50 mb-4">
-                  Start gun in
+                  {firstHeatTime ? "First heat in" : "Start gun in"}
                 </p>
-                <Countdown target={event.date} className="text-white" />
+                <Countdown target={event.date} time={firstHeatTime} className="text-white" />
               </div>
             )}
             {isUpcoming && dateTbc && (
@@ -447,7 +483,7 @@ export default async function EventPage({
                             </td>
                             <td className="px-4 py-3 text-right hidden sm:table-cell font-mono tabular-nums">
                               {entry.prize_amount_cents > 0 ? (
-                                <span className="text-gold">${entry.prize_amount_cents / 100}</span>
+                                <span className="text-gold">{formatFee(entry.prize_amount_cents)}</span>
                               ) : (
                                 <span className="text-stone/60">-</span>
                               )}
@@ -618,19 +654,27 @@ export default async function EventPage({
                 ) : withHeats ? (
                   <>
                     <h3 className="font-semibold tracking-tight mb-2">
-                      {closedReason ? (eventStatus === "Coming Soon" ? "Coming soon" : "Bookings closed") : "Book your heat"}
+                      {closedReason
+                        ? bookingsSoon
+                          ? "Coming soon"
+                          : "Bookings closed"
+                        : allFull
+                          ? "Heats full"
+                          : "Book your heat"}
                     </h3>
                     <p className="text-sm text-midnight/60 mb-4">
                       {closedReason ??
-                        `${spotsLeft} of ${heats.length * (heats[0]?.capacity ?? 0)} spots left across ${heats.length} heats. Pick your heat, pay, and you are in.`}
+                        (allFull
+                          ? fullCopy
+                          : `${spotsCopy} ${freeEntry ? "Pick your heat and you are in." : "Pick your heat, pay, and you are in."}`)}
                     </p>
-                    {closedReason ? (
+                    {closedReason || allFull ? (
                       <button
                         type="button"
                         disabled
                         className="w-full bg-midnight/15 text-midnight/50 text-sm font-medium py-3.5 cursor-not-allowed"
                       >
-                        {closedCta}
+                        {closedReason ? closedCta : "Every heat is full"}
                       </button>
                     ) : (
                       <Link

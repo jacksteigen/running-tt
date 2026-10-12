@@ -48,9 +48,16 @@ export function heatHasStarted(
   today: string,
   nowClock: string
 ): boolean {
-  if (!e.date || e.date !== today) return false;
+  if (!e.date || e.date >= "9999-01-01" || !isValidClock(e.first_heat_time)) return false;
   const heat = buildHeats(e).find((h) => h.number === heatNumber);
-  return !!heat?.startTime && heat.startTime <= nowClock;
+  if (!heat) return false;
+  // Absolute start, so a heat after midnight belongs to the next day.
+  const [h, m] = (e.first_heat_time as string).split(":").map(Number);
+  const startMinutes = h * 60 + m + heat.offsetMinutes;
+  const day = new Date(e.date + "T00:00:00Z");
+  day.setUTCDate(day.getUTCDate() + Math.floor(startMinutes / 1440));
+  const startsAt = `${day.toISOString().slice(0, 10)} ${heat.startTime}`;
+  return startsAt <= `${today} ${nowClock}`;
 }
 
 export function hasHeats(e: Partial<HeatConfig> | null | undefined): boolean {

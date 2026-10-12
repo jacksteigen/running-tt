@@ -11,6 +11,11 @@ const LINK_ERRORS: Record<string, string> = {
   missing_token: "That sign-in link was incomplete. Request a fresh one below.",
 };
 
+/** /events/<slug>/book, with or without a query. Not /booked. */
+const BOOKING_PATH = /\/events\/[^/]+\/book(\?|$)/;
+/** /events/<slug>/booked, the ticket page linked from confirmation emails. */
+const BOOKED_PATH = /\/events\/[^/]+\/booked(\?|$)/;
+
 /** Only same-site paths travel through sign-in; the server checks again. */
 function readNext(search: string): string {
   const value = new URLSearchParams(search).get("next") ?? "";
@@ -39,7 +44,8 @@ export default function LoginPage() {
     setNext(readNext(window.location.search));
   }, []);
 
-  const toBooking = next.includes("/book");
+  const toBooking = BOOKING_PATH.test(next);
+  const toBooked = BOOKED_PATH.test(next);
 
   async function handleLinkSubmit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -112,16 +118,16 @@ export default function LoginPage() {
       <div className="relative mx-auto max-w-md px-6 py-12 md:py-20 motion-safe:animate-fade-up">
         <Link
           href="/"
-          className="text-xs text-stone/60 hover:text-white transition-colors mb-6 inline-block font-mono uppercase tracking-[0.2em]"
+          className="text-xs text-stone/60 hover:text-white transition-colors mb-3 -mt-3 inline-flex items-center min-h-11 font-mono uppercase tracking-[0.2em]"
         >
           &larr; Home
         </Link>
         <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
           Sign in or sign up
         </h1>
-        {toBooking && (
+        {(toBooking || toBooked) && (
           <p className="mt-3 text-lg font-medium text-white">
-            Sign in to book your heat.
+            {toBooking ? "Sign in to book your heat." : "Sign in to see your booking."}
           </p>
         )}
         <p className="mt-3 text-stone/70 leading-relaxed">
@@ -162,7 +168,7 @@ export default function LoginPage() {
               <button
                 onClick={() => handleLinkSubmit()}
                 disabled={loading}
-                className="mt-6 text-sm text-terracotta hover:text-terracotta/80 transition-colors disabled:opacity-50"
+                className="mt-4 inline-flex items-center min-h-11 px-2 text-sm text-terracotta hover:text-terracotta/80 transition-colors disabled:opacity-50"
               >
                 {loading ? "Sending..." : "Send it again"}
               </button>
@@ -178,7 +184,7 @@ export default function LoginPage() {
                       setMode(m);
                       setError("");
                     }}
-                    className={`flex-1 text-xs font-medium py-2.5 transition-colors ${
+                    className={`flex-1 min-h-11 text-xs font-medium py-2.5 transition-colors ${
                       mode === m ? "bg-midnight text-white" : "text-midnight/60 hover:text-midnight"
                     }`}
                   >

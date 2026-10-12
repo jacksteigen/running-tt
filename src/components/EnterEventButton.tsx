@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatFee } from "@/lib/money";
 
 interface EnterEventButtonProps {
   eventId: string;
@@ -67,6 +68,9 @@ export default function EnterEventButton({
         );
       } else if (data.code === "AUTH") {
         router.push(loginHref);
+      } else if (data.code === "ALREADY_BOOKED" && eventSlug) {
+        // Already entered, or the payment from an earlier checkout went through.
+        router.push(`/events/${eventSlug}/booked`);
       } else {
         setError(data.error || "Something went wrong");
       }
@@ -84,12 +88,14 @@ export default function EnterEventButton({
           You are entered
         </div>
         {eventSlug && (
-          <Link
-            href={`/events/${eventSlug}/booked`}
-            className="mt-1 block py-2.5 text-center text-xs font-medium text-midnight/60 underline underline-offset-2 hover:text-terracotta transition-colors"
-          >
-            View your ticket
-          </Link>
+          <div className="mt-1 text-center">
+            <Link
+              href={`/events/${eventSlug}/booked`}
+              className="inline-flex min-h-11 items-center px-3 text-xs font-medium text-midnight/60 underline underline-offset-2 hover:text-terracotta transition-colors"
+            >
+              View your ticket
+            </Link>
+          </div>
         )}
       </div>
     );
@@ -106,14 +112,13 @@ export default function EnterEventButton({
     );
   }
 
-  const feeDisplay =
-    entryFeeCents > 0 ? ` · $${(entryFeeCents / 100).toFixed(0)}` : " · Free";
+  const feeDisplay = entryFeeCents > 0 ? ` · ${formatFee(entryFeeCents)}` : " · Free";
 
   if (!isLoggedIn) {
     return (
       <Link
         href={loginHref}
-        className="block w-full bg-terracotta text-white text-sm font-medium py-3.5 text-center hover:bg-terracotta/90 transition-colors"
+        className="inline-flex w-full min-h-11 items-center justify-center bg-terracotta text-white text-sm font-medium py-3.5 text-center hover:bg-terracotta/90 transition-colors"
       >
         Sign in to enter{feeDisplay}
       </Link>
@@ -124,7 +129,7 @@ export default function EnterEventButton({
     return (
       <Link
         href={welcomeHref}
-        className="block w-full bg-terracotta text-white text-sm font-medium py-3.5 text-center hover:bg-terracotta/90 transition-colors"
+        className="inline-flex w-full min-h-11 items-center justify-center bg-terracotta text-white text-sm font-medium py-3.5 text-center hover:bg-terracotta/90 transition-colors"
       >
         Set up your profile to enter
       </Link>

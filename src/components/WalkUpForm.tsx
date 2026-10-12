@@ -30,6 +30,8 @@ interface ApiReply {
   success?: boolean;
   error?: string;
   code?: string;
+  /** Set on a success that needs a word, e.g. "They had already paid online." */
+  note?: string;
 }
 
 /**
@@ -50,7 +52,10 @@ export async function sendWithHeatCheck<T extends ApiReply>(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(force ? { ...body, force: true } : body),
     });
-    const data = (await res.json()) as T;
+    // A gateway error can come back as a page rather than JSON.
+    const data = (await res.json().catch(() => ({
+      error: "Something went wrong. Try again in a minute.",
+    }))) as T;
     if (!force && res.status === 409 && data.code === "HEAT_FULL") {
       if (!window.confirm(`Heat ${body.heatNumber} is full. ${verb} anyway?`)) {
         return "cancelled";
@@ -186,7 +191,10 @@ export default function WalkUpForm({
       return false;
     }
     setSuccess(
-      `${name} is in${withHeats ? ` ${heatName(heats, heatNumber)}` : ""}. Their confirmation email is on its way.`
+      data.note
+        ? // They paid online while this was going on, so they keep the heat they booked.
+          `${name} is on the start list${withHeats ? " in the heat they booked" : ""}. ${data.note}`
+        : `${name} is in${withHeats ? ` ${heatName(heats, heatNumber)}` : ""}. Their confirmation email is on its way.`
     );
     setForm(EMPTY);
     setCreated(null);

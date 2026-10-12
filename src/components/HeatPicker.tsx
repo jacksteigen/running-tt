@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { HOLD_MINUTES } from "@/lib/heats";
+import { formatFee } from "@/lib/money";
 
 export interface PickerHeat {
   number: number;
@@ -13,14 +15,28 @@ export interface PickerHeat {
   booked: number;
   remaining: number;
   full: boolean;
+  /** Already started on race day, so it can never be booked. */
+  closed: boolean;
+  /** Has space and has not started. */
+  bookable: boolean;
 }
 
-type ApiHeat = Omit<PickerHeat, "offsetMinutes">;
+type ApiHeat = Omit<PickerHeat, "offsetMinutes" | "closed" | "bookable"> & {
+  offsetMinutes?: number | null;
+  closed?: boolean;
+  bookable?: boolean;
+};
 
 /** guest: signed out. incomplete: signed in, profile not finished. */
 export type PickerViewer = "guest" | "incomplete" | "ready";
 
-type Message = { text: string; href?: string; linkText?: string };
+/**
+ * soon: TBC date or Coming Soon, so bookings will open later.
+ * final: sold out, finished, or the last heat has started.
+ */
+export type PickerClosedKind = "soon" | "final";
+
+type Message = { text: string; href?: string; linkText?: string; tone?: "info" };
 
 const POLL_MS = 15000;
 const CLOCK = /^(\d{1,2}:\d{2})(am|pm)$/;
@@ -39,8 +55,34 @@ function releaseHold(heats: PickerHeat[], held: number | null): PickerHeat[] {
     if (h.number !== held || h.booked === 0) return h;
     const booked = h.booked - 1;
     const remaining = Math.max(0, h.capacity - booked);
-    return { ...h, booked, remaining, full: remaining === 0 };
+    return { ...h, booked, remaining, full: remaining === 0, bookable: remaining > 0 && !h.closed };
   });
+}
+
+/**
+ * When a hold lapses, in epoch ms. `since` is the entry's created_at, which
+ * SQLite stores in UTC as "YYYY-MM-DD HH:MM:SS".
+ */
+function holdEndsAt(since: string | null): number | null {
+  if (!since) return null;
+  const iso = since.includes("T") ? since : since.replace(" ", "T");
+  const t = Date.parse(/(Z|[+-]\d{2}:?\d{2})$/.test(iso) ? iso : `${iso}Z`);
+  return Number.isFinite(t) ? t + HOLD_MINUTES * 60_000 : null;
+}
+
+function toPickerHeat(h: ApiHeat, offsets: Map<number, number | null>): PickerHeat {
+  const closed = !!h.closed;
+  return {
+    number: h.number,
+    label: h.label,
+    offsetMinutes: h.offsetMinutes ?? offsets.get(h.number) ?? null,
+    capacity: h.capacity,
+    booked: h.booked,
+    remaining: h.remaining,
+    full: h.full,
+    closed,
+    bookable: h.bookable ?? (!h.full && !closed),
+  };
 }
 
 /** Big time on the card: "5:45" + "pm", or "+0:45" from the first gun. */
@@ -58,6 +100,7 @@ function timeParts(h: PickerHeat): { main: string; suffix: string; caption: stri
 }
 
 function spotsText(h: PickerHeat, preview: boolean) {
+  if (h.closed) return "Started";
   if (h.full || h.remaining <= 0) return "Full";
   if (preview && h.remaining === h.capacity) return `${h.capacity} spots`;
   if (h.remaining === 1) return "Last spot";
@@ -67,7 +110,7 @@ function spotsText(h: PickerHeat, preview: boolean) {
 
 /** Seat-map meter: one segment per spot, or a bar for big heats. */
 function Meter({ heat, selected }: { heat: PickerHeat; selected: boolean }) {
-  const low = !heat.full && heat.remaining <= 3;
+  const low = heat.bookable && heat.remaining <= 3;
   if (heat.capacity > 16) {
     const pct = Math.min(100, ((heat.booked + (selected ? 1 : 0)) / heat.capacity) * 100);
     return (
@@ -125,8 +168,10 @@ export default function HeatPicker({
   initialHeats,
   initialHeat,
   heldHeat,
+  heldSince,
   viewer,
   closedReason,
+  closedKind,
   closedCta,
   timesConfirmed,
   intervalMinutes,
@@ -142,9 +187,13 @@ export default function HeatPicker({
   initialHeat: number | null;
   /** The heat an unpaid checkout of theirs is holding, if any. */
   heldHeat: number | null;
+  /** When that checkout started (entries.created_at), so the hold can lapse here too. */
+  heldSince: string | null;
   viewer: PickerViewer;
   /** Why bookings are not open, or null when they are. */
   closedReason: string | null;
+  /** Whether a closed booking will open later or is closed for good. */
+  closedKind: PickerClosedKind;
   /** Short label for the disabled button while closed. */
   closedCta: string;
   timesConfirmed: boolean;
@@ -157,31 +206,59 @@ export default function HeatPicker({
   const router = useRouter();
   const preview = !!closedReason;
   const paid = entryFeeCents > 0;
-  const price = paid ? `$${(entryFeeCents / 100).toFixed(entryFeeCents % 100 ? 2 : 0)}` : "Free";
+  const price = paid ? formatFee(entryFeeCents) : "Free";
+  const bookedHref = `/events/${eventSlug}/booked`;
 
-  const [heats, setHeats] = useState<PickerHeat[]>(() => releaseHold(initialHeats, heldHeat));
+  // Counts as the server reports them; the athlete's own hold is taken off below.
+  const [serverHeats, setServerHeats] = useState<PickerHeat[]>(initialHeats);
+  // Their own unfinished checkout, only for as long as the server still keeps it.
+  const [hold, setHold] = useState<number | null>(heldHeat);
+
+  // Fresh props from the server (router.refresh after coming back from
+  // Stripe) replace the live counts and the hold.
+  const [synced, setSynced] = useState({ initialHeats, heldHeat, heldSince });
+  if (
+    synced.initialHeats !== initialHeats ||
+    synced.heldHeat !== heldHeat ||
+    synced.heldSince !== heldSince
+  ) {
+    setSynced({ initialHeats, heldHeat, heldSince });
+    setServerHeats(initialHeats);
+    setHold(heldHeat);
+  }
+
+  const heats = useMemo(() => releaseHold(serverHeats, hold), [serverHeats, hold]);
+
   const [selected, setSelected] = useState<number | null>(() => {
     if (preview) return null;
     const wanted = initialHeat ?? heldHeat;
     const h = releaseHold(initialHeats, heldHeat).find((x) => x.number === wanted);
-    return h && !h.full ? h.number : null;
+    return h && h.bookable ? h.number : null;
   });
   const [notice, setNotice] = useState(() => {
     if (preview || !initialHeat) return "";
     const h = releaseHold(initialHeats, heldHeat).find((x) => x.number === initialHeat);
-    return h?.full ? `Heat ${initialHeat} has filled up. Pick another heat.` : "";
+    if (!h || h.bookable) return "";
+    return h.closed
+      ? `Heat ${initialHeat} has already started. Pick a later heat.`
+      : `Heat ${initialHeat} has filled up. Pick another heat.`;
   });
   const [error, setError] = useState<Message | null>(null);
-  const [busy, setBusy] = useState<null | "holding" | "redirecting">(null);
+  const [busy, setBusy] = useState<null | "holding" | "redirecting" | "booked">(null);
 
   const selectedRef = useRef(selected);
+  const holdRef = useRef(hold);
   const buttons = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     selectedRef.current = selected;
   }, [selected]);
 
-  // Start offsets come from the event config, which the live feed leaves out.
+  useEffect(() => {
+    holdRef.current = hold;
+  }, [hold]);
+
+  // Fallback start offsets from the event config, in case the live feed leaves them out.
   const [offsets] = useState(() => new Map(initialHeats.map((h) => [h.number, h.offsetMinutes])));
 
   const refresh = useCallback(async () => {
@@ -190,21 +267,37 @@ export default function HeatPicker({
       if (!res.ok) return;
       const data = (await res.json()) as { heats?: ApiHeat[] };
       if (!data.heats) return;
-      const next = releaseHold(
-        data.heats.map((h) => ({ ...h, offsetMinutes: offsets.get(h.number) ?? null })),
-        heldHeat
-      );
-      setHeats(next);
+      const fresh = data.heats.map((h) => toPickerHeat(h, offsets));
+      setServerHeats(fresh);
       const current = selectedRef.current;
-      if (current && next.find((h) => h.number === current)?.full) {
+      const now = current ? releaseHold(fresh, holdRef.current).find((h) => h.number === current) : null;
+      if (current && now && !now.bookable) {
         selectedRef.current = null;
         setSelected(null);
-        setNotice(`Heat ${current} just filled up. Pick another heat.`);
+        setNotice(
+          now.closed
+            ? `Heat ${current} has started. Pick a later heat.`
+            : `Heat ${current} just filled up. Pick another heat.`
+        );
       }
     } catch {
       // Offline for a moment: keep showing the last counts.
     }
-  }, [eventId, heldHeat, offsets]);
+  }, [eventId, offsets]);
+
+  // The server stops holding an unpaid checkout after HOLD_MINUTES. Stop
+  // counting it as theirs at the same moment, then pick up the real counts.
+  useEffect(() => {
+    if (hold === null) return;
+    const ends = holdEndsAt(heldSince);
+    if (ends === null) return;
+    const id = setTimeout(() => {
+      holdRef.current = null;
+      setHold(null);
+      refresh();
+    }, Math.max(0, ends - Date.now()));
+    return () => clearTimeout(id);
+  }, [hold, heldSince, refresh]);
 
   // Live spots left, paused while the tab is in the background.
   useEffect(() => {
@@ -239,7 +332,7 @@ export default function HeatPicker({
   function choose(n: number) {
     if (preview || busy) return;
     const h = heats.find((x) => x.number === n);
-    if (!h || h.full) return;
+    if (!h || !h.bookable) return;
     setSelected(n);
     setNotice("");
     setError(null);
@@ -250,7 +343,7 @@ export default function HeatPicker({
     const keys = ["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"];
     if (!keys.includes(e.key)) return;
     e.preventDefault();
-    const open = heats.map((h, i) => (h.full ? -1 : i)).filter((i) => i >= 0);
+    const open = heats.map((h, i) => (h.bookable ? i : -1)).filter((i) => i >= 0);
     if (!open.length) return;
     const pos = open.indexOf(index);
     let target: number;
@@ -279,7 +372,15 @@ export default function HeatPicker({
         next?: string;
         error?: string;
         code?: string;
+        holdReleased?: boolean;
       };
+      // Forget their old hold only when the server says it gave it up (a
+      // booking went through, or it cleared the old checkout first). Errors
+      // raised before that leave the hold, and its spot, in place.
+      if (res.ok || data.holdReleased) {
+        holdRef.current = null;
+        setHold(null);
+      }
 
       if (data.checkoutUrl) {
         setBusy("redirecting");
@@ -299,12 +400,34 @@ export default function HeatPicker({
           await refresh();
           setError({ text: data.error || "That heat has just filled up. Pick another one." });
           break;
-        case "ALREADY_BOOKED":
+        case "HEAT_STARTED":
+          selectedRef.current = null;
+          setSelected(null);
+          await refresh();
+          setError({ text: data.error || "That heat has already started. Pick a later one." });
+          break;
+        case "IN_PROGRESS":
+          // Another tab is setting up a checkout. Keep their pick so they can retry.
           setError({
+            text: data.error || "Your booking is already being set up. Give it a moment, then try again.",
+          });
+          break;
+        case "ALREADY_BOOKED":
+          // Booked already, or the payment from an earlier checkout went through.
+          setBusy("booked");
+          setError({
+            tone: "info",
             text: data.error || "You already have a heat booked.",
-            href: `/events/${eventSlug}/booked`,
+            href: bookedHref,
             linkText: "View your booking",
           });
+          router.push(bookedHref);
+          return;
+        case "CLOSED":
+          selectedRef.current = null;
+          setSelected(null);
+          setError({ text: data.error || "Bookings have closed." });
+          router.refresh();
           break;
         case "PROFILE": {
           setBusy("redirecting");
@@ -329,10 +452,13 @@ export default function HeatPicker({
   }
 
   const chosen = heats.find((h) => h.number === selected) ?? null;
-  const allFull = !preview && heats.length > 0 && heats.every((h) => h.full);
+  // Nothing left to book: every heat is full or has already started.
+  const allFull = !preview && heats.length > 0 && heats.every((h) => !h.bookable);
+  const allStarted = heats.length > 0 && heats.every((h) => h.closed);
+  const someStarted = heats.some((h) => h.closed);
   const focusIndex = Math.max(
     0,
-    chosen ? heats.indexOf(chosen) : heats.findIndex((h) => !h.full)
+    chosen ? heats.indexOf(chosen) : heats.findIndex((h) => h.bookable)
   );
 
   /* ---------- CTA, shared by the side panel and the phone bar ---------- */
@@ -348,7 +474,7 @@ export default function HeatPicker({
     if (preview || allFull) {
       return (
         <button type="button" disabled className={ctaDisabled}>
-          {allFull ? "Every heat is full" : closedCta}
+          {preview ? closedCta : allStarted ? "Bookings closed" : "Every heat is full"}
         </button>
       );
     }
@@ -386,33 +512,48 @@ export default function HeatPicker({
         )}
         {busy === "holding"
           ? "Holding your spot..."
-          : busy === "redirecting"
-            ? paid
-              ? "Opening secure checkout..."
-              : "Confirming..."
-            : `Book Heat ${chosen.number} · ${price}`}
+          : busy === "booked"
+            ? "Opening your booking..."
+            : busy === "redirecting"
+              ? paid
+                ? "Opening secure checkout..."
+                : "Confirming..."
+              : `Book Heat ${chosen.number} · ${price}`}
       </button>
     );
   }
 
-  const errorBox = (dark: boolean) =>
-    error ? (
-      <p role="alert" className={`text-sm leading-snug ${dark ? "text-white" : "text-terracotta"}`}>
-        {dark && <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-terracotta mr-2 align-middle" />}
+  const errorBox = (dark: boolean) => {
+    if (!error) return null;
+    const info = error.tone === "info";
+    return (
+      <p
+        role={info ? "status" : "alert"}
+        className={`text-sm leading-snug ${dark ? "text-white" : info ? "text-trail" : "text-terracotta"}`}
+      >
+        {dark && (
+          <span
+            aria-hidden
+            className={`inline-block h-1.5 w-1.5 rounded-full mr-2 align-middle ${info ? "bg-trail" : "bg-terracotta"}`}
+          />
+        )}
         {error.text}
         {error.href && (
           <>
             {" "}
             <Link
               href={error.href}
-              className={`underline underline-offset-2 font-medium ${dark ? "text-terracotta" : "hover:text-midnight"}`}
+              className={`inline-flex min-h-11 items-center underline underline-offset-2 font-medium ${
+                dark ? "text-terracotta" : "hover:text-midnight"
+              }`}
             >
               {error.linkText}
             </Link>
           </>
         )}
       </p>
-    ) : null;
+    );
+  };
 
   const finePrint = paid
     ? `Secure payment by Stripe, in AUD. Your spot is held while you check out. Need to move later? Heat changes are made by our team${changeFeeText}.`
@@ -423,7 +564,8 @@ export default function HeatPicker({
   const card = (h: PickerHeat, i: number) => {
     const isSelected = selected === h.number;
     const t = timeParts(h);
-    const low = !h.full && h.remaining <= 3;
+    const low = h.bookable && h.remaining <= 3;
+    const unavailable = !h.bookable;
     const status = spotsText(h, preview);
 
     const inner = (
@@ -443,7 +585,17 @@ export default function HeatPicker({
             t.main.length > 7 ? "text-base" : "text-2xl md:text-[1.75rem]"
           }`}
         >
-          <span className={h.full ? "line-through decoration-1 decoration-midnight/50" : undefined}>{t.main}</span>
+          <span
+            className={
+              h.closed
+                ? "text-midnight/50"
+                : h.full
+                  ? "line-through decoration-1 decoration-midnight/50"
+                  : undefined
+            }
+          >
+            {t.main}
+          </span>
           {t.suffix && <span className="ml-0.5 text-sm font-medium text-midnight/50">{t.suffix}</span>}
         </p>
         <p className="mt-1.5 h-4 font-mono text-[10px] uppercase tracking-[0.15em] text-midnight/40 truncate">
@@ -456,7 +608,7 @@ export default function HeatPicker({
           {low && !preview && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold shrink-0" />}
           <span
             className={
-              h.full
+              unavailable
                 ? "font-mono uppercase tracking-[0.15em] text-[10px] text-midnight/50"
                 : low && !preview
                   ? "font-medium text-midnight"
@@ -486,14 +638,14 @@ export default function HeatPicker({
         type="button"
         role="radio"
         aria-checked={isSelected}
-        aria-disabled={h.full || undefined}
+        aria-disabled={unavailable || undefined}
         aria-label={`Heat ${h.number}, ${h.label}, ${status.toLowerCase()}`}
-        disabled={h.full}
+        disabled={unavailable}
         tabIndex={i === focusIndex ? 0 : -1}
         onClick={() => choose(h.number)}
         onKeyDown={(e) => onKeyDown(e, i)}
         className={`relative text-left p-4 md:p-5 border transition-[border-color,background-color,transform,box-shadow] duration-200 ${
-          h.full
+          unavailable
             ? "bg-bone/70 border-stone/40 opacity-60 cursor-not-allowed"
             : isSelected
               ? "bg-terracotta/[0.06] border-terracotta ring-1 ring-inset ring-terracotta"
@@ -510,10 +662,20 @@ export default function HeatPicker({
       <div className="lg:col-span-2 min-w-0">
         {/* Banners */}
         {preview && (
-          <div className="mb-8 border-l-2 border-terracotta bg-white border-y border-r border-y-stone/40 border-r-stone/40 px-5 py-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-terracotta mb-1">Preview</p>
+          <div
+            className={`mb-8 border-l-2 bg-white border-y border-r border-y-stone/40 border-r-stone/40 px-5 py-4 ${
+              closedKind === "soon" ? "border-terracotta" : "border-dust"
+            }`}
+          >
+            <p
+              className={`font-mono text-[10px] uppercase tracking-[0.25em] mb-1 ${
+                closedKind === "soon" ? "text-terracotta" : "text-dust"
+              }`}
+            >
+              {closedKind === "soon" ? "Preview" : "Bookings closed"}
+            </p>
             <p className="text-sm text-midnight/80">
-              {closedReason} Have a look at the heats in the meantime.
+              {closedKind === "soon" ? `${closedReason} Have a look at the heats in the meantime.` : closedReason}
             </p>
           </div>
         )}
@@ -523,18 +685,22 @@ export default function HeatPicker({
             <p className="text-sm text-midnight/80">Payment not finished. Pick your heat again to continue.</p>
           </div>
         )}
-        {!preview && !cancelled && heldHeat && (
+        {!preview && !cancelled && hold && (
           <div className="mb-8 border-l-2 border-dust bg-white border-y border-r border-y-stone/40 border-r-stone/40 px-5 py-4">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-dust mb-1">Unfinished checkout</p>
             <p className="text-sm text-midnight/80">
-              You started booking Heat {heldHeat}. Book again to pick up where you left off.
+              You started booking Heat {hold}. Book again to pick up where you left off.
             </p>
           </div>
         )}
         {allFull && (
           <div className="mb-8 border-l-2 border-terracotta bg-white border-y border-r border-y-stone/40 border-r-stone/40 px-5 py-4">
             <p className="text-sm text-midnight/80">
-              Every heat is full right now. Spots can free up as unfinished checkouts expire, so check back soon.
+              {allStarted
+                ? "Bookings have closed. The last heat has started."
+                : someStarted
+                  ? "Every heat still to run is full right now. Spots can free up as unfinished checkouts expire, so check back soon."
+                  : "Every heat is full right now. Spots can free up as unfinished checkouts expire, so check back soon."}
             </p>
           </div>
         )}
@@ -651,7 +817,13 @@ export default function HeatPicker({
                 </div>
               ) : (
                 <p className="mt-2 text-sm text-midnight/50">
-                  {preview ? "Heats open for booking soon." : "Pick a heat to see it here."}
+                  {preview
+                    ? closedKind === "soon"
+                      ? "Heats open for booking soon."
+                      : "Bookings are closed."
+                    : allFull
+                      ? "No heats left to book right now."
+                      : "Pick a heat to see it here."}
                 </p>
               )}
             </div>

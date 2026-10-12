@@ -15,6 +15,7 @@ import Countdown from "@/components/Countdown";
 import { dateParts, formatEventDate, isDateTbc } from "@/lib/dates";
 import { buildHeats, hasHeats, heatLabel, type HeatConfig } from "@/lib/heats";
 import { bookingRef } from "@/lib/bookings";
+import { formatFee } from "@/lib/money";
 import { todayInMelbourne } from "@/lib/events";
 
 export const metadata: Metadata = {
@@ -144,10 +145,26 @@ export default async function DashboardPage({
       ? buildHeats(soonestUpcoming).find((h) => h.number === soonestUpcoming.heat_number)
       : undefined;
 
+  // A confirmed heat counts down to that heat. An unfinished booking counts
+  // down to the first heat, and an event without heats to the start gun.
+  const spotlightPending = !!soonestUpcoming && soonestUpcoming.status !== "confirmed";
+  const spotlightFirstHeat =
+    soonestUpcoming && hasHeats(soonestUpcoming) ? soonestUpcoming.first_heat_time : null;
+  const spotlightCountdown = spotlightPending
+    ? {
+        time: spotlightFirstHeat,
+        label: spotlightFirstHeat ? "First heat in" : "Start gun in",
+      }
+    : {
+        time: spotlightHeat?.startTime ?? null,
+        label: spotlightHeat?.startTime ? "Your heat starts in" : "Start gun in",
+      };
+
   const spotlight = soonestUpcoming
     ? {
         tbc: isDateTbc(soonestUpcoming.date),
-        pending: soonestUpcoming.status !== "confirmed",
+        pending: spotlightPending,
+        countdown: spotlightCountdown,
         ...entryLink(soonestUpcoming),
       }
     : null;
@@ -206,20 +223,20 @@ export default async function DashboardPage({
             <div className="flex items-center gap-2 flex-wrap">
               <Link
                 href={`/athletes/${user.id}`}
-                className="text-xs font-medium text-white border border-white/20 px-4 py-2 hover:border-white/50 transition-colors"
+                className="inline-flex items-center min-h-11 text-xs font-medium text-white border border-white/20 px-4 py-2 hover:border-white/50 transition-colors"
               >
                 Public profile
               </Link>
               <Link
                 href="#profile"
-                className="text-xs font-medium text-white border border-white/20 px-4 py-2 hover:border-white/50 transition-colors"
+                className="inline-flex items-center min-h-11 text-xs font-medium text-white border border-white/20 px-4 py-2 hover:border-white/50 transition-colors"
               >
                 Edit profile
               </Link>
               {user.isAdmin && (
                 <Link
                   href="/admin"
-                  className="text-xs font-medium bg-terracotta text-white px-4 py-2 hover:bg-terracotta/90 transition-colors"
+                  className="inline-flex items-center min-h-11 text-xs font-medium bg-terracotta text-white px-4 py-2 hover:bg-terracotta/90 transition-colors"
                 >
                   Admin
                 </Link>
@@ -256,7 +273,7 @@ export default async function DashboardPage({
             </div>
             <div className="hidden md:block">
               <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums text-gold">
-                ${(earnings / 100).toFixed(0)}
+                {formatFee(earnings)}
               </p>
               <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
                 Earned
@@ -333,13 +350,11 @@ export default async function DashboardPage({
                 ) : (
                   <>
                     <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60 mb-2">
-                      {spotlightHeat?.startTime && !spotlight.pending
-                        ? "Your heat starts in"
-                        : "Start gun in"}
+                      {spotlight.countdown.label}
                     </p>
                     <Countdown
                       target={soonestUpcoming.date}
-                      time={spotlight.pending ? null : (spotlightHeat?.startTime ?? null)}
+                      time={spotlight.countdown.time}
                       className="text-white"
                     />
                   </>
@@ -456,7 +471,7 @@ export default async function DashboardPage({
                   </p>
                   <Link
                     href="/events"
-                    className="inline-block bg-midnight text-white text-sm font-medium px-5 py-2.5 hover:bg-midnight/90 transition-colors"
+                    className="inline-flex items-center min-h-11 bg-midnight text-white text-sm font-medium px-5 py-2.5 hover:bg-midnight/90 transition-colors"
                   >
                     Browse events
                   </Link>

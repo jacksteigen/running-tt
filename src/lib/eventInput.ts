@@ -106,6 +106,10 @@ export function parseEventInput(
     const fh = str(body.firstHeatTime, 5);
     if (fh) {
       if (!isValidClock(fh)) return { ok: false, error: "First heat time does not look right" };
+      const [hh, mm] = fh.split(":").map(Number);
+      if (hh * 60 + mm + (count - 1) * interval >= 1440) {
+        return { ok: false, error: "Every heat has to start before midnight. Start earlier or run fewer heats." };
+      }
       firstHeat = fh;
       time = formatClock(fh);
     } else {

@@ -6,6 +6,17 @@ import { OUTCOMES, type Outcome } from "@/lib/outcomes";
 
 export type FinishOutcome = { ok: true } | { ok: false; error: string };
 
+/**
+ * A time taken on the stopwatch that is not on the server yet. It lives with
+ * the results editor (and in localStorage), not here, so switching heats,
+ * searching or reloading never loses it.
+ */
+export interface StopwatchCapture {
+  time: string;
+  /** Why the save failed, or null while it is still on its way. */
+  error: string | null;
+}
+
 export interface StopwatchAthlete {
   userId: string;
   name: string;
@@ -14,6 +25,8 @@ export interface StopwatchAthlete {
   rank: number | null;
   /** DNF, DNS or DQ, when the athlete has no time. */
   outcome: Outcome | null;
+  /** A finish taken here that has not saved yet. */
+  capture: StopwatchCapture | null;
 }
 
 function clockKey(eventId: string, heat: number) {
@@ -148,6 +161,7 @@ export default function HeatStopwatch({
   onFinish,
   onUndo,
   onOutcome,
+  onDismiss,
 }: {
   heatNumber: number;
   /** "5:45pm", or null while heat times are not set. */
@@ -159,16 +173,19 @@ export default function HeatStopwatch({
   onFinish: (userId: string, time: string) => Promise<FinishOutcome>;
   onUndo: (userId: string) => Promise<boolean>;
   onOutcome: (userId: string, outcome: Outcome) => Promise<boolean>;
+  /** Throw away a time that did not save. The editor asks first. */
+  onDismiss: (userId: string) => void;
 }) {
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
-  // A captured time that failed to save, kept so a retry sends the same time.
-  const [unsaved, setUnsaved] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState("");
   const pressedAt = useRef<Record<string, number>>({});
 
   const runners = [...athletes].sort((a, b) => a.name.localeCompare(b.name));
   const untimed = athletes.filter((a) => !a.timeDisplay && !a.outcome).length;
+  const notSaved = athletes.filter(
+    (a) => a.capture && a.capture.error !== null && !a.timeDisplay && !a.outcome
+  ).length;
 
   /** Set or clear one athlete's entry in a per-athlete map. */
   function patch<T>(
@@ -184,22 +201,18 @@ export default function HeatStopwatch({
     });
   }
 
+  /** Save a time. A failure is held by the editor as a capture, with a retry. */
   async function record(athlete: StopwatchAthlete, time: string) {
     patch(setBusy, athlete.userId, true);
     patch(setErrors, athlete.userId, undefined);
     const outcome = await onFinish(athlete.userId, time);
     patch(setBusy, athlete.userId, undefined);
-    if (outcome.ok) {
-      patch(setUnsaved, athlete.userId, undefined);
-      setNotice(`${athlete.name} finished in ${time}.`);
-    } else {
-      patch(setUnsaved, athlete.userId, time);
-      patch(setErrors, athlete.userId, `${time} not saved. ${outcome.error}`);
-    }
+    if (outcome.ok) setNotice(`${athlete.name} finished in ${time}.`);
   }
 
   function finish(athlete: StopwatchAthlete) {
-    if (!startedAt || busy[athlete.userId]) return;
+    // Once a time is taken, only a retry or a discard can replace it.
+    if (!startedAt || busy[athlete.userId] || athlete.capture) return;
     // Time from the moment the finger landed, not when it lifted.
     const now = Date.now();
     const pressed = pressedAt.current[athlete.userId];
@@ -271,6 +284,12 @@ export default function HeatStopwatch({
               {heatTime ? ` · ${heatTime}` : ""}
               <span className="text-stone/40"> · </span>
               {untimed === 0 ? "everyone timed" : `${untimed} to finish`}
+              {notSaved > 0 && (
+                <span className="text-gold">
+                  {" · "}
+                  {notSaved} not saved, retry below
+                </span>
+              )}
             </p>
           </div>
           <button
@@ -316,9 +335,9 @@ export default function HeatStopwatch({
           when they finish, so nothing moves under the next tap. */}
       <ul className="mt-6 space-y-2">
         {runners.map((a) => {
-          const saving = !!busy[a.userId];
+          const capture = !a.timeDisplay && !a.outcome ? a.capture : null;
+          const saving = !!busy[a.userId] || capture?.error === null;
           const error = errors[a.userId];
-          const retry = unsaved[a.userId];
           return (
             <li key={a.userId}>
               {a.timeDisplay || a.outcome ? (
@@ -349,6 +368,27 @@ export default function HeatStopwatch({
                 </div>
               ) : (
                 <div className="flex gap-2">
+                {capture ? (
+                  // Taken but not on the server yet: hold the slot with the
+                  // time so a second tap can never replace it with a later one.
+                  <div className="w-full min-w-0 min-h-14 flex items-center justify-between gap-4 px-4 py-2 border border-gold/60 bg-gold/10">
+                    <span className="min-w-0">
+                      <span className="block font-medium truncate text-white">{a.name}</span>
+                      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-gold">
+                        <span
+                          aria-hidden
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full bg-gold ${
+                            saving ? "motion-safe:animate-pulse" : ""
+                          }`}
+                        />
+                        {saving ? "Saving" : "Not saved"}
+                      </span>
+                    </span>
+                    <span className="shrink-0 font-mono text-base font-semibold tabular-nums text-gold">
+                      {capture.time}
+                    </span>
+                  </div>
+                ) : (
                 <button
                   type="button"
                   onPointerDown={() => {
@@ -369,6 +409,7 @@ export default function HeatStopwatch({
                     {saving ? "Saving" : "Finish"}
                   </span>
                 </button>
+                )}
                 <button
                   type="button"
                   onClick={() => markDnf(a)}
@@ -380,22 +421,39 @@ export default function HeatStopwatch({
                 </button>
                 </div>
               )}
+              {capture && capture.error !== null && (
+                <div
+                  role="alert"
+                  className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-l-2 border-gold pl-3 text-xs text-stone"
+                >
+                  <span>
+                    {capture.time} not saved. {capture.error}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => record(a, capture.time)}
+                    disabled={saving}
+                    className="min-h-11 px-3 font-medium text-white border border-white/30 hover:border-white/60 transition-colors disabled:opacity-40"
+                  >
+                    Retry <span className="font-mono">{capture.time}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDismiss(a.userId)}
+                    disabled={saving}
+                    aria-label={`Discard ${capture.time} for ${a.name}`}
+                    className="min-h-11 px-2 text-stone/60 hover:text-terracotta transition-colors disabled:opacity-40"
+                  >
+                    Discard
+                  </button>
+                </div>
+              )}
               {error && (
                 <div
                   role="alert"
                   className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-l-2 border-terracotta pl-3 text-xs text-stone"
                 >
                   <span>{error}</span>
-                  {retry && !a.timeDisplay && !a.outcome && (
-                    <button
-                      type="button"
-                      onClick={() => record(a, retry)}
-                      disabled={saving}
-                      className="min-h-11 px-3 font-medium text-white border border-white/30 hover:border-white/60 transition-colors"
-                    >
-                      Retry {retry}
-                    </button>
-                  )}
                 </div>
               )}
             </li>

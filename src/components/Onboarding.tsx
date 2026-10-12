@@ -3,6 +3,7 @@
 import { useState } from "react";
 import CountrySelect from "@/components/CountrySelect";
 import { formatEventDate } from "@/lib/dates";
+import { formatFee } from "@/lib/money";
 
 interface Initial {
   firstName: string;
@@ -56,7 +57,9 @@ export default function Onboarding({
 
   // Someone part way through booking a heat skips the event offer.
   const offer = next ? null : openEvent;
-  const toBooking = !!next && next.includes("/book");
+  // Exactly /events/<slug>/book. A /booked link means the heat is already theirs.
+  const toBooking = !!next && /\/events\/[^/]+\/book(\?|$)/.test(next);
+  const toBooked = !!next && /\/events\/[^/]+\/booked(\?|$)/.test(next);
   const totalSteps = offer ? 4 : 3;
 
   function set<K extends keyof Initial>(key: K, value: string) {
@@ -186,6 +189,7 @@ export default function Onboarding({
           <p className="text-sm text-stone/60 leading-relaxed">
             This is how your name appears on results and your athlete page.
             {toBooking && " Three quick steps, then you pick your heat."}
+            {toBooked && " Three quick steps, then straight to your booking."}
           </p>
           <div>
             <label htmlFor="firstName" className={labelCls}>
@@ -356,9 +360,11 @@ export default function Onboarding({
                 ? "Saving..."
                 : toBooking
                   ? "Save and pick your heat"
-                  : next || offer
-                    ? "Save and continue"
-                    : "Finish"}
+                  : toBooked
+                    ? "Save and see your booking"
+                    : next || offer
+                      ? "Save and continue"
+                      : "Finish"}
             </button>
           </div>
         </form>
@@ -382,7 +388,7 @@ export default function Onboarding({
             </p>
             <p className="font-mono text-xs text-stone/60 mt-4">
               {offer.entryFeeCents > 0
-                ? `$${(offer.entryFeeCents / 100).toFixed(0)} entry`
+                ? `${formatFee(offer.entryFeeCents)} entry`
                 : "Free entry"}
             </p>
           </div>
@@ -405,7 +411,7 @@ export default function Onboarding({
           )}
           <a
             href="/dashboard?welcome=1"
-            className="block text-center mt-4 py-2 text-sm text-stone/50 hover:text-white transition-colors"
+            className="mt-4 w-full min-h-11 inline-flex items-center justify-center py-2 text-sm text-stone/50 hover:text-white transition-colors"
           >
             Not this time
           </a>

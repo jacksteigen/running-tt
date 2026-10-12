@@ -40,10 +40,10 @@ export const EVENT_BOOKING_COLUMNS = `id, slug, name, distance, date, time, venu
 
 export type BookingResult =
   | { ok: true; entryId: string; confirmed: boolean; checkoutUrl?: string }
-  | { ok: false; status: number; code: string; error: string };
+  | { ok: false; status: number; code: string; error: string; holdReleased?: boolean };
 
-function fail(status: number, code: string, error: string): BookingResult {
-  return { ok: false, status, code, error };
+function fail(status: number, code: string, error: string, holdReleased = false): BookingResult {
+  return { ok: false, status, code, error, holdReleased };
 }
 
 /** Short, readable reference for tickets and emails: RTT-3F9A2C. */
@@ -174,6 +174,8 @@ export async function createBooking(
       .bind(existing.id)
       .run();
   }
+  // From here on, any spot this athlete was holding has been given up.
+  const released = !!existing;
 
   const paid = event.entry_fee_cents > 0;
   const entryId = `ent_${generateId()}`;
@@ -211,19 +213,23 @@ export async function createBooking(
            SELECT ?, ?, ?, ?, ?
            WHERE (SELECT COUNT(*) FROM entries WHERE event_id = ? AND ${OCCUPYING_SQL}) < ?`
         )
-        .bind(entryId, event.id, user.id, status, ageGroup, event.id, event.max_entries ?? 1_000_000)
+        .bind(
+          entryId, event.id, user.id, status, ageGroup, event.id,
+          // No limit set (null or 0) means unlimited.
+          event.max_entries && event.max_entries > 0 ? event.max_entries : 1_000_000
+        )
         .run();
       inserted = res.meta.changes ?? 0;
     }
   } catch {
     // UNIQUE(event_id, user_id): the same athlete booking from two tabs.
-    return fail(409, "ALREADY_BOOKED", "You already have a booking for this event.");
+    return fail(409, "ALREADY_BOOKED", "You already have a booking for this event.", released);
   }
 
   if (!inserted) {
     return withHeats
-      ? fail(409, "HEAT_FULL", "That heat has just filled up. Pick another one.")
-      : fail(409, "EVENT_FULL", "This event is full.");
+      ? fail(409, "HEAT_FULL", "That heat has just filled up. Pick another one.", released)
+      : fail(409, "EVENT_FULL", "This event is full.", released);
   }
 
   if (!paid) {
@@ -252,14 +258,14 @@ export async function createBooking(
     if (!(linked.meta.changes ?? 0)) {
       // The row was replaced by a booking from another tab meanwhile.
       await expireCheckoutSession(checkout.id);
-      return fail(409, "IN_PROGRESS", "Your booking was started in another tab. Refresh and try again.");
+      return fail(409, "IN_PROGRESS", "Your booking was started in another tab. Refresh and try again.", true);
     }
 
     return { ok: true, entryId, confirmed: false, checkoutUrl: checkout.url ?? undefined };
   } catch (err) {
     console.error("Checkout creation failed", err instanceof Error ? err.message : "unknown");
     await db.prepare("DELETE FROM entries WHERE id = ?").bind(entryId).run();
-    return fail(502, "PAYMENT_UNAVAILABLE", "Payments are unavailable right now. Try again shortly.");
+    return fail(502, "PAYMENT_UNAVAILABLE", "Payments are unavailable right now. Try again shortly.", true);
   }
 }
 

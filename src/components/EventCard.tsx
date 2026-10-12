@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { dateParts, formatEventDate } from "@/lib/dates";
+import { formatFee } from "@/lib/money";
 
 interface EventCardProps {
   slug: string;
@@ -94,7 +95,7 @@ export default function EventCard({
                 )}
                 <span className="font-mono">
                   {entryFeeCents > 0
-                    ? `$${(entryFeeCents / 100).toFixed(0)} entry`
+                    ? `${formatFee(entryFeeCents)} entry`
                     : "Free"}
                 </span>
               </>

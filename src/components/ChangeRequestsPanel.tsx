@@ -10,6 +10,7 @@ import {
   sendWithHeatCheck,
   type HeatOption,
 } from "@/components/WalkUpForm";
+import { formatFee } from "@/lib/money";
 
 export interface ChangeRequest {
   id: string;
@@ -52,7 +53,7 @@ export default function ChangeRequestsPanel({
 
   const fee =
     changeFeeCents && changeFeeCents > 0
-      ? `$${(changeFeeCents / 100).toFixed(changeFeeCents % 100 ? 2 : 0)} admin fee`
+      ? `${formatFee(changeFeeCents)} admin fee`
       : "admin fee";
 
   function targetFor(r: ChangeRequest): string {

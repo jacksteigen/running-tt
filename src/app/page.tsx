@@ -8,8 +8,14 @@ import Sponsors from "@/components/Sponsors";
 import Reveal from "@/components/Reveal";
 import { displayStatus, todayInMelbourne } from "@/lib/events";
 import { formatEventDate, isDateTbc } from "@/lib/dates";
-import { hasHeats, heatWindow } from "@/lib/heats";
+import {
+  getHeatAvailability,
+  hasHeats,
+  heatWindow,
+  type HeatAvailability,
+} from "@/lib/heats";
 import { bookingClosedReason, type BookableEvent } from "@/lib/bookings";
+import { formatFee } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
@@ -47,18 +53,31 @@ const steps = [
 ];
 
 /** What the "Next event" band says and where its button goes. */
-function describeSpotlight(event: BookableEvent, entered: number) {
-  const bookable = bookingClosedReason(event) === null;
+function describeSpotlight(
+  event: BookableEvent,
+  entered: number,
+  heats: HeatAvailability[]
+) {
+  const open = bookingClosedReason(event) === null;
   const withHeats = hasHeats(event);
+  // Open, but no heat left to book: each one is full or has already started.
+  const noHeatLeft =
+    withHeats && open && heats.length > 0 && heats.every((h) => !h.bookable);
+  const bookable = open && !noHeatLeft;
   const cta =
     withHeats && bookable
       ? { href: `/events/${event.slug}/book`, label: "Book your heat" }
       : bookable
         ? { href: `/events/${event.slug}`, label: "Enter now" }
         : { href: `/events/${event.slug}`, label: "See the event" };
+  const fullNote = noHeatLeft
+    ? heats.every((h) => h.full)
+      ? "Every heat is full right now. Spots can free up as unfinished checkouts expire."
+      : "Every heat still to run is full. Spots can free up as unfinished checkouts expire."
+    : null;
   const facts = [
     event.entry_fee_cents > 0
-      ? `$${(event.entry_fee_cents / 100).toFixed(0)} entry`
+      ? `${formatFee(event.entry_fee_cents)} entry`
       : "Free entry",
     withHeats
       ? `${event.heat_count} heats${
@@ -73,6 +92,7 @@ function describeSpotlight(event: BookableEvent, entered: number) {
     tbc: isDateTbc(event.date),
     heatTimes: withHeats ? heatWindow(event) : null,
     cta,
+    fullNote,
     facts,
   };
 }
@@ -105,8 +125,14 @@ export default async function Home() {
     upcomingEvents.results.find((e) => bookingClosedReason(e) === null) ??
     upcomingEvents.results[0];
 
+  // Live heat availability, only needed while the event is taking bookings.
+  const spotlightHeats =
+    nextOpen && hasHeats(nextOpen) && bookingClosedReason(nextOpen) === null
+      ? await getHeatAvailability(db, nextOpen)
+      : [];
+
   const spotlight = nextOpen
-    ? describeSpotlight(nextOpen, countMap.get(nextOpen.id) ?? 0)
+    ? describeSpotlight(nextOpen, countMap.get(nextOpen.id) ?? 0, spotlightHeats)
     : null;
 
   return (
@@ -202,6 +228,15 @@ export default async function Home() {
                     </span>
                   ))}
                 </div>
+                {spotlight.fullNote && (
+                  <p className="mt-5 flex items-start gap-2.5 max-w-md text-sm text-white/90 leading-relaxed">
+                    <span
+                      aria-hidden
+                      className="mt-[7px] inline-block w-1.5 h-1.5 rounded-full bg-white/70 shrink-0"
+                    />
+                    {spotlight.fullNote}
+                  </p>
+                )}
                 <Link
                   href={spotlight.cta.href}
                   className="inline-flex items-center gap-2 mt-6 bg-white text-terracotta font-medium px-6 py-3 min-h-[44px] text-sm hover:bg-bone transition-colors"
@@ -296,7 +331,7 @@ export default async function Home() {
             </div>
             <Link
               href="/events"
-              className="text-sm text-terracotta hover:text-terracotta/80 transition-colors"
+              className="inline-flex items-center min-h-11 -mb-3 text-sm text-terracotta hover:text-terracotta/80 transition-colors"
             >
               View all →
             </Link>
@@ -358,7 +393,7 @@ export default async function Home() {
             </div>
             <Link
               href="/format"
-              className="text-sm text-terracotta hover:text-terracotta/80 transition-colors"
+              className="inline-flex items-center min-h-11 -mb-3 text-sm text-terracotta hover:text-terracotta/80 transition-colors"
             >
               Full breakdown →
             </Link>

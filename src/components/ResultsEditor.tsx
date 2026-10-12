@@ -10,9 +10,14 @@ import {
   stopwatchReading,
   type PrizeSlot,
 } from "@/lib/racetime";
-import HeatStopwatch, { useHeatClocks, type FinishOutcome } from "@/components/HeatStopwatch";
+import HeatStopwatch, {
+  useHeatClocks,
+  type FinishOutcome,
+  type StopwatchCapture,
+} from "@/components/HeatStopwatch";
 import type { HeatOption } from "@/components/WalkUpForm";
 import { OUTCOMES, type Outcome } from "@/lib/outcomes";
+import { formatFee } from "@/lib/money";
 
 export interface OutcomeMark {
   userId: string;
@@ -64,6 +69,52 @@ type ResultsResponse = {
   code?: string;
   suggestion?: string | null;
 };
+
+type Captures = Record<string, StopwatchCapture>;
+
+function capturesKey(eventId: string) {
+  return `rtt-captures-${eventId}`;
+}
+
+/** Stopwatch times this device took that are not on the server yet. */
+function readCaptures(eventId: string): Captures {
+  try {
+    const raw = window.localStorage.getItem(capturesKey(eventId));
+    const list: unknown = raw ? JSON.parse(raw) : [];
+    const found: Captures = {};
+    if (!Array.isArray(list)) return found;
+    for (const item of list) {
+      if (item && typeof item.userId === "string" && typeof item.time === "string" && item.time) {
+        found[item.userId] = {
+          time: item.time,
+          error: typeof item.error === "string" ? item.error : null,
+        };
+      }
+    }
+    return found;
+  } catch {
+    return {};
+  }
+}
+
+function writeCaptures(eventId: string, captures: Captures) {
+  try {
+    const key = capturesKey(eventId);
+    const list = Object.entries(captures).map(([userId, c]) => ({
+      userId,
+      time: c.time,
+      error: c.error,
+    }));
+    if (list.length === 0) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+    const value = JSON.stringify(list);
+    if (window.localStorage.getItem(key) !== value) window.localStorage.setItem(key, value);
+  } catch {
+    // Private mode or storage full: the times are still held on this page.
+  }
+}
 
 /** Phones have no colon on the number pad, so 4.32.10 means 4:32.10. */
 function normaliseTime(input: string) {
@@ -142,6 +193,44 @@ export default function ResultsEditor({
     () => new Map(entrants.map((e) => [e.userId, e])),
     [entrants]
   );
+
+  // Stopwatch times not on the server yet, by athlete. They live here and on
+  // this device, never inside the stopwatch, so a heat switch, a search or a
+  // reload cannot lose one. null until localStorage has been read.
+  const [captures, setCaptures] = useState<Captures | null>(null);
+
+  useEffect(() => {
+    const restored = readCaptures(eventId);
+    // A save still on its way when the page closed never came back.
+    for (const c of Object.values(restored)) {
+      if (c.error === null) c.error = "The page closed before it saved.";
+    }
+    setCaptures(restored);
+    const key = capturesKey(eventId);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === key) setCaptures(readCaptures(eventId));
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [eventId]);
+
+  useEffect(() => {
+    if (captures) writeCaptures(eventId, captures);
+  }, [eventId, captures]);
+
+  // Done with once the athlete has a saved time or a DNF, DNS or DQ, or is no
+  // longer on the start list.
+  if (captures) {
+    const stale = Object.keys(captures).filter(
+      (id) => !entrantById.has(id) || standingByUser.has(id) || outcomeByUser.has(id)
+    );
+    if (stale.length > 0) {
+      const next = { ...captures };
+      for (const id of stale) delete next[id];
+      setCaptures(next);
+    }
+  }
+  const unsaved: Captures = captures ?? {};
 
   // Open on the first heat that still has someone to time.
   const [tab, setTab] = useState<Tab>(() => {
@@ -371,9 +460,17 @@ export default function ResultsEditor({
       }
     }
 
+    // Retrying a stopwatch time that did not save: show it as on its way
+    // everywhere, and keep it if this attempt fails too.
+    const capture = unsaved[userId];
+    const forCapture = !!capture && capture.time === time;
+
     update(userId, { draft: typed, status: "saving", message: undefined });
+    if (forCapture) putCapture(userId, { time, error: null });
     const outcome = await submit(userId, time, opts.confirmLong);
+    if (!outcome.ok && forCapture) putCapture(userId, { time, error: outcome.error });
     if (outcome.ok) {
+      dropCapture(userId);
       settle(userId, "saved");
       setTimeout(
         () =>
@@ -392,6 +489,9 @@ export default function ResultsEditor({
         suggestion: outcome.suggestion ?? null,
         message: outcome.error,
       });
+    } else if (forCapture) {
+      // The stopwatch warning on the row carries this error, with a retry.
+      update(userId, { status: "idle", message: undefined });
     } else {
       update(userId, { status: "error", message: outcome.error });
     }
@@ -417,11 +517,51 @@ export default function ResultsEditor({
     }
   }
 
+  function putCapture(userId: string, capture: StopwatchCapture) {
+    setCaptures((prev) => ({ ...(prev ?? {}), [userId]: capture }));
+  }
+
+  function dropCapture(userId: string) {
+    setCaptures((prev) => {
+      if (!prev || !(userId in prev)) return prev;
+      const next = { ...prev };
+      delete next[userId];
+      return next;
+    });
+  }
+
+  function dismissCapture(userId: string) {
+    const capture = unsaved[userId];
+    if (!capture) return;
+    const name = entrantById.get(userId)?.name ?? "this athlete";
+    if (
+      window.confirm(
+        `Discard the stopwatch time ${capture.time} for ${name}? It has not been saved, and it cannot be got back.`
+      )
+    ) {
+      dropCapture(userId);
+    }
+  }
+
   async function finishFromClock(userId: string, time: string): Promise<FinishOutcome> {
+    // Hold the time before it goes anywhere, so a bad signal, a heat switch
+    // or a reload mid-save never loses it.
+    putCapture(userId, { time, error: null });
     const outcome = await submit(userId, time);
     if (outcome.ok) {
+      dropCapture(userId);
       settle(userId, "idle");
       return { ok: true };
+    }
+    putCapture(userId, { time, error: outcome.error });
+    if (outcome.code === "LONG_TIME") {
+      update(userId, {
+        draft: time,
+        status: "confirm",
+        asked: time,
+        suggestion: outcome.suggestion ?? null,
+        message: outcome.error,
+      });
     }
     return { ok: false, error: outcome.error };
   }
@@ -470,10 +610,28 @@ export default function ResultsEditor({
   const currentHeat = activeTab === "all" ? null : heats.find((h) => h.number === activeTab) ?? null;
   const heatEntrants = currentHeat ? entrants.filter((e) => e.heat === currentHeat.number) : [];
 
+  // Stopwatch times that failed to save (not ones still on their way). Each
+  // heat tab flags its own, and anything outside this view gets a pointer.
+  const failedIds = Object.keys(unsaved).filter((id) => unsaved[id].error !== null);
+  const tabFor = (id: string): Tab => {
+    const h = entrantById.get(id)?.heat;
+    return h && heats.some((x) => x.number === h) ? h : "all";
+  };
+  const failedByTab = new Map<Tab, number>();
+  for (const id of failedIds) {
+    const t = tabFor(id);
+    if (t !== "all") failedByTab.set(t, (failedByTab.get(t) ?? 0) + 1);
+  }
+  failedByTab.set("all", failedIds.length);
+  const shownIds = new Set(visible.map((e) => e.userId));
+  const failedElsewhere = failedIds.filter((id) => !shownIds.has(id));
+  const elsewhereTabs = [...new Set(failedElsewhere.map(tabFor))];
+
   function tabButton(key: Tab, title: string, sub: string, timed: number, total: number) {
     const selected = activeTab === key;
     const running = key !== "all" && !!clocks[key];
     const complete = total > 0 && timed === total;
+    const failed = failedByTab.get(key) ?? 0;
     return (
       <button
         key={String(key)}
@@ -488,6 +646,11 @@ export default function ResultsEditor({
         aria-controls="results-panel"
         tabIndex={selected ? 0 : -1}
         onClick={() => selectTab(key)}
+        title={
+          failed > 0
+            ? `${failed} stopwatch ${failed === 1 ? "time" : "times"} not saved`
+            : undefined
+        }
         className={`shrink-0 min-w-[4.75rem] px-3 pt-3 pb-2.5 text-left border-b-2 -mb-px transition-colors ${
           selected
             ? "border-terracotta text-midnight bg-bone/40"
@@ -500,6 +663,14 @@ export default function ResultsEditor({
             <>
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-terracotta" />
               <span className="sr-only">(clock running)</span>
+            </>
+          )}
+          {failed > 0 && (
+            <>
+              <span aria-hidden className="h-2 w-2 rounded-full bg-gold ring-2 ring-gold/25" />
+              <span className="sr-only">
+                ({failed} stopwatch {failed === 1 ? "time" : "times"} not saved)
+              </span>
             </>
           )}
         </span>
@@ -602,6 +773,28 @@ export default function ResultsEditor({
           </p>
         )}
 
+        {failedElsewhere.length > 0 && (
+          <div className="px-4 sm:px-5 py-2 border-b border-gold/50 bg-gold/10 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="flex-1 min-w-[12rem] text-xs text-midnight leading-relaxed">
+              <span aria-hidden className="inline-block h-2 w-2 rounded-full bg-gold mr-2 align-middle" />
+              {failedElsewhere.length} stopwatch{" "}
+              {failedElsewhere.length === 1 ? "time" : "times"} not saved outside this view.
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {elsewhereTabs.map((t) => (
+                <button
+                  key={String(t)}
+                  type="button"
+                  onClick={() => selectTab(t)}
+                  className="min-h-11 px-3 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] border border-midnight/30 text-midnight hover:border-midnight transition-colors"
+                >
+                  {t === "all" ? "Show all" : `Show H${t}`}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {currentHeat && !query && heatEntrants.length > 0 && (
           <HeatStopwatch
             key={currentHeat.number}
@@ -619,10 +812,12 @@ export default function ResultsEditor({
                 timeDisplay: s?.timeDisplay ?? null,
                 rank: s?.rank ?? null,
                 outcome: outcomeByUser.get(e.userId) ?? null,
+                capture: unsaved[e.userId] ?? null,
               };
             })}
             onFinish={finishFromClock}
             onUndo={undoFromClock}
+            onDismiss={dismissCapture}
             onOutcome={async (userId, outcome) => {
               const ok = await markOutcome(userId, outcome);
               if (ok) settle(userId, "idle");
@@ -645,6 +840,7 @@ export default function ResultsEditor({
               const row = rows[entrant.userId] ?? { status: "idle" as const };
               const standing = standingByUser.get(entrant.userId);
               const mark = outcomeByUser.get(entrant.userId);
+              const capture = unsaved[entrant.userId];
               const value = row.draft ?? standing?.timeDisplay ?? "";
               const meta = [
                 entrant.ageGroup ?? "No age group",
@@ -654,9 +850,7 @@ export default function ResultsEditor({
                     : "No heat"
                   : null,
                 standing?.ageGroupRank ? `${ordinal(standing.ageGroupRank)} in group` : null,
-                standing && standing.prizeCents > 0
-                  ? `$${(standing.prizeCents / 100).toFixed(0)}`
-                  : null,
+                standing && standing.prizeCents > 0 ? formatFee(standing.prizeCents) : null,
               ]
                 .filter(Boolean)
                 .join(" · ");
@@ -766,6 +960,57 @@ export default function ResultsEditor({
                       )}
                     </div>
                   </div>
+
+                  {capture &&
+                    (capture.error === null ? (
+                      <p className="mt-2 sm:ml-11 flex items-center gap-2 text-xs text-midnight/60">
+                        <span
+                          aria-hidden
+                          className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold motion-safe:animate-pulse"
+                        />
+                        Saving stopwatch time{" "}
+                        <span className="font-mono tabular-nums">{capture.time}</span>
+                      </p>
+                    ) : (
+                      <div
+                        role="alert"
+                        className="mt-2 sm:ml-11 border border-gold/60 bg-gold/10 px-3 py-2.5"
+                      >
+                        <p className="text-xs text-midnight leading-relaxed">
+                          <span className="font-semibold">
+                            Stopwatch time{" "}
+                            <span className="font-mono tabular-nums">{capture.time}</span> not
+                            saved.
+                          </span>{" "}
+                          <span className="text-midnight/70">{capture.error}</span>
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => saveRow(entrant.userId, { time: capture.time })}
+                            disabled={row.status === "saving"}
+                            className="h-11 px-4 text-xs font-medium bg-midnight text-white hover:bg-midnight/90 transition-colors disabled:opacity-40"
+                          >
+                            {row.status === "saving" ? (
+                              "Saving"
+                            ) : (
+                              <>
+                                Retry <span className="font-mono">{capture.time}</span>
+                              </>
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => dismissCapture(entrant.userId)}
+                            disabled={row.status === "saving"}
+                            aria-label={`Discard ${capture.time} for ${entrant.name}`}
+                            className="h-11 px-4 text-xs font-medium border border-midnight/30 text-midnight hover:border-midnight transition-colors disabled:opacity-40"
+                          >
+                            Discard
+                          </button>
+                        </div>
+                      </div>
+                    ))}
 
                   <div
                     role="group"

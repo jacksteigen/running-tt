@@ -199,9 +199,11 @@ export interface BookingTicketProps {
   heatLabel: string | null;
   /** 24h "HH:MM" start of the heat, or null while it is not set. */
   heatStart: string | null;
-  /** "$15 AUD, paid" or "Free entry". */
+  /** "$15 AUD, paid", "Free entry", or "Entered by Running TT" when the team added them. */
   entryText: string;
   email: string;
+  /** False when no confirmation email has gone out (e.g. added by the team without one). */
+  emailed?: boolean;
 }
 
 /**
@@ -224,12 +226,19 @@ export default function BookingTicket({
   heatStart,
   entryText,
   email,
+  emailed = true,
 }: BookingTicketProps) {
   const [saved, setSaved] = useState(false);
   const firstName = athleteName.split(" ")[0] || athleteName;
   const tbc = isDateTbc(date);
   const parts = dateParts(date);
   const canCalendar = !tbc && !!heatStart && !!heatNumber;
+  // Say what is actually missing: the date, the heat times, or (no heats) a start time.
+  const calendarWaitText = tbc
+    ? "Add to calendar unlocks once the date is set."
+    : heatNumber
+      ? "Add to calendar unlocks once heat times are set."
+      : "Start times are on the event page.";
 
   function addToCalendar() {
     if (!heatStart || !heatNumber) return;
@@ -262,7 +271,12 @@ export default function BookingTicket({
           {heatNumber ? `Heat ${heatNumber} is yours, ${firstName}.` : `See you on the line, ${firstName}.`}
         </h1>
         <p className="mt-3 text-midnight/60 leading-relaxed max-w-xl">
-          Your confirmation is on its way to <span className="text-midnight font-medium break-words">{email}</span>.
+          {emailed ? (
+            <>
+              Your confirmation is on its way to{" "}
+              <span className="text-midnight font-medium break-words">{email}</span>.{" "}
+            </>
+          ) : null}
           This page is your ticket, so come back any time.
         </p>
       </div>
@@ -375,7 +389,7 @@ export default function BookingTicket({
           </button>
         ) : (
           <p className="flex items-center justify-center border border-dashed border-stone px-4 py-3 min-h-12 text-xs text-midnight/50 text-center">
-            Add to calendar unlocks once heat times are set.
+            {calendarWaitText}
           </p>
         )}
         <Link

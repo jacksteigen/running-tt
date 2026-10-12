@@ -6,6 +6,7 @@ function pad(n: number) {
 }
 
 function spotsText(h: HeatAvailability) {
+  if (h.closed) return "Started";
   if (h.full) return "Full";
   if (h.remaining === 1) return "Last spot";
   if (h.remaining <= 3) return `Last ${h.remaining}`;
@@ -35,7 +36,15 @@ export default function HeatSchedule({
 
   const interval = heats.length > 1 ? heats[1].offsetMinutes - heats[0].offsetMinutes : null;
   const capacity = heats[0].capacity;
-  const left = heats.reduce((sum, h) => sum + h.remaining, 0);
+  // Heats that have already started no longer count towards spots left.
+  const toRun = heats.filter((h) => !h.closed);
+  const left = toRun.reduce((sum, h) => sum + h.remaining, 0);
+  const spotsSummary =
+    toRun.length === heats.length
+      ? `${left} of ${heats.length * capacity} open`
+      : toRun.length > 0
+        ? `${left} open in later heats`
+        : "All heats started";
 
   return (
     <div className="bg-white border border-stone/40">
@@ -50,7 +59,7 @@ export default function HeatSchedule({
 
       <ul className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-stone/30">
         {heats.map((h) => {
-          const low = !h.full && h.remaining <= 3;
+          const low = h.bookable && h.remaining <= 3;
           const row = (
             <>
               <span className="font-mono text-[11px] tracking-[0.15em] text-dust w-8 shrink-0">
@@ -58,7 +67,13 @@ export default function HeatSchedule({
               </span>
               <span
                 className={`flex-1 min-w-0 truncate font-mono text-sm tabular-nums ${
-                  h.full && showSpots ? "text-midnight/40 line-through decoration-midnight/30" : "font-medium"
+                  !showSpots
+                    ? "font-medium"
+                    : h.closed
+                      ? "text-midnight/40"
+                      : h.full
+                        ? "text-midnight/40 line-through decoration-midnight/30"
+                        : "font-medium"
                 }`}
               >
                 {h.label}
@@ -66,7 +81,7 @@ export default function HeatSchedule({
               {showSpots ? (
                 <span
                   className={`shrink-0 font-mono text-[11px] uppercase tracking-[0.12em] tabular-nums px-1.5 py-0.5 ${
-                    h.full
+                    !h.bookable
                       ? "text-midnight/40"
                       : low
                         ? "bg-gold/25 text-midnight"
@@ -85,7 +100,7 @@ export default function HeatSchedule({
 
           return (
             <li key={h.number} className="bg-white">
-              {bookHref && !h.full ? (
+              {bookHref && h.bookable ? (
                 <Link
                   href={`${bookHref}?heat=${h.number}`}
                   aria-label={`Book heat ${h.number}, ${h.label}, ${spotsText(h).toLowerCase()}`}
@@ -122,7 +137,7 @@ export default function HeatSchedule({
             : "Heat times are confirmed with the date."}
         </p>
         <p className="font-mono tabular-nums text-midnight/50">
-          {capacity} per heat{showSpots ? ` · ${left} of ${heats.length * capacity} open` : ""}
+          {capacity} per heat{showSpots ? ` · ${spotsSummary}` : ""}
         </p>
       </div>
     </div>

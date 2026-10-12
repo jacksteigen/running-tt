@@ -13,17 +13,50 @@ export default function RemoveEntryButton({
   disabled?: boolean;
 }) {
   const router = useRouter();
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  async function remove() {
-    if (!window.confirm(`Remove this entry for ${label}?`)) return;
+  async function remove(confirmPaid = false) {
+    if (!confirmPaid && !window.confirm(`Remove this entry for ${label}?`)) return;
+    setBusy(true);
+    setError("");
     try {
-      const res = await fetch(`/api/admin/entries/${entryId}`, { method: "DELETE" });
-      const data = (await res.json()) as { success?: boolean; error?: string };
-      if (data.success) router.refresh();
-      else setError(data.error || "Could not remove");
+      const res = await fetch(`/api/admin/entries/${entryId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmPaid }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+        code?: string;
+      };
+      if (data.success) {
+        router.refresh();
+      } else if (res.status === 409 && data.code === "PAID") {
+        // They paid online. Removing them needs a second, deliberate yes.
+        router.refresh();
+        if (
+          !confirmPaid &&
+          window.confirm(`${data.error || "This athlete paid online."} Remove them anyway?`)
+        ) {
+          setBusy(false);
+          await remove(true);
+          return;
+        }
+        setError(data.error || "They paid online, so they are still entered.");
+      } else {
+        setError(
+          data.error ||
+            (res.status === 502
+              ? "Could not reach Stripe to close their checkout. Try again in a minute."
+              : "Could not remove")
+        );
+      }
     } catch {
       setError("Could not connect");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -31,14 +64,18 @@ export default function RemoveEntryButton({
     <span className="inline-flex items-center gap-2">
       <button
         type="button"
-        onClick={remove}
-        disabled={disabled}
+        onClick={() => remove()}
+        disabled={disabled || busy}
         title={disabled ? "Clear their time first" : "Remove entry"}
-        className="text-xs text-dust hover:text-terracotta transition-colors disabled:opacity-30"
+        className="min-h-11 px-2 -mx-2 inline-flex items-center text-xs text-dust hover:text-terracotta transition-colors disabled:opacity-30"
       >
-        Remove
+        {busy ? "Removing..." : "Remove"}
       </button>
-      {error && <span className="text-xs text-terracotta">{error}</span>}
+      {error && (
+        <span role="alert" className="max-w-[12rem] sm:max-w-xs text-xs text-terracotta leading-snug">
+          {error}
+        </span>
+      )}
     </span>
   );
 }

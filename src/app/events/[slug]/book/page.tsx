@@ -14,8 +14,9 @@ import {
 import { formatEventDate, isDateTbc } from "@/lib/dates";
 import { HOLD_MINUTES, getHeatAvailability, hasHeats, isValidClock } from "@/lib/heats";
 import { todayInMelbourne } from "@/lib/events";
+import { formatFee } from "@/lib/money";
 import { retrieveCheckoutSession } from "@/lib/stripe";
-import HeatPicker, { type PickerViewer } from "@/components/HeatPicker";
+import HeatPicker, { type PickerClosedKind, type PickerViewer } from "@/components/HeatPicker";
 import { BookingSteps } from "@/components/BookingTicket";
 
 export const dynamic = "force-dynamic";
@@ -43,11 +44,26 @@ export async function generateMetadata({
   };
 }
 
+/**
+ * Whether closed bookings will open later (a TBC date, Coming Soon, or heat
+ * times still being set) or are closed for good (sold out, finished, or the
+ * last heat has started). Follows the order of bookingClosedReason().
+ */
+function closedKind(event: BookableEvent): PickerClosedKind {
+  if (isDateTbc(event.date)) return "soon";
+  if (event.date < todayInMelbourne()) return "final";
+  if (event.status === "Coming Soon") return "soon";
+  if (event.status !== "Open") return "final";
+  if (hasHeats(event) && !event.first_heat_time) return "soon";
+  return "final";
+}
+
 /** Short label for the disabled booking button while bookings are closed. */
 function closedCta(event: BookableEvent) {
-  if (!isDateTbc(event.date) && event.date < todayInMelbourne()) return "Event finished";
+  if (closedKind(event) === "soon") return "Booking opens soon";
+  if (event.date < todayInMelbourne()) return "Event finished";
   if (event.status === "Sold Out") return "Sold out";
-  return "Booking opens soon";
+  return "Bookings closed";
 }
 
 export default async function BookHeatPage({
@@ -70,10 +86,11 @@ export default async function BookHeatPage({
   // An unpaid checkout of theirs is still holding a spot. If Stripe has in
   // fact taken the money, confirm it now rather than letting them book twice.
   let heldHeat: number | null = null;
+  let heldSince: string | null = null;
   if (session) {
     const entry = await db
       .prepare(
-        `SELECT id, status, heat_number, stripe_payment_id,
+        `SELECT id, status, heat_number, stripe_payment_id, created_at,
                 (created_at > datetime('now', '-${HOLD_MINUTES} minutes')) as holding
          FROM entries WHERE event_id = ? AND user_id = ?`
       )
@@ -83,6 +100,7 @@ export default async function BookHeatPage({
         status: string;
         heat_number: number | null;
         stripe_payment_id: string | null;
+        created_at: string;
         holding: number;
       }>();
 
@@ -106,7 +124,10 @@ export default async function BookHeatPage({
         }
       }
       if (paid) redirect(`/events/${slug}/booked`);
-      if (entry.holding) heldHeat = entry.heat_number;
+      if (entry.holding && entry.heat_number) {
+        heldHeat = entry.heat_number;
+        heldSince = entry.created_at;
+      }
     }
   }
 
@@ -121,7 +142,7 @@ export default async function BookHeatPage({
   const wanted = Number(sp.heat);
   const initialHeat = Number.isInteger(wanted) && wanted >= 1 && wanted <= heats.length ? wanted : null;
   const free = event.entry_fee_cents <= 0;
-  const price = free ? "Free" : `$${(event.entry_fee_cents / 100).toFixed(event.entry_fee_cents % 100 ? 2 : 0)} AUD`;
+  const price = free ? "Free" : `${formatFee(event.entry_fee_cents)} AUD`;
 
   return (
     <>
@@ -187,11 +208,15 @@ export default async function BookHeatPage({
             booked: h.booked,
             remaining: h.remaining,
             full: h.full,
+            closed: h.closed,
+            bookable: h.bookable,
           }))}
           initialHeat={initialHeat}
           heldHeat={heldHeat}
+          heldSince={heldSince}
           viewer={viewer}
           closedReason={closed}
+          closedKind={closedKind(event)}
           closedCta={closedCta(event)}
           timesConfirmed={isValidClock(event.first_heat_time)}
           intervalMinutes={event.heat_interval_minutes && event.heat_interval_minutes > 0 ? event.heat_interval_minutes : 15}

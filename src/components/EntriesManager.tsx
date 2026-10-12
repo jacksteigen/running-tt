@@ -131,19 +131,46 @@ export default function EntriesManager({
   }
 
   async function remove(e: StartListEntry) {
-    const extra = e.paidOnline ? " Any refund is done separately in Stripe." : "";
+    // A pending entry's checkout id is not a payment, so only a confirmed
+    // entry with one was paid online.
+    const extra =
+      e.status === "confirmed"
+        ? e.paidOnline
+          ? " Any refund is done separately in Stripe."
+          : ""
+        : e.holding
+          ? " Their checkout is closed first, so they cannot pay after this."
+          : "";
     if (!window.confirm(`Remove ${e.name} from this event?${extra}`)) return;
     setBusy(e.id);
     setError("");
     setNotice("");
     try {
-      const res = await fetch(`/api/admin/entries/${e.id}`, { method: "DELETE" });
-      const data = (await res.json()) as { success?: boolean; error?: string };
+      // The confirm above already covered the Stripe refund for paid rows.
+      const res = await fetch(`/api/admin/entries/${e.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmPaid: e.status === "confirmed" && e.paidOnline }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        success?: boolean;
+        error?: string;
+        code?: string;
+      };
       if (data.success) {
         setNotice(`${e.name} removed from the start list.`);
         router.refresh();
+      } else if (res.status === 409 && data.code === "PAID") {
+        // They paid while this was going on, so they are in, not removed.
+        setError(data.error || `${e.name} has just paid, so they are still entered.`);
+        router.refresh();
       } else {
-        setError(data.error || "Could not remove");
+        setError(
+          data.error ||
+            (res.status === 502
+              ? "Could not reach Stripe to close their checkout. Try again in a minute."
+              : "Could not remove")
+        );
       }
     } catch {
       setError("Could not connect. Try again.");
@@ -426,7 +453,12 @@ function AddExisting({
     setError("");
     try {
       const heatNumber = withHeats ? Number(heat) : null;
-      const data = await sendWithHeatCheck<{ success?: boolean; error?: string; code?: string }>(
+      const data = await sendWithHeatCheck<{
+        success?: boolean;
+        error?: string;
+        code?: string;
+        note?: string;
+      }>(
         "/api/admin/entries",
         "POST",
         { eventId, userId: picked.id, heatNumber, notify: true },
@@ -435,7 +467,10 @@ function AddExisting({
       if (data === "cancelled") return;
       if (data.success) {
         onAdded(
-          `${picked.name} added${withHeats ? ` to ${heatName(heats, heatNumber)}` : ""}. Their confirmation email is on its way.`
+          data.note
+            ? // They paid online while this was going on, so they keep the heat they booked.
+              `${picked.name} is on the start list${withHeats ? " in the heat they booked" : ""}. ${data.note}`
+            : `${picked.name} added${withHeats ? ` to ${heatName(heats, heatNumber)}` : ""}. Their confirmation email is on its way.`
         );
         setPicked(null);
         setQuery("");
