@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import CountrySelect from "@/components/CountrySelect";
+import { isKnownCountry } from "@/lib/countries";
 
 interface SponsorRef {
   name: string;
@@ -12,6 +14,8 @@ interface ProfileFormProps {
   user: {
     name: string;
     location: string | null;
+    city?: string | null;
+    country?: string | null;
     bio?: string | null;
     story?: string | null;
     photoUrl?: string | null;
@@ -29,6 +33,27 @@ const inputCls =
   "w-full border border-stone/40 px-3 py-2 text-sm bg-bone/50 focus:outline-none focus:border-terracotta transition-colors";
 const labelCls = "block text-xs text-dust mb-1";
 
+/**
+ * Profiles saved before city and country were split only have a single
+ * location line. Pull the country off the end when it is one we know, so
+ * saving the form never wipes where someone is from.
+ */
+function initialPlace(user: ProfileFormProps["user"]) {
+  if (user.city || user.country) {
+    return { city: user.city ?? "", country: user.country ?? "" };
+  }
+  const legacy = (user.location ?? "").trim();
+  const parts = legacy.split(",").map((p) => p.trim()).filter(Boolean);
+  const last = parts[parts.length - 1];
+  if (parts.length > 1 && isKnownCountry(last)) {
+    return { city: parts.slice(0, -1).join(", "), country: last };
+  }
+  if (parts.length === 1 && isKnownCountry(last)) {
+    return { city: "", country: last };
+  }
+  return { city: legacy, country: "" };
+}
+
 export default function ProfileForm({ user }: ProfileFormProps) {
   const router = useRouter();
 
@@ -40,7 +65,9 @@ export default function ProfileForm({ user }: ProfileFormProps) {
   }
 
   const [name, setName] = useState(user.name);
-  const [location, setLocation] = useState(user.location || "");
+  const place = initialPlace(user);
+  const [city, setCity] = useState(place.city);
+  const [country, setCountry] = useState(place.country);
   const [bio, setBio] = useState(user.bio || "");
   const [story, setStory] = useState(user.story || "");
   const [instagram, setInstagram] = useState(user.instagram || "");
@@ -104,33 +131,38 @@ export default function ProfileForm({ user }: ProfileFormProps) {
     setSaved(false);
     setError("");
 
-    const res = await fetch("/api/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        location,
-        bio,
-        story,
-        instagram,
-        stravaUrl,
-        tiktok,
-        website,
-        sponsors: sponsors.filter((s) => s.name.trim()),
-        sponsorInterests,
-        openToSponsorship,
-      }),
-    });
-
-    setSaving(false);
-    if (!res.ok) {
-      const data = (await res.json()) as { error?: string };
-      setError(data.error || "Could not save");
-      return;
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          city,
+          country,
+          bio,
+          story,
+          instagram,
+          stravaUrl,
+          tiktok,
+          website,
+          sponsors: sponsors.filter((s) => s.name.trim()),
+          sponsorInterests,
+          openToSponsorship,
+        }),
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        setError(data.error || "Could not save");
+        return;
+      }
+      setSaved(true);
+      router.refresh();
+      setTimeout(() => setSaved(false), 2000);
+    } catch {
+      setError("Could not connect. Try again.");
+    } finally {
+      setSaving(false);
     }
-    setSaved(true);
-    router.refresh();
-    setTimeout(() => setSaved(false), 2000);
   }
 
   return (
@@ -191,18 +223,33 @@ export default function ProfileForm({ user }: ProfileFormProps) {
           />
         </div>
 
-        <div>
-          <label htmlFor="location" className={labelCls}>
-            Location
-          </label>
-          <input
-            id="location"
-            type="text"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            placeholder="e.g. London, UK"
-            className={inputCls}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
+          <div>
+            <label htmlFor="city" className={labelCls}>
+              Town or city
+            </label>
+            <input
+              id="city"
+              type="text"
+              autoComplete="address-level2"
+              maxLength={60}
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              placeholder="e.g. Geelong"
+              className={inputCls}
+            />
+          </div>
+          <div>
+            <label htmlFor="country" className={labelCls}>
+              Country
+            </label>
+            <CountrySelect
+              id="country"
+              value={country}
+              onChange={setCountry}
+              className={`${inputCls} cursor-pointer [&_option]:text-midnight ${country ? "" : "text-midnight/50"}`}
+            />
+          </div>
         </div>
 
         <div>
@@ -385,7 +432,11 @@ export default function ProfileForm({ user }: ProfileFormProps) {
           </label>
         </div>
 
-        {error && <p className="text-sm text-terracotta">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-terracotta">
+            {error}
+          </p>
+        )}
 
         <button
           type="submit"

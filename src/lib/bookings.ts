@@ -12,6 +12,7 @@ import {
 import {
   createCheckoutSession,
   expireCheckoutSession,
+  retrieveCheckoutSession,
 } from "@/lib/stripe";
 import { SITE_URL } from "@/lib/site";
 
@@ -114,10 +115,34 @@ export async function createBooking(
     );
   }
 
-  // A pending row means an unfinished checkout. Close it and start again so
-  // nobody is ever locked out by an abandoned payment page.
+  // A pending row means an unfinished checkout. If Stripe says it was in
+  // fact paid (the webhook just has not landed yet), confirm it rather than
+  // throwing away a paid entry. Otherwise close it and start again so nobody
+  // is ever locked out by an abandoned payment page.
   if (existing) {
-    if (existing.stripe_payment_id) await expireCheckoutSession(existing.stripe_payment_id);
+    if (existing.stripe_payment_id) {
+      let paidCheckout: Awaited<ReturnType<typeof retrieveCheckoutSession>> | null = null;
+      try {
+        paidCheckout = await retrieveCheckoutSession(existing.stripe_payment_id);
+      } catch {
+        paidCheckout = null;
+      }
+      if (paidCheckout && paidCheckout.payment_status === "paid") {
+        await confirmPaidCheckout(db, {
+          id: paidCheckout.id,
+          payment_status: paidCheckout.payment_status,
+          metadata: (paidCheckout.metadata ?? null) as Record<string, string> | null,
+        });
+        return fail(
+          409,
+          "ALREADY_BOOKED",
+          withHeats
+            ? "Your payment went through and your heat is booked."
+            : "Your payment went through and you are entered."
+        );
+      }
+      await expireCheckoutSession(existing.stripe_payment_id);
+    }
     await db
       .prepare("DELETE FROM entries WHERE id = ? AND status = 'pending'")
       .bind(existing.id)

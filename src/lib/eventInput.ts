@@ -40,12 +40,16 @@ function dollarsToCents(v: unknown, max: number): number | null {
   return Math.round(n * 100);
 }
 
+/** Words a slug cannot be, because a fixed route already uses that path. */
+const RESERVED_SLUGS = new Set(["new", "edit", "book", "booked", "qr"]);
+
 export function slugify(input: string): string {
-  return input
+  const slug = input
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
+  return RESERVED_SLUGS.has(slug) ? `${slug}-event` : slug;
 }
 
 function isRealDate(v: string): boolean {

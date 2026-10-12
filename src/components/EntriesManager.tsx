@@ -3,15 +3,28 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import WalkUpForm, {
+  HeatSelect,
+  firstOpenHeat,
+  heatName,
+  sendWithHeatCheck,
+  type HeatOption,
+} from "@/components/WalkUpForm";
 
-interface EntryRow {
+export interface StartListEntry {
   id: string;
   userId: string;
   name: string;
   email: string;
   ageGroup: string | null;
-  status: string;
+  status: "confirmed" | "pending";
+  /** An unpaid checkout still inside its hold, so it is taking a spot. */
+  holding: boolean;
+  holdMinutesLeft: number | null;
+  heatNumber: number | null;
   hasResult: boolean;
+  /** Paid through Stripe, rather than added by an admin. */
+  paidOnline: boolean;
 }
 
 interface Candidate {
@@ -20,138 +33,528 @@ interface Candidate {
   email: string;
 }
 
-/** Who is in the event, with add and remove for walk-ups and fixes. */
+const fieldCls =
+  "h-11 border border-stone/40 px-3 text-base sm:text-sm bg-bone/50 focus:outline-none focus:border-terracotta transition-colors";
+
+/**
+ * The start list, grouped by heat, with moves, removals and race-day adds
+ * for athletes with or without an account.
+ */
 export default function EntriesManager({
   eventId,
+  heats,
   entries,
   candidates,
+  paidEvent,
 }: {
   eventId: string;
-  entries: EntryRow[];
+  /** Empty for events without heat booking. */
+  heats: HeatOption[];
+  entries: StartListEntry[];
   candidates: Candidate[];
+  paidEvent: boolean;
 }) {
   const router = useRouter();
-  const [picked, setPicked] = useState("");
-  const [busy, setBusy] = useState(false);
+  const withHeats = heats.length > 0;
+  const [panel, setPanel] = useState<"existing" | "walkup" | null>(null);
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
-  async function add() {
-    if (!picked) return;
-    setBusy(true);
+  const active = entries.filter((e) => e.status === "confirmed" || e.holding);
+  const lapsed = entries.filter((e) => e.status === "pending" && !e.holding);
+  const confirmedCount = entries.filter((e) => e.status === "confirmed").length;
+  const payingCount = entries.filter((e) => e.status === "pending" && e.holding).length;
+  const totalSpots = heats.reduce((n, h) => n + h.capacity, 0);
+  const bookedSpots = heats.reduce((n, h) => n + h.booked, 0);
+
+  const enteredHeats = Object.fromEntries(active.map((e) => [e.userId, e.heatNumber]));
+
+  const groups = withHeats
+    ? [
+        ...heats.map((h) => ({
+          key: `heat-${h.number}`,
+          title: heatName(heats, h.number),
+          sub: h.startTime ? null : h.label,
+          count: `${h.booked}/${h.capacity}`,
+          full: h.full,
+          rows: active.filter((e) => e.heatNumber === h.number),
+        })),
+        {
+          key: "unassigned",
+          title: "Unassigned",
+          sub: "Entered before heats were set, or by hand",
+          count: "",
+          full: false,
+          rows: active.filter(
+            (e) => !e.heatNumber || !heats.some((h) => h.number === e.heatNumber)
+          ),
+        },
+      ].filter((g) => g.key !== "unassigned" || g.rows.length > 0)
+    : [];
+
+  async function moveEntry(e: StartListEntry) {
+    const heat = Number(drafts[e.id]);
+    if (!heat) return;
+    setBusy(e.id);
     setError("");
+    setNotice("");
     try {
-      const res = await fetch("/api/admin/entries", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId, userId: picked }),
-      });
-      const data = (await res.json()) as { success?: boolean; error?: string };
+      const data = await sendWithHeatCheck<{ success?: boolean; error?: string; code?: string }>(
+        `/api/admin/entries/${e.id}`,
+        "PATCH",
+        { heatNumber: heat, notify: true },
+        "Move"
+      );
+      if (data === "cancelled") return;
       if (data.success) {
-        setPicked("");
+        setDrafts((prev) => {
+          const next = { ...prev };
+          delete next[e.id];
+          return next;
+        });
+        setNotice(
+          `${e.name} moved to ${heatName(heats, heat)}.${
+            e.status === "confirmed" ? " They have been emailed." : ""
+          }`
+        );
         router.refresh();
       } else {
-        setError(data.error || "Could not add");
+        setError(data.error || "Could not move them");
       }
     } catch {
-      setError("Could not connect");
+      setError("Could not connect. Try again.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
 
-  async function remove(id: string, name: string) {
-    if (!window.confirm(`Remove ${name} from this event?`)) return;
+  async function remove(e: StartListEntry) {
+    const extra = e.paidOnline ? " Any refund is done separately in Stripe." : "";
+    if (!window.confirm(`Remove ${e.name} from this event?${extra}`)) return;
+    setBusy(e.id);
     setError("");
+    setNotice("");
     try {
-      const res = await fetch(`/api/admin/entries/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/admin/entries/${e.id}`, { method: "DELETE" });
       const data = (await res.json()) as { success?: boolean; error?: string };
-      if (data.success) router.refresh();
-      else setError(data.error || "Could not remove");
+      if (data.success) {
+        setNotice(`${e.name} removed from the start list.`);
+        router.refresh();
+      } else {
+        setError(data.error || "Could not remove");
+      }
     } catch {
-      setError("Could not connect");
+      setError("Could not connect. Try again.");
+    } finally {
+      setBusy(null);
     }
+  }
+
+  function row(e: StartListEntry) {
+    const draft = drafts[e.id] ?? (e.heatNumber ? String(e.heatNumber) : "");
+    // A lapsed checkout holds nothing, so there is nothing to move.
+    const movable = withHeats && (e.status === "confirmed" || e.holding);
+    const changed = movable && draft !== "" && draft !== String(e.heatNumber ?? "");
+    const working = busy === e.id;
+    const meta = [
+      e.email,
+      e.ageGroup ?? "No age group yet",
+      e.status === "pending" && e.holdMinutesLeft !== null
+        ? `hold ends in ${e.holdMinutesLeft} min`
+        : null,
+      paidEvent && e.status === "confirmed" && !e.paidOnline ? "added by admin" : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+    return (
+      <li key={e.id} className="px-4 sm:px-5 py-3 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <Link
+              href={`/admin/athletes/${e.userId}`}
+              className="text-sm font-medium truncate hover:text-terracotta transition-colors"
+            >
+              {e.name}
+            </Link>
+            <StatusBadge entry={e} />
+          </div>
+          <p className="text-[11px] text-midnight/50 truncate">{meta}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {movable && (
+            <HeatSelect
+              heats={heats}
+              value={draft}
+              onChange={(v) => setDrafts((prev) => ({ ...prev, [e.id]: v }))}
+              compact
+              placeholder={e.heatNumber ? undefined : "Pick a heat"}
+              ariaLabel={`Heat for ${e.name}`}
+              className={`${fieldCls} min-w-0 flex-1 sm:flex-none sm:w-52`}
+            />
+          )}
+          {changed && (
+            <button
+              type="button"
+              onClick={() => moveEntry(e)}
+              disabled={working}
+              className="h-11 px-4 text-xs font-medium bg-midnight text-white hover:bg-midnight/90 transition-colors disabled:opacity-50"
+            >
+              {working ? "Moving..." : "Move"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => remove(e)}
+            disabled={e.hasResult || working}
+            title={e.hasResult ? "Clear their time first" : "Remove from event"}
+            aria-label={
+              e.hasResult
+                ? `Remove ${e.name} (clear their time first)`
+                : `Remove ${e.name} from this event`
+            }
+            className="h-11 px-2 text-xs text-dust hover:text-terracotta transition-colors disabled:opacity-30 disabled:hover:text-dust"
+          >
+            Remove
+          </button>
+        </div>
+      </li>
+    );
   }
 
   return (
     <div className="bg-white border border-stone/40">
-      <div className="px-5 py-4 border-b border-stone/30 flex flex-wrap items-end justify-between gap-4">
+      <div className="px-4 sm:px-5 py-4 border-b border-stone/30 flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-1">
             Start list
           </p>
           <h2 className="font-semibold tracking-tight">
-            {entries.length} entered
+            {confirmedCount} entered
+            {payingCount > 0 && (
+              <span className="text-midnight/50 font-normal"> · {payingCount} paying</span>
+            )}
           </h2>
+          {withHeats && (
+            <p className="mt-1 font-mono text-[11px] text-dust tabular-nums">
+              {bookedSpots}/{totalSpots} spots across {heats.length} heats
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={picked}
-            onChange={(e) => setPicked(e.target.value)}
-            aria-label="Add an athlete"
-            className="border border-stone/40 px-3 py-2 text-sm bg-bone/50 focus:outline-none focus:border-terracotta transition-colors max-w-[14rem]"
-          >
-            <option value="">Add an athlete...</option>
-            {candidates.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name} ({c.email})
-              </option>
-            ))}
-          </select>
+        <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
           <button
             type="button"
-            onClick={add}
-            disabled={!picked || busy}
-            className="text-xs font-medium bg-midnight text-white px-4 py-2.5 hover:bg-midnight/90 transition-colors disabled:opacity-40"
+            onClick={() => setPanel(panel === "existing" ? null : "existing")}
+            aria-expanded={panel === "existing"}
+            aria-controls="add-athlete-panel"
+            className={`h-11 px-4 text-xs font-medium transition-colors ${
+              panel === "existing"
+                ? "bg-midnight text-white"
+                : "border border-midnight/20 text-midnight hover:border-midnight/60"
+            }`}
           >
-            Add
+            Add athlete
+          </button>
+          <button
+            type="button"
+            onClick={() => setPanel(panel === "walkup" ? null : "walkup")}
+            aria-expanded={panel === "walkup"}
+            aria-controls="add-athlete-panel"
+            className={`h-11 px-4 text-xs font-medium transition-colors ${
+              panel === "walkup"
+                ? "bg-midnight text-white"
+                : "border border-midnight/20 text-midnight hover:border-midnight/60"
+            }`}
+          >
+            Walk-up, no account
           </button>
         </div>
       </div>
 
+      {panel && (
+        <div id="add-athlete-panel" className="px-4 sm:px-5 py-5 border-b border-stone/30 bg-bone/40">
+          {panel === "existing" ? (
+            <AddExisting
+              eventId={eventId}
+              heats={heats}
+              candidates={candidates}
+              onAdded={(message) => {
+                setError("");
+                setNotice(message);
+                router.refresh();
+              }}
+            />
+          ) : (
+            <>
+              <p className="text-sm text-midnight/70 mb-4">
+                For someone without an account. They can claim it later by
+                signing in with the same email.
+              </p>
+              <WalkUpForm eventId={eventId} heats={heats} enteredHeats={enteredHeats} />
+            </>
+          )}
+        </div>
+      )}
+
       {error && (
-        <p role="alert" className="px-5 pt-3 text-xs text-terracotta">
+        <p role="alert" className="px-4 sm:px-5 py-3 text-sm text-terracotta border-b border-stone/30">
           {error}
         </p>
       )}
+      <p
+        aria-live="polite"
+        className={
+          notice
+            ? "px-4 sm:px-5 py-3 text-sm text-trail font-medium bg-trail/5 border-b border-stone/30"
+            : "sr-only"
+        }
+      >
+        {notice}
+      </p>
 
       {entries.length === 0 ? (
-        <p className="px-5 py-8 text-sm text-midnight/50 text-center">
-          No entries yet.
-        </p>
-      ) : (
-        <div className="divide-y divide-stone/30">
-          {entries.map((e) => (
-            <div key={e.id} className="px-5 py-3 flex items-center gap-4">
-              <div className="flex-1 min-w-0">
-                <Link
-                  href={`/admin/athletes/${e.userId}`}
-                  className="text-sm font-medium hover:text-terracotta transition-colors"
-                >
-                  {e.name}
-                </Link>
-                <p className="text-[11px] text-midnight/50 truncate">
-                  {e.email} · {e.ageGroup ?? "no age group yet"}
+        <div className="px-4 sm:px-5 py-12 text-center">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-2">
+            No entries yet
+          </p>
+          <p className="text-sm text-midnight/60 max-w-sm mx-auto">
+            {withHeats
+              ? "Bookings land here by heat as athletes pay. Add someone by hand with the buttons above."
+              : "Entries land here as athletes sign up. Add someone by hand with the buttons above."}
+          </p>
+        </div>
+      ) : withHeats ? (
+        <div className="-mt-px">
+          {groups.map((g) => (
+            <section key={g.key} aria-label={g.title}>
+              <div className="px-4 sm:px-5 py-2.5 bg-bone/70 border-y border-stone/30 flex items-center justify-between gap-3">
+                <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-midnight/80 truncate">
+                  {g.title}
+                  {g.sub && <span className="text-dust normal-case tracking-normal"> · {g.sub}</span>}
                 </p>
+                {g.count && (
+                  <p
+                    className={`shrink-0 font-mono text-[11px] tabular-nums ${
+                      g.full ? "text-terracotta font-semibold" : "text-dust"
+                    }`}
+                  >
+                    {g.full ? `Full · ${g.count}` : g.count}
+                  </p>
+                )}
               </div>
-              <span
-                className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 ${
-                  e.status === "confirmed" ? "bg-trail/10 text-trail" : "bg-gold/20 text-midnight"
-                }`}
-              >
-                {e.status === "confirmed" ? "Entered" : "Pending"}
-              </span>
-              <button
-                type="button"
-                onClick={() => remove(e.id, e.name)}
-                disabled={e.hasResult}
-                title={e.hasResult ? "Clear their time first" : "Remove from event"}
-                className="text-xs text-dust hover:text-terracotta transition-colors disabled:opacity-30 disabled:hover:text-dust"
-              >
-                Remove
-              </button>
-            </div>
+              {g.rows.length > 0 && (
+                <ul className="divide-y divide-stone/30">{g.rows.map(row)}</ul>
+              )}
+            </section>
           ))}
         </div>
+      ) : (
+        <ul className="divide-y divide-stone/30">{active.map(row)}</ul>
+      )}
+
+      {lapsed.length > 0 && (
+        <details className="border-t border-stone/30 group">
+          <summary className="px-4 sm:px-5 py-3 min-h-11 cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-3 text-xs text-dust hover:text-midnight transition-colors">
+            <span>
+              {lapsed.length} unfinished checkout{lapsed.length === 1 ? "" : "s"}, spot released
+            </span>
+            <span aria-hidden className="font-mono group-open:rotate-45 transition-transform">+</span>
+          </summary>
+          <p className="px-4 sm:px-5 pb-2 text-xs text-midnight/50">
+            They started paying but did not finish, so their spot is free again. They can book
+            again themselves, or add them with Add athlete.
+          </p>
+          <ul className="divide-y divide-stone/30 border-t border-stone/30">{lapsed.map(row)}</ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function StatusBadge({ entry }: { entry: StartListEntry }) {
+  if (entry.status === "confirmed") {
+    return (
+      <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 bg-trail/10 text-trail">
+        Entered
+      </span>
+    );
+  }
+  return entry.holding ? (
+    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 bg-gold/20 text-midnight">
+      Paying
+    </span>
+  ) : (
+    <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 bg-stone/60 text-midnight/60">
+      Unpaid
+    </span>
+  );
+}
+
+/** Pick someone who already has an account and put them in a heat. */
+function AddExisting({
+  eventId,
+  heats,
+  candidates,
+  onAdded,
+}: {
+  eventId: string;
+  heats: HeatOption[];
+  candidates: Candidate[];
+  onAdded: (message: string) => void;
+}) {
+  const withHeats = heats.length > 0;
+  const [query, setQuery] = useState("");
+  const [picked, setPicked] = useState<Candidate | null>(null);
+  const [heat, setHeat] = useState(() => String(firstOpenHeat(heats) ?? ""));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? candidates.filter(
+        (c) => c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+      )
+    : candidates;
+  const matches = filtered.slice(0, 8);
+
+  async function add() {
+    if (!picked) return setError("Pick an athlete first.");
+    if (withHeats && !heat) return setError("Pick a heat.");
+    setBusy(true);
+    setError("");
+    try {
+      const heatNumber = withHeats ? Number(heat) : null;
+      const data = await sendWithHeatCheck<{ success?: boolean; error?: string; code?: string }>(
+        "/api/admin/entries",
+        "POST",
+        { eventId, userId: picked.id, heatNumber, notify: true },
+        "Add"
+      );
+      if (data === "cancelled") return;
+      if (data.success) {
+        onAdded(
+          `${picked.name} added${withHeats ? ` to ${heatName(heats, heatNumber)}` : ""}. Their confirmation email is on its way.`
+        );
+        setPicked(null);
+        setQuery("");
+      } else {
+        setError(data.error || "Could not add them");
+      }
+    } catch {
+      setError("Could not connect. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (candidates.length === 0) {
+    return (
+      <p className="text-sm text-midnight/60">
+        Everyone with an account is already on the start list. Use Walk-up for
+        someone new.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {picked ? (
+        <div className="flex items-center justify-between gap-3 bg-white border border-terracotta px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium truncate">{picked.name}</p>
+            <p className="text-[11px] text-midnight/50 truncate">{picked.email}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPicked(null)}
+            className="h-11 px-2 text-xs text-dust hover:text-terracotta transition-colors"
+          >
+            Change
+          </button>
+        </div>
+      ) : (
+        <div>
+          <label
+            htmlFor="add-athlete-search"
+            className="block font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-1.5"
+          >
+            Athlete
+          </label>
+          <input
+            id="add-athlete-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or email"
+            autoComplete="off"
+            className={`${fieldCls} w-full`}
+          />
+          {matches.length === 0 ? (
+            <p className="mt-2 text-xs text-midnight/50">
+              Nobody matches. If they have no account, use Walk-up.
+            </p>
+          ) : (
+            <ul className="mt-2 bg-white border border-stone/40 divide-y divide-stone/30">
+              {matches.map((c) => (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPicked(c);
+                      setError("");
+                    }}
+                    className="w-full min-h-11 px-4 py-2 text-left hover:bg-bone transition-colors"
+                  >
+                    <span className="block text-sm font-medium truncate">{c.name}</span>
+                    <span className="block text-[11px] text-midnight/50 truncate">{c.email}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          {filtered.length > matches.length && (
+            <p className="mt-1.5 text-[11px] text-midnight/50">
+              Showing {matches.length} of {filtered.length}. Type to narrow it down.
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+        {withHeats && (
+          <div className="sm:w-72">
+            <label
+              htmlFor="add-athlete-heat"
+              className="block font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-1.5"
+            >
+              Heat
+            </label>
+            <HeatSelect
+              id="add-athlete-heat"
+              heats={heats}
+              value={heat}
+              onChange={setHeat}
+              placeholder="Pick a heat"
+              className={`${fieldCls} w-full`}
+            />
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={add}
+          disabled={busy || !picked}
+          className="h-11 px-6 text-sm font-medium bg-terracotta text-white hover:bg-terracotta/90 transition-colors disabled:opacity-50"
+        >
+          {busy ? "Adding..." : "Add to start list"}
+        </button>
+      </div>
+
+      {error && (
+        <p role="alert" className="text-sm text-terracotta">
+          {error}
+        </p>
       )}
     </div>
   );

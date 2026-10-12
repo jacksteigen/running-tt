@@ -1,4 +1,5 @@
 import { getDB } from "@/lib/db";
+import { OUTCOMES, PUBLIC_OUTCOMES, type Outcome } from "@/lib/outcomes";
 import { getSession } from "@/lib/auth";
 import type { Metadata } from "next";
 import Image from "next/image";
@@ -7,9 +8,13 @@ import { notFound } from "next/navigation";
 import EnterEventButton from "@/components/EnterEventButton";
 import Countdown from "@/components/Countdown";
 import LiveRefresh from "@/components/LiveRefresh";
+import HeatSchedule from "@/components/HeatSchedule";
 import { displayStatus, todayInMelbourne } from "@/lib/events";
 import { parsePrizes } from "@/lib/racetime";
 import { AGE_GROUPS } from "@/lib/agegroups";
+import { formatEventDate, isDateTbc } from "@/lib/dates";
+import { getHeatAvailability, hasHeats, heatLabel, heatWindow } from "@/lib/heats";
+import { bookingClosedReason, changeFeeText } from "@/lib/bookings";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +36,11 @@ interface EventRow {
   course_record: string | null;
   course_record_holder: string | null;
   prizes: string | null;
+  change_fee_cents: number | null;
+  first_heat_time: string | null;
+  heat_interval_minutes: number | null;
+  heat_count: number | null;
+  heat_capacity: number | null;
 }
 
 interface LeaderboardRow {
@@ -43,16 +53,6 @@ interface LeaderboardRow {
   prize_amount_cents: number;
   age_group: string | null;
   age_group_rank: number | null;
-}
-
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-AU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
 }
 
 export async function generateMetadata({
@@ -73,7 +73,9 @@ export async function generateMetadata({
     title: `${event.name} · Running TT`,
     description:
       event.description ??
-      `${event.distance} time trial at ${event.venue} on ${formatDate(event.date)}. Enter on Running TT.`,
+      `${event.distance} time trial at ${event.venue}${
+        isDateTbc(event.date) ? "" : ` on ${formatEventDate(event.date, "long")}`
+      }. Enter on Running TT.`,
   };
 }
 
@@ -113,6 +115,26 @@ export default async function EventPage({
     .bind(event.id)
     .all() as unknown as { results: LeaderboardRow[] };
 
+  // DNF and DQ are listed under the finishers; DNS stays private.
+  const nonFinishers = (await db
+    .prepare(
+      `SELECT u.id as user_id, u.name, e.age_group, e.heat_number, e.outcome
+       FROM entries e JOIN users u ON u.id = e.user_id
+       WHERE e.event_id = ? AND e.status = 'confirmed'
+         AND e.outcome IN (${PUBLIC_OUTCOMES.map(() => "?").join(", ")})
+       ORDER BY e.outcome, u.name COLLATE NOCASE`
+    )
+    .bind(event.id, ...PUBLIC_OUTCOMES)
+    .all()) as unknown as {
+    results: {
+      user_id: string;
+      name: string;
+      age_group: string | null;
+      heat_number: number | null;
+      outcome: Outcome;
+    }[];
+  };
+
   const avgTime = await db
     .prepare("SELECT AVG(time_seconds) as avg FROM results WHERE event_id = ?")
     .bind(event.id)
@@ -123,16 +145,30 @@ export default async function EventPage({
     : "-";
 
   const session = await getSession(db);
-  let alreadyEntered = false;
+  let myEntry: { id: string; heat_number: number | null } | null = null;
   if (session) {
-    const entry = await db
+    myEntry = await db
       .prepare(
-        "SELECT id FROM entries WHERE event_id = ? AND user_id = ? AND status = 'confirmed'"
+        "SELECT id, heat_number FROM entries WHERE event_id = ? AND user_id = ? AND status = 'confirmed'"
       )
       .bind(event.id, session.user.id)
-      .first();
-    alreadyEntered = !!entry;
+      .first<{ id: string; heat_number: number | null }>();
   }
+  const alreadyEntered = !!myEntry;
+
+  // Heat booking: events with heats are booked one heat at a time.
+  const withHeats = hasHeats(event);
+  const heats = withHeats ? await getHeatAvailability(db, event) : [];
+  const closedReason = withHeats ? bookingClosedReason(event) : null;
+  const timeWindow = withHeats ? heatWindow(event) : null;
+  const bookHref = `/events/${event.slug}/book`;
+  const bookedHref = `/events/${event.slug}/booked`;
+  const myHeat = myEntry?.heat_number ? heatLabel(event, myEntry.heat_number) : "";
+  const spotsLeft = heats.reduce((sum, h) => sum + h.remaining, 0);
+  const feeLabel =
+    event.entry_fee_cents > 0
+      ? `$${(event.entry_fee_cents / 100).toFixed(event.entry_fee_cents % 100 ? 2 : 0)}`
+      : "Free";
 
   const whatToBring: string[] = event.what_to_bring
     ? JSON.parse(event.what_to_bring)
@@ -149,6 +185,13 @@ export default async function EventPage({
   const eventStatus = displayStatus(event.status, event.date);
   const isUpcoming = eventStatus === "Open" || eventStatus === "Coming Soon";
   const isRaceDay = event.date === today;
+  const dateTbc = isDateTbc(event.date);
+  const closedCta =
+    !dateTbc && event.date < today
+      ? "Event finished"
+      : event.status === "Sold Out"
+        ? "Sold out"
+        : "Booking opens soon";
 
   // Age group standings, in band order, only for groups with a finisher.
   const groups = AGE_GROUPS.map((group) => ({
@@ -156,6 +199,33 @@ export default async function EventPage({
     rows: leaderboard.results.filter((r) => r.age_group === group),
   })).filter((g) => g.rows.length > 0);
   const ungrouped = leaderboard.results.filter((r) => !r.age_group);
+
+  // Heats lead while the event is ahead, then step aside for the results.
+  const heatsFirst = leaderboard.results.length === 0 && eventStatus !== "Completed";
+  const heatsSection = withHeats ? (
+    <div>
+      <div className="flex items-end justify-between gap-4 mb-6">
+        <div>
+          <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">Rolling start</p>
+          <h2 className="text-xl font-semibold tracking-tight">Heats</h2>
+        </div>
+        {isUpcoming && !closedReason && !myEntry && (
+          <Link
+            href={bookHref}
+            className="text-sm font-medium text-terracotta hover:text-midnight transition-colors py-2"
+          >
+            Choose your heat &rarr;
+          </Link>
+        )}
+      </div>
+      <HeatSchedule
+        heats={heats}
+        timeWindow={timeWindow}
+        bookHref={isUpcoming && !closedReason && !myEntry ? bookHref : null}
+        showSpots={isUpcoming}
+      />
+    </div>
+  ) : null;
 
   return (
     <>
@@ -198,15 +268,42 @@ export default async function EventPage({
                 {isRaceDay && leaderboard.results.length > 0 && <LiveRefresh />}
               </div>
               <div className="flex flex-wrap items-center gap-3 text-base text-stone/80">
-                <span>{formatDate(event.date)}</span>
+                <span>{formatEventDate(event.date, "long")}</span>
                 <span className="text-stone/30">·</span>
-                <span className="font-mono">{event.time}</span>
+                <span className="font-mono">{timeWindow ?? event.time}</span>
                 <span className="text-stone/30">·</span>
                 <span>{event.venue}</span>
               </div>
+
+              {/* Phones: the booking action up top, not below the leaderboard */}
+              {withHeats && isUpcoming && (myEntry || !closedReason) && (
+                <div className="lg:hidden mt-7">
+                  {myEntry ? (
+                    <Link
+                      href={bookedHref}
+                      className="flex items-center justify-between gap-4 border border-white/15 bg-white/5 backdrop-blur-sm px-5 py-3.5 min-h-12 hover:border-white/30 transition-colors"
+                    >
+                      <span>
+                        <span className="block font-mono text-[10px] uppercase tracking-[0.25em] text-terracotta">
+                          You are in
+                        </span>
+                        <span className="block text-sm font-medium mt-0.5">{myHeat}</span>
+                      </span>
+                      <span className="text-sm text-stone/70">View booking &rarr;</span>
+                    </Link>
+                  ) : (
+                    <Link
+                      href={bookHref}
+                      className="flex w-full items-center justify-center bg-terracotta text-white text-sm font-medium py-4 min-h-12 hover:bg-terracotta/90 transition-colors"
+                    >
+                      Book your heat · {feeLabel}
+                    </Link>
+                  )}
+                </div>
+              )}
             </div>
 
-            {isUpcoming && !isRaceDay && (
+            {isUpcoming && !isRaceDay && !dateTbc && (
               <div className="lg:border-l lg:border-white/10 lg:pl-8">
                 <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/50 mb-4">
                   Start gun in
@@ -214,12 +311,23 @@ export default async function EventPage({
                 <Countdown target={event.date} className="text-white" />
               </div>
             )}
+            {isUpcoming && dateTbc && (
+              <div className="lg:border-l lg:border-white/10 lg:pl-8">
+                <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/50 mb-3">
+                  Start gun
+                </p>
+                <p className="font-mono text-3xl md:text-4xl font-semibold tracking-tight">Date TBC</p>
+                <p className="text-sm text-stone/60 mt-2 max-w-xs">
+                  The date is being locked in. {withHeats ? "Heat booking" : "Entry"} opens once it is set.
+                </p>
+              </div>
+            )}
             {isRaceDay && (
               <div className="lg:border-l lg:border-white/10 lg:pl-8">
                 <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-2">
                   Race day
                 </p>
-                <p className="text-2xl font-semibold tracking-tight">Today, {event.time}</p>
+                <p className="text-2xl font-semibold tracking-tight">Today, {timeWindow ?? event.time}</p>
                 <p className="text-sm text-stone/60 mt-1">{event.venue}</p>
               </div>
             )}
@@ -256,6 +364,8 @@ export default async function EventPage({
       <div className="mx-auto max-w-6xl px-6 py-14 md:py-20">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           <div className="lg:col-span-2 space-y-14">
+            {heatsFirst && heatsSection}
+
             {/* Overall leaderboard */}
             <div>
               <div className="flex items-end justify-between mb-6">
@@ -345,8 +455,49 @@ export default async function EventPage({
                           </tr>
                         );
                       })}
+                      {nonFinishers.results.map((nf) => (
+                        <tr
+                          key={nf.user_id}
+                          className="border-b border-stone/20 last:border-b-0 border-l-2 border-l-transparent bg-bone/40"
+                        >
+                          <td className="px-4 py-3 font-mono text-midnight/30">-</td>
+                          <td className="px-4 py-3">
+                            <Link
+                              href={`/athletes/${nf.user_id}`}
+                              className="font-medium text-midnight/70 hover:text-terracotta transition-colors"
+                            >
+                              {nf.name}
+                            </Link>
+                            <span className="sm:hidden block text-[11px] text-dust mt-0.5">
+                              {nf.age_group ?? ""}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 hidden sm:table-cell text-midnight/50">
+                            {nf.age_group ?? "-"}
+                          </td>
+                          <td
+                            className="px-4 py-3 font-mono text-right font-semibold text-midnight/60 uppercase tracking-[0.1em]"
+                            title={OUTCOMES[nf.outcome].name}
+                          >
+                            {OUTCOMES[nf.outcome].label}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-dust hidden md:table-cell tabular-nums">
+                            {nf.heat_number ? `H${nf.heat_number}` : "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right hidden sm:table-cell font-mono">
+                            <span className="text-stone/60">-</span>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
+                  {nonFinishers.results.length > 0 && (
+                    <p className="px-4 py-3 border-t border-stone/30 text-[11px] text-midnight/50">
+                      {PUBLIC_OUTCOMES.filter((o) => nonFinishers.results.some((n) => n.outcome === o))
+                        .map((o) => `${OUTCOMES[o].label}: ${OUTCOMES[o].name.toLowerCase()}`)
+                        .join(" · ")}
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="bg-white border border-stone/40 p-12 text-center">
@@ -412,6 +563,8 @@ export default async function EventPage({
               </div>
             )}
 
+            {!heatsFirst && heatsSection}
+
             {/* Prize Money */}
             {eventPrizes.length > 0 && (
               <div>
@@ -446,28 +599,76 @@ export default async function EventPage({
           <div className="space-y-8">
             {isUpcoming && (
               <div className="bg-white border border-stone/40 p-6 lg:sticky lg:top-24">
-                <h3 className="font-semibold tracking-tight mb-2">
-                  {eventStatus === "Open" ? "Enter this event" : "Coming soon"}
-                </h3>
-                <p className="text-sm text-midnight/60 mb-4">
-                  {eventStatus === "Open"
-                    ? `${entryCount?.count ?? 0} ${
-                        (entryCount?.count ?? 0) === 1 ? "athlete has" : "athletes have"
-                      } locked in. Rolling heats, so get in early.`
-                    : "Entries will open soon."}
-                </p>
-                <EnterEventButton
-                  eventId={event.id}
-                  eventStatus={eventStatus}
-                  entryFeeCents={event.entry_fee_cents}
-                  isLoggedIn={!!session}
-                  profileCompleted={!!session?.user.profileCompleted}
-                  alreadyEntered={alreadyEntered}
-                />
+                {withHeats && myEntry ? (
+                  <>
+                    <p className="font-mono text-xs uppercase tracking-[0.25em] text-trail mb-2">
+                      You are in
+                    </p>
+                    <h3 className="text-2xl font-semibold tracking-tight">{myHeat}</h3>
+                    <p className="text-sm text-midnight/60 mt-2 mb-5">
+                      Your ticket, calendar file and heat change requests all live on your booking.
+                    </p>
+                    <Link
+                      href={bookedHref}
+                      className="block w-full bg-midnight text-white text-sm font-medium py-3.5 text-center hover:bg-midnight/85 transition-colors"
+                    >
+                      View your booking
+                    </Link>
+                  </>
+                ) : withHeats ? (
+                  <>
+                    <h3 className="font-semibold tracking-tight mb-2">
+                      {closedReason ? (eventStatus === "Coming Soon" ? "Coming soon" : "Bookings closed") : "Book your heat"}
+                    </h3>
+                    <p className="text-sm text-midnight/60 mb-4">
+                      {closedReason ??
+                        `${spotsLeft} of ${heats.length * (heats[0]?.capacity ?? 0)} spots left across ${heats.length} heats. Pick your heat, pay, and you are in.`}
+                    </p>
+                    {closedReason ? (
+                      <button
+                        type="button"
+                        disabled
+                        className="w-full bg-midnight/15 text-midnight/50 text-sm font-medium py-3.5 cursor-not-allowed"
+                      >
+                        {closedCta}
+                      </button>
+                    ) : (
+                      <Link
+                        href={bookHref}
+                        className="block w-full bg-terracotta text-white text-sm font-medium py-3.5 text-center hover:bg-terracotta/90 transition-colors"
+                      >
+                        Book your heat · {feeLabel}
+                      </Link>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <h3 className="font-semibold tracking-tight mb-2">
+                      {eventStatus === "Open" ? "Enter this event" : "Coming soon"}
+                    </h3>
+                    <p className="text-sm text-midnight/60 mb-4">
+                      {eventStatus === "Open"
+                        ? `${entryCount?.count ?? 0} ${
+                            (entryCount?.count ?? 0) === 1 ? "athlete has" : "athletes have"
+                          } locked in. Rolling heats, so get in early.`
+                        : "Entries will open soon."}
+                    </p>
+                    <EnterEventButton
+                      eventId={event.id}
+                      eventSlug={event.slug}
+                      eventStatus={eventStatus}
+                      entryFeeCents={event.entry_fee_cents}
+                      isLoggedIn={!!session}
+                      profileCompleted={!!session?.user.profileCompleted}
+                      alreadyEntered={alreadyEntered}
+                    />
+                  </>
+                )}
                 <p className="mt-3 text-xs text-midnight/50 leading-relaxed">
                   {event.entry_fee_cents > 0
-                    ? `$${(event.entry_fee_cents / 100).toFixed(0)} AUD entry. Entry fees and sponsor cash fund the prize purse.`
+                    ? `${feeLabel} AUD entry. Entry fees and sponsor cash fund the prize purse.`
                     : "Free entry for this event."}{" "}
+                  {withHeats && `Heat changes are made by our team${changeFeeText(event.change_fee_cents)}. `}
                   By entering you agree to the{" "}
                   <Link href="/terms" className="underline underline-offset-2 hover:text-terracotta transition-colors">
                     terms of entry

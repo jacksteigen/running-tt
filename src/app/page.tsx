@@ -7,6 +7,9 @@ import EventCard from "@/components/EventCard";
 import Sponsors from "@/components/Sponsors";
 import Reveal from "@/components/Reveal";
 import { displayStatus, todayInMelbourne } from "@/lib/events";
+import { formatEventDate, isDateTbc } from "@/lib/dates";
+import { hasHeats, heatWindow } from "@/lib/heats";
+import { bookingClosedReason, type BookableEvent } from "@/lib/bookings";
 
 export const dynamic = "force-dynamic";
 
@@ -43,31 +46,41 @@ const steps = [
   },
 ];
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-AU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
+/** What the "Next event" band says and where its button goes. */
+function describeSpotlight(event: BookableEvent, entered: number) {
+  const bookable = bookingClosedReason(event) === null;
+  const withHeats = hasHeats(event);
+  const cta =
+    withHeats && bookable
+      ? { href: `/events/${event.slug}/book`, label: "Book your heat" }
+      : bookable
+        ? { href: `/events/${event.slug}`, label: "Enter now" }
+        : { href: `/events/${event.slug}`, label: "See the event" };
+  const facts = [
+    event.entry_fee_cents > 0
+      ? `$${(event.entry_fee_cents / 100).toFixed(0)} entry`
+      : "Free entry",
+    withHeats
+      ? `${event.heat_count} heats${
+          event.heat_interval_minutes ? `, every ${event.heat_interval_minutes} min` : ""
+        }`
+      : null,
+    entered > 0 ? `${entered} ${withHeats ? "booked" : "entered"}` : null,
+  ].filter((f): f is string => !!f);
+
+  return {
+    withHeats,
+    tbc: isDateTbc(event.date),
+    heatTimes: withHeats ? heatWindow(event) : null,
+    cta,
+    facts,
+  };
 }
 
 export default async function Home() {
   const db = await getDB();
 
-  interface EventRow {
-    id: string;
-    slug: string;
-    name: string;
-    distance: string;
-    date: string;
-    time: string;
-    location: string;
-    venue: string;
-    status: string;
-    entry_fee_cents: number;
-  }
+  type EventRow = BookableEvent;
 
   // "Upcoming" means the event's date is today or later. This lets an event
   // automatically shift from upcoming to past without any manual status change.
@@ -86,10 +99,15 @@ export default async function Home() {
     entryCounts.results.map((r: { event_id: string; count: number }) => [r.event_id, r.count])
   );
 
-  // Soonest event with Open entries, or failing that the soonest upcoming.
+  // Soonest event taking bookings right now, or failing that the soonest
+  // upcoming one (which may still be waiting on a date).
   const nextOpen =
-    upcomingEvents.results.find((e) => e.status === "Open") ??
+    upcomingEvents.results.find((e) => bookingClosedReason(e) === null) ??
     upcomingEvents.results[0];
+
+  const spotlight = nextOpen
+    ? describeSpotlight(nextOpen, countMap.get(nextOpen.id) ?? 0)
+    : null;
 
   return (
     <>
@@ -154,44 +172,73 @@ export default async function Home() {
       </section>
 
       {/* Next Event Spotlight */}
-      {nextOpen && (
+      {nextOpen && spotlight && (
         <section className="bg-terracotta text-white">
           <div className="mx-auto max-w-6xl px-6 py-10 md:py-14">
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
               <div className="lg:col-span-3">
                 <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/70 mb-3">
-                  Next event
+                  Next event{nextOpen.distance ? ` · ${nextOpen.distance}` : ""}
                 </p>
                 <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">
                   {nextOpen.name}
                 </h2>
                 <p className="mt-2 text-white/85 text-sm md:text-base">
-                  {formatDate(nextOpen.date)} · {nextOpen.venue}
+                  {spotlight.tbc
+                    ? "Date to be announced"
+                    : formatEventDate(nextOpen.date, "long")}{" "}
+                  · {nextOpen.venue}
                 </p>
-                <div className="mt-4 flex flex-wrap items-center gap-4 text-sm text-white/80">
-                  <span className="font-mono">
-                    {nextOpen.entry_fee_cents > 0
-                      ? `$${(nextOpen.entry_fee_cents / 100).toFixed(0)} entry`
-                      : "Free entry"}
-                  </span>
-                  <span className="text-white/40">·</span>
-                  <span className="font-mono">
-                    {countMap.get(nextOpen.id) ?? 0} entered
-                  </span>
+                {spotlight.heatTimes && !spotlight.tbc && (
+                  <p className="mt-1 font-mono text-xs uppercase tracking-[0.2em] text-white/70">
+                    Heats {spotlight.heatTimes}
+                  </p>
+                )}
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/80">
+                  {spotlight.facts.map((fact, i) => (
+                    <span key={fact} className="flex items-center gap-4">
+                      {i > 0 && <span aria-hidden className="text-white/40">·</span>}
+                      <span className="font-mono">{fact}</span>
+                    </span>
+                  ))}
                 </div>
                 <Link
-                  href={`/events/${nextOpen.slug}`}
-                  className="inline-block mt-6 bg-white text-terracotta font-medium px-6 py-3 text-sm hover:bg-bone transition-colors"
+                  href={spotlight.cta.href}
+                  className="inline-flex items-center gap-2 mt-6 bg-white text-terracotta font-medium px-6 py-3 min-h-[44px] text-sm hover:bg-bone transition-colors"
                 >
-                  Enter now →
+                  {spotlight.cta.label} <span aria-hidden>→</span>
                 </Link>
               </div>
 
               <div className="lg:col-span-2 lg:border-l lg:border-white/20 lg:pl-8">
-                <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/60 mb-4">
-                  Start gun in
-                </p>
-                <Countdown target={nextOpen.date} className="text-white" />
+                {spotlight.tbc ? (
+                  <div className="border-t border-white/20 pt-6 lg:border-t-0 lg:pt-0">
+                    <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/60 mb-3">
+                      Bookings
+                    </p>
+                    <p className="text-2xl md:text-3xl font-semibold tracking-tight">
+                      Opening soon
+                    </p>
+                    <p className="mt-3 text-sm text-white/80 leading-relaxed max-w-sm">
+                      {spotlight.withHeats
+                        ? "The date and heat times are being locked in. Set up your profile now and you are one tap from booking a heat when they land."
+                        : "The date is being locked in. Set up your profile now and you are one tap from entering when it lands."}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/60 mb-4">
+                      {spotlight.withHeats && nextOpen.first_heat_time
+                        ? "First heat in"
+                        : "Start gun in"}
+                    </p>
+                    <Countdown
+                      target={nextOpen.date}
+                      time={spotlight.withHeats ? nextOpen.first_heat_time : null}
+                      className="text-white"
+                    />
+                  </>
+                )}
               </div>
             </div>
           </div>

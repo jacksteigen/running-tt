@@ -1,13 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import CountrySelect from "@/components/CountrySelect";
+import { formatEventDate } from "@/lib/dates";
 
 interface Initial {
   firstName: string;
   middleName: string;
   lastName: string;
   dateOfBirth: string;
-  location: string;
+  city: string;
+  country: string;
   bio: string;
 }
 
@@ -20,45 +23,47 @@ interface OpenEvent {
   time: string;
   venue: string;
   entryFeeCents: number;
+  hasHeats: boolean;
+  /** "12 heats · 5:00pm to 7:45pm", shown in place of the start time. */
+  heatSummary: string | null;
 }
 
 const inputCls =
   "w-full bg-white/5 border border-white/15 px-4 py-3.5 text-base text-white placeholder:text-white/30 focus:outline-none focus:border-terracotta focus:bg-white/10 transition-colors";
+const selectCls =
+  "w-full appearance-none bg-white/5 border border-white/15 pl-4 pr-10 py-3.5 text-base cursor-pointer focus:outline-none focus:border-terracotta focus:bg-white/10 transition-colors [color-scheme:dark] [&_optgroup]:bg-midnight [&_option]:bg-midnight [&_option]:text-white";
 const labelCls =
   "block font-mono text-[10px] uppercase tracking-[0.25em] text-stone/60 mb-2";
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-AU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-}
-
 /**
  * First-run profile, in three short steps, then an invitation to the next
- * open event. Nothing else on the site opens until this is done.
+ * open event. Nothing else on the site opens until this is done. When the
+ * athlete arrived mid-booking (`next`), they go straight back to it instead.
  */
 export default function Onboarding({
   initial,
   openEvent,
+  next = null,
 }: {
   initial: Initial;
   openEvent: OpenEvent | null;
+  next?: string | null;
 }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<Initial>(initial);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const totalSteps = openEvent ? 4 : 3;
+  // Someone part way through booking a heat skips the event offer.
+  const offer = next ? null : openEvent;
+  const toBooking = !!next && next.includes("/book");
+  const totalSteps = offer ? 4 : 3;
 
   function set<K extends keyof Initial>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function next() {
+  function goNext() {
     setError("");
     if (step === 0) {
       if (!form.firstName.trim()) return setError("Your first name, please.");
@@ -66,7 +71,8 @@ export default function Onboarding({
     }
     if (step === 1) {
       if (!form.dateOfBirth) return setError("Your date of birth sets your age group.");
-      if (!form.location.trim()) return setError("Where are you based?");
+      if (!form.city.trim()) return setError("Which town or city are you based in?");
+      if (!form.country) return setError("Pick your country from the list.");
     }
     setStep((s) => s + 1);
   }
@@ -77,57 +83,67 @@ export default function Onboarding({
       return setError("A sentence or two is all it takes.");
     }
     setBusy(true);
+    let leaving = false;
     try {
       const res = await fetch("/api/profile/complete", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          firstName: form.firstName,
+          middleName: form.middleName,
+          lastName: form.lastName,
+          dateOfBirth: form.dateOfBirth,
+          city: form.city,
+          country: form.country,
+          bio: form.bio,
+        }),
       });
       const data = (await res.json()) as { success?: boolean; error?: string };
       if (!data.success) {
         setError(data.error || "Something went wrong");
         return;
       }
-      if (openEvent) {
+      if (offer) {
         setStep(3);
       } else {
-        window.location.href = "/dashboard?welcome=1";
+        leaving = true;
+        window.location.href = next ?? "/dashboard?welcome=1";
       }
     } catch {
       setError("Could not connect. Try again.");
     } finally {
-      setBusy(false);
+      if (!leaving) setBusy(false);
     }
   }
 
   async function enterEvent() {
-    if (!openEvent) return;
+    if (!offer) return;
     setBusy(true);
     setError("");
+    let leaving = false;
     try {
       const res = await fetch("/api/entries", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId: openEvent.id }),
+        body: JSON.stringify({ eventId: offer.id }),
       });
       const data = (await res.json()) as {
         success?: boolean;
         checkoutUrl?: string;
+        next?: string;
         error?: string;
       };
-      if (data.checkoutUrl) {
-        window.location.href = data.checkoutUrl;
-        return;
-      }
-      if (data.success) {
-        window.location.href = `/dashboard?entered=${openEvent.id}`;
+      if (data.checkoutUrl || data.success) {
+        leaving = true;
+        window.location.href =
+          data.checkoutUrl || data.next || `/dashboard?entered=${offer.id}`;
         return;
       }
       setError(data.error || "Could not enter the event");
     } catch {
       setError("Could not connect. Try again.");
     } finally {
-      setBusy(false);
+      if (!leaving) setBusy(false);
     }
   }
 
@@ -163,12 +179,13 @@ export default function Onboarding({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            next();
+            goNext();
           }}
           className="mt-6 space-y-5"
         >
           <p className="text-sm text-stone/60 leading-relaxed">
             This is how your name appears on results and your athlete page.
+            {toBooking && " Three quick steps, then you pick your heat."}
           </p>
           <div>
             <label htmlFor="firstName" className={labelCls}>
@@ -218,7 +235,7 @@ export default function Onboarding({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            next();
+            goNext();
           }}
           className="mt-6 space-y-5"
         >
@@ -242,17 +259,50 @@ export default function Onboarding({
             />
           </div>
           <div>
-            <label htmlFor="location" className={labelCls}>
-              Where you are based
-            </label>
-            <input
-              id="location"
-              placeholder="e.g. Geelong, Australia"
-              autoComplete="address-level2"
-              value={form.location}
-              onChange={(e) => set("location", e.target.value)}
-              className={inputCls}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div>
+                <label htmlFor="city" className={labelCls}>
+                  Town or city
+                </label>
+                <input
+                  id="city"
+                  placeholder="e.g. Geelong"
+                  autoComplete="address-level2"
+                  maxLength={60}
+                  value={form.city}
+                  onChange={(e) => set("city", e.target.value)}
+                  className={inputCls}
+                />
+              </div>
+              <div>
+                <label htmlFor="country" className={labelCls}>
+                  Country
+                </label>
+                <div className="relative">
+                  <CountrySelect
+                    id="country"
+                    value={form.country}
+                    onChange={(value) => set("country", value)}
+                    className={`${selectCls} ${form.country ? "text-white" : "text-white/40"}`}
+                  />
+                  <svg
+                    aria-hidden
+                    width="12"
+                    height="12"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-stone/60"
+                  >
+                    <path d="M2.5 4.5L6 8l3.5-3.5" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <p className="mt-2 text-[11px] text-stone/40">
+              Shown on your athlete page as your home base.
+            </p>
           </div>
           {error && <p role="alert" className="text-sm text-terracotta">{error}</p>}
           <div className="flex gap-3">
@@ -302,42 +352,60 @@ export default function Onboarding({
               Back
             </button>
             <button type="submit" disabled={busy} className="flex-1 bg-terracotta text-white font-medium py-4 hover:bg-terracotta/90 transition-colors disabled:opacity-50">
-              {busy ? "Saving..." : openEvent ? "Save and continue" : "Finish"}
+              {busy
+                ? "Saving..."
+                : toBooking
+                  ? "Save and pick your heat"
+                  : next || offer
+                    ? "Save and continue"
+                    : "Finish"}
             </button>
           </div>
         </form>
       )}
 
-      {step === 3 && openEvent && (
+      {step === 3 && offer && (
         <div className="mt-6">
           <p className="text-sm text-stone/60 leading-relaxed mb-6">
-            Your profile is set. Entries are open right now for this one.
+            {offer.hasHeats
+              ? "Your profile is set. Heats are open for booking right now."
+              : "Your profile is set. Entries are open right now for this one."}
           </p>
           <div className="border border-terracotta/40 bg-terracotta/10 p-6 mb-6">
             <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-terracotta mb-2">
-              {openEvent.distance} · {openEvent.venue}
+              {offer.distance} · {offer.venue}
             </p>
-            <p className="text-2xl font-semibold tracking-tight">{openEvent.name}</p>
+            <p className="text-2xl font-semibold tracking-tight">{offer.name}</p>
             <p className="text-sm text-stone/70 mt-1">
-              {formatDate(openEvent.date)} · {openEvent.time}
+              {formatEventDate(offer.date, "medium")} ·{" "}
+              {offer.heatSummary ?? offer.time}
             </p>
             <p className="font-mono text-xs text-stone/60 mt-4">
-              {openEvent.entryFeeCents > 0
-                ? `$${(openEvent.entryFeeCents / 100).toFixed(0)} entry`
+              {offer.entryFeeCents > 0
+                ? `$${(offer.entryFeeCents / 100).toFixed(0)} entry`
                 : "Free entry"}
             </p>
           </div>
           {error && <p role="alert" className="text-sm text-terracotta mb-4">{error}</p>}
-          <button
-            onClick={enterEvent}
-            disabled={busy}
-            className="w-full bg-terracotta text-white text-lg font-medium py-4 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
-          >
-            {busy ? "Entering..." : "Count me in"}
-          </button>
+          {offer.hasHeats ? (
+            <a
+              href={`/events/${offer.slug}/book`}
+              className="block w-full text-center bg-terracotta text-white text-lg font-medium py-4 hover:bg-terracotta/90 transition-colors"
+            >
+              Choose your heat
+            </a>
+          ) : (
+            <button
+              onClick={enterEvent}
+              disabled={busy}
+              className="w-full bg-terracotta text-white text-lg font-medium py-4 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
+            >
+              {busy ? "Entering..." : "Count me in"}
+            </button>
+          )}
           <a
             href="/dashboard?welcome=1"
-            className="block text-center mt-4 text-sm text-stone/50 hover:text-white transition-colors"
+            className="block text-center mt-4 py-2 text-sm text-stone/50 hover:text-white transition-colors"
           >
             Not this time
           </a>

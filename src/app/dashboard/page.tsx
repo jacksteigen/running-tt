@@ -12,30 +12,14 @@ import PhotoAlbum from "@/components/PhotoAlbum";
 import PBCard from "@/components/PBCard";
 import ResultsTable from "@/components/ResultsTable";
 import Countdown from "@/components/Countdown";
+import { dateParts, formatEventDate, isDateTbc } from "@/lib/dates";
+import { buildHeats, hasHeats, heatLabel, type HeatConfig } from "@/lib/heats";
+import { bookingRef } from "@/lib/bookings";
+import { todayInMelbourne } from "@/lib/events";
 
 export const metadata: Metadata = {
   title: "Dashboard · Running TT",
 };
-
-function formatDayMonth(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  const day = d.toLocaleDateString("en-AU", { day: "2-digit" });
-  const month = d.toLocaleDateString("en-AU", { month: "short" }).toUpperCase();
-  const weekday = d
-    .toLocaleDateString("en-AU", { weekday: "short" })
-    .toUpperCase();
-  return { day, month, weekday };
-}
-
-function formatLongDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-AU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
 
 export default async function DashboardPage({
   searchParams,
@@ -57,9 +41,10 @@ export default async function DashboardPage({
     redirect("/welcome");
   }
 
-  interface EntryRow {
+  interface EntryRow extends HeatConfig {
     entry_id: string;
     status: string;
+    heat_number: number | null;
     entered_at: string;
     event_id: string;
     slug: string;
@@ -92,8 +77,9 @@ export default async function DashboardPage({
   // Fetch user's entries with event details
   const entries = await db
     .prepare(
-      `SELECT e.id as entry_id, e.status, e.created_at as entered_at,
-              ev.id as event_id, ev.slug, ev.name, ev.distance, ev.date, ev.time, ev.venue, ev.status as event_status
+      `SELECT e.id as entry_id, e.status, e.heat_number, e.created_at as entered_at,
+              ev.id as event_id, ev.slug, ev.name, ev.distance, ev.date, ev.time, ev.venue, ev.status as event_status,
+              ev.first_heat_time, ev.heat_interval_minutes, ev.heat_count, ev.heat_capacity
        FROM entries e
        JOIN events ev ON e.event_id = ev.id
        WHERE e.user_id = ?
@@ -145,13 +131,41 @@ export default async function DashboardPage({
     .toUpperCase()
     .slice(0, 2);
 
-  // Upcoming entries, sorted ascending by date so the soonest is first.
+  // Upcoming means today or later (a TBC date sorts last), soonest first.
+  // A confirmed booking takes the spotlight over an unfinished one.
+  const today = todayInMelbourne();
   const upcomingEntries = entries.results
-    .filter(
-      (e) => e.event_status === "Open" || e.event_status === "Coming Soon"
-    )
+    .filter((e) => e.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date));
-  const soonestUpcoming = upcomingEntries[0];
+  const soonestUpcoming =
+    upcomingEntries.find((e) => e.status === "confirmed") ?? upcomingEntries[0];
+  const spotlightHeat =
+    soonestUpcoming && soonestUpcoming.heat_number
+      ? buildHeats(soonestUpcoming).find((h) => h.number === soonestUpcoming.heat_number)
+      : undefined;
+
+  const spotlight = soonestUpcoming
+    ? {
+        tbc: isDateTbc(soonestUpcoming.date),
+        pending: soonestUpcoming.status !== "confirmed",
+        ...entryLink(soonestUpcoming),
+      }
+    : null;
+
+  /** Where an entry card leads, and the action it offers. */
+  function entryLink(entry: EntryRow): { href: string; action: string | null } {
+    const upcoming = entry.date >= today;
+    if (upcoming && entry.status === "pending") {
+      return {
+        href: hasHeats(entry) ? `/events/${entry.slug}/book` : `/events/${entry.slug}`,
+        action: "Finish booking",
+      };
+    }
+    if (upcoming && hasHeats(entry)) {
+      return { href: `/events/${entry.slug}/booked`, action: "View booking" };
+    }
+    return { href: `/events/${entry.slug}`, action: null };
+  }
 
   // Summary stats
   const totalRaces = results.results.length;
@@ -218,7 +232,7 @@ export default async function DashboardPage({
           <div className="grid grid-cols-3 md:grid-cols-4 gap-4 md:gap-6 mt-10 pt-8 border-t border-stone/10">
             <div>
               <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums">
-                {upcomingEntries.length}
+                {upcomingEntries.filter((e) => e.status === "confirmed").length}
               </p>
               <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
                 Upcoming
@@ -266,30 +280,70 @@ export default async function DashboardPage({
       )}
 
       {/* Next race spotlight */}
-      {soonestUpcoming && (
+      {soonestUpcoming && spotlight && (
         <section className="bg-terracotta text-white">
           <div className="mx-auto max-w-6xl px-6 py-8 md:py-10">
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-center">
               <div className="lg:col-span-3">
                 <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/70 mb-2">
-                  Your next race
+                  {spotlight.pending ? "Finish your booking" : "Your next race"}
                 </p>
                 <h2 className="text-xl md:text-2xl font-semibold tracking-tight">
                   {soonestUpcoming.name}
                 </h2>
                 <p className="text-sm text-white/85 mt-1">
-                  {formatLongDate(soonestUpcoming.date)} ·{" "}
-                  {soonestUpcoming.venue}
+                  {spotlight.tbc
+                    ? "Date to be announced"
+                    : formatEventDate(soonestUpcoming.date, "long")}{" "}
+                  · {soonestUpcoming.venue}
                 </p>
+                {!spotlight.pending && (
+                  <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-xs uppercase tracking-[0.2em]">
+                    {soonestUpcoming.heat_number && (
+                      <span className="bg-white/15 px-2 py-1">
+                        {heatLabel(soonestUpcoming, soonestUpcoming.heat_number)}
+                      </span>
+                    )}
+                    <span className="text-white/70">
+                      Ref {bookingRef(soonestUpcoming.entry_id)}
+                    </span>
+                  </p>
+                )}
+                {spotlight.action && (
+                  <Link
+                    href={spotlight.href}
+                    className="inline-flex items-center gap-2 mt-5 bg-white text-terracotta text-sm font-medium px-5 py-3 min-h-[44px] hover:bg-bone transition-colors"
+                  >
+                    {spotlight.action} <span aria-hidden>→</span>
+                  </Link>
+                )}
               </div>
               <div className="lg:col-span-2 lg:border-l lg:border-white/20 lg:pl-6">
-                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60 mb-2">
-                  Start gun in
-                </p>
-                <Countdown
-                  target={soonestUpcoming.date}
-                  className="text-white"
-                />
+                {spotlight.tbc ? (
+                  <div className="border-t border-white/20 pt-5 lg:border-t-0 lg:pt-0">
+                    <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60 mb-2">
+                      What happens next
+                    </p>
+                    <p className="text-sm md:text-base text-white/90 leading-relaxed max-w-sm">
+                      {spotlight.pending
+                        ? "Bookings open once the date is locked in. The date and heat times land here first."
+                        : "Your spot is held. The date and your heat time land here as soon as they are locked in."}
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60 mb-2">
+                      {spotlightHeat?.startTime && !spotlight.pending
+                        ? "Your heat starts in"
+                        : "Start gun in"}
+                    </p>
+                    <Countdown
+                      target={soonestUpcoming.date}
+                      time={spotlight.pending ? null : (spotlightHeat?.startTime ?? null)}
+                      className="text-white"
+                    />
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -320,31 +374,42 @@ export default async function DashboardPage({
               {entries.results.length > 0 ? (
                 <div className="space-y-3">
                   {entries.results.map((entry) => {
-                    const { day, month, weekday } = formatDayMonth(entry.date);
-                    const statusCls =
-                      entry.status === "confirmed"
-                        ? "bg-trail text-white"
-                        : "bg-gold text-midnight";
+                    const { day, month, weekday, tbc } = dateParts(entry.date);
+                    const { href, action } = entryLink(entry);
+                    const confirmed = entry.status === "confirmed";
+                    const heat = confirmed ? heatLabel(entry, entry.heat_number) : "";
+                    const statusCls = confirmed
+                      ? "bg-trail text-white"
+                      : "bg-gold text-midnight";
                     return (
                       <Link
                         key={entry.entry_id}
-                        href={`/events/${entry.slug}`}
+                        href={href}
                         className="group block bg-white border border-stone/40 hover:border-midnight/30 transition-colors"
                       >
                         <div className="flex items-stretch">
                           {/* Date block */}
-                          <div className="shrink-0 bg-bone border-r border-stone/40 px-5 py-4 text-center flex flex-col justify-center">
-                            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust">
-                              {weekday}
-                            </p>
-                            <p className="font-mono text-2xl font-semibold tracking-tight leading-none mt-1">
-                              {day}
-                            </p>
-                            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mt-1">
-                              {month}
-                            </p>
+                          <div className="shrink-0 w-[4.75rem] bg-bone border-r border-stone/40 px-3 py-4 text-center flex flex-col justify-center">
+                            <span className="sr-only">
+                              {formatEventDate(entry.date, "long")}
+                            </span>
+                            <div aria-hidden>
+                              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust">
+                                {weekday}
+                              </p>
+                              <p
+                                className={`font-mono text-2xl font-semibold tracking-tight leading-none mt-1 ${
+                                  tbc ? "text-midnight/45" : ""
+                                }`}
+                              >
+                                {day}
+                              </p>
+                              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mt-1">
+                                {month || "\u00A0"}
+                              </p>
+                            </div>
                           </div>
-                          <div className="flex-1 px-5 py-4 flex items-center justify-between gap-4">
+                          <div className="flex-1 min-w-0 px-4 sm:px-5 py-4 flex items-center justify-between gap-3">
                             <div className="min-w-0">
                               <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-1">
                                 {entry.distance}
@@ -355,12 +420,24 @@ export default async function DashboardPage({
                               <p className="text-sm text-midnight/60 mt-0.5 truncate">
                                 {entry.venue}
                               </p>
+                              {heat && (
+                                <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-midnight mt-1.5">
+                                  {heat}
+                                </p>
+                              )}
+                              {action && (
+                                <p className="text-xs font-medium text-terracotta mt-2">
+                                  {action} <span aria-hidden>→</span>
+                                </p>
+                              )}
                             </div>
                             <span
-                              className={`shrink-0 text-[10px] font-medium uppercase tracking-wider px-2 py-1 ${statusCls}`}
+                              className={`shrink-0 self-start text-[10px] font-medium uppercase tracking-wider px-2 py-1 ${statusCls}`}
                             >
-                              {entry.status === "confirmed"
-                                ? "Entered"
+                              {confirmed
+                                ? entry.heat_number
+                                  ? "Booked"
+                                  : "Entered"
                                 : "Pending"}
                             </span>
                           </div>

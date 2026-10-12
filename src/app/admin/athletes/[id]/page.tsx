@@ -3,6 +3,9 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getDB } from "@/lib/db";
 import { getSession } from "@/lib/auth";
+import { formatEventDate } from "@/lib/dates";
+import { composeLocation, isKnownCountry } from "@/lib/countries";
+import { heatLabel } from "@/lib/heats";
 import AthleteEditor from "@/components/AthleteEditor";
 import RemoveEntryButton from "@/components/RemoveEntryButton";
 
@@ -12,6 +15,20 @@ export const metadata: Metadata = {
   title: "Athlete · Admin · Running TT",
   robots: { index: false, follow: false },
 };
+
+/**
+ * Profiles saved before city and country were split only have a location
+ * line. Pull a known country off the end so the editor starts filled in.
+ */
+function splitPlace(city: string | null, country: string | null, location: string | null) {
+  if (city || country) return { city: city ?? "", country: country ?? "" };
+  const parts = (location ?? "").split(",").map((p) => p.trim()).filter(Boolean);
+  const last = parts[parts.length - 1];
+  if (last && isKnownCountry(last)) {
+    return { city: parts.slice(0, -1).join(", "), country: last };
+  }
+  return { city: (location ?? "").trim(), country: "" };
+}
 
 export default async function AdminAthletePage({
   params,
@@ -27,7 +44,7 @@ export default async function AdminAthletePage({
   const athlete = await db
     .prepare(
       `SELECT id, name, email, first_name, middle_name, last_name, date_of_birth,
-              location, bio, is_admin, profile_completed, created_at
+              city, country, location, bio, is_admin, profile_completed, created_at
        FROM users WHERE id = ?`
     )
     .bind(id)
@@ -39,6 +56,8 @@ export default async function AdminAthletePage({
       middle_name: string | null;
       last_name: string | null;
       date_of_birth: string | null;
+      city: string | null;
+      country: string | null;
       location: string | null;
       bio: string | null;
       is_admin: number;
@@ -50,7 +69,8 @@ export default async function AdminAthletePage({
 
   const entries = await db
     .prepare(
-      `SELECT e.id, e.status, e.age_group, ev.name, ev.slug, ev.date, ev.distance,
+      `SELECT e.id, e.status, e.age_group, e.heat_number, ev.name, ev.slug, ev.date, ev.distance,
+              ev.first_heat_time, ev.heat_interval_minutes, ev.heat_count, ev.heat_capacity,
               (SELECT time_display FROM results r WHERE r.event_id = e.event_id AND r.user_id = e.user_id) as time_display
        FROM entries e JOIN events ev ON ev.id = e.event_id
        WHERE e.user_id = ?
@@ -62,6 +82,11 @@ export default async function AdminAthletePage({
       id: string;
       status: string;
       age_group: string | null;
+      heat_number: number | null;
+      first_heat_time: string | null;
+      heat_interval_minutes: number | null;
+      heat_count: number | null;
+      heat_capacity: number | null;
       name: string;
       slug: string;
       date: string;
@@ -69,6 +94,9 @@ export default async function AdminAthletePage({
       time_display: string | null;
     }[];
   };
+
+  const place = splitPlace(athlete.city, athlete.country, athlete.location);
+  const placeText = composeLocation(athlete.city, athlete.country) || athlete.location;
 
   return (
     <>
@@ -79,7 +107,8 @@ export default async function AdminAthletePage({
           </Link>
           <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">{athlete.name}</h1>
           <p className="mt-2 text-stone/70 text-sm">
-            {athlete.email} · joined {athlete.created_at.slice(0, 10)}
+            {athlete.email}
+            {placeText ? ` · ${placeText}` : ""} · joined {athlete.created_at.slice(0, 10)}
             {athlete.profile_completed ? "" : " · profile incomplete"}
           </p>
           <Link href={`/athletes/${athlete.id}`} className="inline-block mt-4 text-xs text-terracotta hover:text-terracotta/80 transition-colors">
@@ -100,7 +129,8 @@ export default async function AdminAthletePage({
                 middleName: athlete.middle_name ?? "",
                 lastName: athlete.last_name ?? "",
                 dateOfBirth: athlete.date_of_birth ?? "",
-                location: athlete.location ?? "",
+                city: place.city,
+                country: place.country,
                 bio: athlete.bio ?? "",
                 isAdmin: athlete.is_admin === 1,
               }}
@@ -121,7 +151,10 @@ export default async function AdminAthletePage({
                           {e.name}
                         </Link>
                         <p className="text-[11px] text-midnight/50">
-                          {e.date} · {e.distance} · {e.age_group ?? "no age group"}
+                          {formatEventDate(e.date, "compact")} · {e.distance}
+                          {e.heat_number ? ` · ${heatLabel(e, e.heat_number)}` : ""}
+                          {" · "}
+                          {e.age_group ?? "no age group"}
                           {e.time_display ? ` · ${e.time_display}` : ""}
                         </p>
                       </div>

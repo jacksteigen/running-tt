@@ -10,6 +10,7 @@ import {
   LONG_TIME_SECONDS,
 } from "@/lib/racetime";
 import { recomputePersonalBest } from "@/lib/personalBests";
+import { isOutcome, type Outcome } from "@/lib/outcomes";
 
 export interface Standing {
   userId: string;
@@ -88,6 +89,16 @@ async function recompute(db: D1Database, eventId: string): Promise<Standing[]> {
   return standings;
 }
 
+async function listOutcomes(db: D1Database, eventId: string) {
+  const rows = (await db
+    .prepare(
+      "SELECT user_id, outcome FROM entries WHERE event_id = ? AND outcome IS NOT NULL"
+    )
+    .bind(eventId)
+    .all()) as unknown as { results: { user_id: string; outcome: Outcome }[] };
+  return rows.results.map((r) => ({ userId: r.user_id, outcome: r.outcome }));
+}
+
 async function requireAdmin(db: D1Database) {
   const session = await getSession(db);
   if (!session) return { error: "Not authenticated", status: 401 };
@@ -108,6 +119,7 @@ export async function POST(request: NextRequest) {
   let time = "";
   let heat: number | null = null;
   let confirmLong = false;
+  let outcome: Outcome | null = null;
   try {
     const body = (await request.json()) as {
       eventId?: string;
@@ -115,7 +127,9 @@ export async function POST(request: NextRequest) {
       time?: string;
       heat?: number | string;
       confirmLong?: boolean;
+      outcome?: string;
     };
+    outcome = isOutcome(body.outcome) ? body.outcome : null;
     eventId = typeof body.eventId === "string" ? body.eventId : "";
     userId = typeof body.userId === "string" ? body.userId : "";
     time = typeof body.time === "string" ? body.time.trim() : "";
@@ -124,6 +138,37 @@ export async function POST(request: NextRequest) {
     confirmLong = body.confirmLong === true;
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+  }
+
+  // DNF, DNS or DQ: mark the entry and remove any time, then re-rank.
+  if (outcome) {
+    const ev = await db
+      .prepare("SELECT id, distance FROM events WHERE id = ?")
+      .bind(eventId)
+      .first<{ id: string; distance: string }>();
+    if (!ev) return NextResponse.json({ error: "Event not found" }, { status: 404 });
+
+    const marked = await db
+      .prepare(
+        "UPDATE entries SET outcome = ? WHERE event_id = ? AND user_id = ? AND status = 'confirmed'"
+      )
+      .bind(outcome, eventId, userId)
+      .run();
+    if (!(marked.meta.changes ?? 0)) {
+      return NextResponse.json(
+        { error: "That athlete is not entered in this event" },
+        { status: 400 }
+      );
+    }
+
+    await db
+      .prepare("DELETE FROM results WHERE event_id = ? AND user_id = ?")
+      .bind(eventId, userId)
+      .run();
+    await recomputePersonalBest(db, userId, ev.distance);
+
+    const standings = await recompute(db, eventId);
+    return NextResponse.json({ success: true, standings, outcomes: await listOutcomes(db, eventId) });
   }
 
   const seconds = parseTimeToSeconds(time);
@@ -195,10 +240,15 @@ export async function POST(request: NextRequest) {
     )
     .run();
 
+  await db
+    .prepare("UPDATE entries SET outcome = NULL WHERE id = ?")
+    .bind(entry.id)
+    .run();
+
   await recomputePersonalBest(db, userId, event.distance);
 
   const standings = await recompute(db, eventId);
-  return NextResponse.json({ success: true, standings });
+  return NextResponse.json({ success: true, standings, outcomes: await listOutcomes(db, eventId) });
 }
 
 /** Remove one athlete's time for an event. */
@@ -230,6 +280,11 @@ export async function DELETE(request: NextRequest) {
     .first<{ distance: string }>();
   if (event) await recomputePersonalBest(db, userId, event.distance);
 
+  await db
+    .prepare("UPDATE entries SET outcome = NULL WHERE event_id = ? AND user_id = ?")
+    .bind(eventId, userId)
+    .run();
+
   const standings = await recompute(db, eventId);
-  return NextResponse.json({ success: true, standings });
+  return NextResponse.json({ success: true, standings, outcomes: await listOutcomes(db, eventId) });
 }

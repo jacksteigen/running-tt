@@ -24,6 +24,8 @@ export async function GET(
       heats: heats.map((h) => ({
         number: h.number,
         label: h.label,
+        offsetMinutes: h.offsetMinutes,
+        startTime: h.startTime,
         capacity: h.capacity,
         booked: h.booked,
         remaining: h.remaining,

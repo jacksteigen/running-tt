@@ -4,6 +4,9 @@ import { redirect } from "next/navigation";
 import { getDB } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { ageOn } from "@/lib/agegroups";
+import { composeLocation } from "@/lib/countries";
+import { todayInMelbourne } from "@/lib/events";
+import AddAthleteForm from "@/components/AddAthleteForm";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +19,8 @@ interface AthleteRow {
   id: string;
   name: string;
   email: string;
+  city: string | null;
+  country: string | null;
   location: string | null;
   date_of_birth: string | null;
   profile_completed: number;
@@ -33,7 +38,7 @@ export default async function AdminAthletesPage() {
 
   const athletes = await db
     .prepare(
-      `SELECT u.id, u.name, u.email, u.location, u.date_of_birth, u.profile_completed, u.is_admin, u.created_at,
+      `SELECT u.id, u.name, u.email, u.city, u.country, u.location, u.date_of_birth, u.profile_completed, u.is_admin, u.created_at,
               (SELECT COUNT(*) FROM entries WHERE user_id = u.id AND status = 'confirmed') as entries,
               (SELECT COUNT(*) FROM results WHERE user_id = u.id) as results
        FROM users u
@@ -41,7 +46,7 @@ export default async function AdminAthletesPage() {
     )
     .all() as unknown as { results: AthleteRow[] };
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInMelbourne();
 
   return (
     <>
@@ -60,7 +65,9 @@ export default async function AdminAthletesPage() {
       </section>
 
       <section className="bg-bone min-h-[60vh]">
-        <div className="mx-auto max-w-5xl px-6 py-10 md:py-14">
+        <div className="mx-auto max-w-5xl px-6 py-10 md:py-14 space-y-8">
+          <AddAthleteForm />
+
           <div className="bg-white border border-stone/40 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -76,6 +83,7 @@ export default async function AdminAthletesPage() {
               <tbody>
                 {athletes.results.map((a) => {
                   const age = a.date_of_birth ? ageOn(a.date_of_birth, today) : null;
+                  const place = composeLocation(a.city, a.country) || a.location;
                   return (
                     <tr key={a.id} className="border-b border-stone/20 last:border-b-0 hover:bg-bone/60 transition-colors">
                       <td className="px-4 py-3">
@@ -87,7 +95,7 @@ export default async function AdminAthletesPage() {
                         )}
                         <p className="text-xs text-midnight/50">{a.email}</p>
                       </td>
-                      <td className="px-4 py-3 hidden md:table-cell text-midnight/70">{a.location ?? "-"}</td>
+                      <td className="px-4 py-3 hidden md:table-cell text-midnight/70">{place || "-"}</td>
                       <td className="px-4 py-3 text-right font-mono tabular-nums">{age ?? "-"}</td>
                       <td className="px-4 py-3 text-right font-mono tabular-nums hidden sm:table-cell">{a.entries}</td>
                       <td className="px-4 py-3 text-right font-mono tabular-nums hidden sm:table-cell">{a.results}</td>

@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import CountrySelect from "@/components/CountrySelect";
 
 interface AthleteFields {
   firstName: string;
   middleName: string;
   lastName: string;
   dateOfBirth: string;
-  location: string;
+  city: string;
+  country: string;
   bio: string;
   isAdmin: boolean;
 }
@@ -45,7 +47,16 @@ export default function AthleteEditor({
       const res = await fetch(`/api/admin/athletes/${athleteId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({
+          firstName: form.firstName,
+          middleName: form.middleName,
+          lastName: form.lastName,
+          dateOfBirth: form.dateOfBirth,
+          city: form.city,
+          country: form.country,
+          bio: form.bio,
+          isAdmin: form.isAdmin,
+        }),
       });
       const data = (await res.json()) as { success?: boolean; error?: string };
       if (data.success) {
@@ -78,16 +89,28 @@ export default function AthleteEditor({
           <input id="a-last" value={form.lastName} onChange={(e) => set("lastName", e.target.value)} className={inputCls} />
         </div>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div>
           <label htmlFor="a-dob" className={labelCls}>Date of birth</label>
           <input id="a-dob" type="date" value={form.dateOfBirth} onChange={(e) => set("dateOfBirth", e.target.value)} className={inputCls} />
         </div>
         <div>
-          <label htmlFor="a-loc" className={labelCls}>Location</label>
-          <input id="a-loc" value={form.location} onChange={(e) => set("location", e.target.value)} className={inputCls} />
+          <label htmlFor="a-city" className={labelCls}>Town or city</label>
+          <input id="a-city" autoComplete="off" maxLength={60} placeholder="e.g. Geelong" value={form.city} onChange={(e) => set("city", e.target.value)} className={inputCls} />
+        </div>
+        <div>
+          <label htmlFor="a-country" className={labelCls}>Country</label>
+          <CountrySelect
+            id="a-country"
+            value={form.country}
+            onChange={(value) => set("country", value)}
+            className={`${inputCls} cursor-pointer [&_option]:text-midnight ${form.country ? "" : "text-midnight/50"}`}
+          />
         </div>
       </div>
+      <p className="text-[11px] text-midnight/45 -mt-1">
+        Date of birth sets the age group on every entry. With a town and country as well, the profile counts as complete.
+      </p>
       <div>
         <label htmlFor="a-bio" className={labelCls}>Short intro</label>
         <textarea id="a-bio" rows={3} maxLength={600} value={form.bio} onChange={(e) => set("bio", e.target.value)} className={inputCls} />

@@ -11,6 +11,12 @@ const LINK_ERRORS: Record<string, string> = {
   missing_token: "That sign-in link was incomplete. Request a fresh one below.",
 };
 
+/** Only same-site paths travel through sign-in; the server checks again. */
+function readNext(search: string): string {
+  const value = new URLSearchParams(search).get("next") ?? "";
+  return value.startsWith("/") && !value.startsWith("//") ? value : "";
+}
+
 const inputCls =
   "w-full border border-stone/40 px-4 py-3.5 text-base bg-bone/50 focus:outline-none focus:border-terracotta transition-colors";
 
@@ -24,12 +30,16 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [linkError, setLinkError] = useState("");
   const [resent, setResent] = useState(false);
+  const [next, setNext] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get("error");
     if (code && LINK_ERRORS[code]) setLinkError(LINK_ERRORS[code]);
+    setNext(readNext(window.location.search));
   }, []);
+
+  const toBooking = next.includes("/book");
 
   async function handleLinkSubmit(e?: React.FormEvent) {
     e?.preventDefault();
@@ -39,7 +49,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/magic-link", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, declared }),
+        body: JSON.stringify({ email, declared, next: next || undefined }),
       });
       if (!res.ok) {
         const data = (await res.json()) as { error?: string };
@@ -64,7 +74,7 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, next: next || undefined }),
       });
       const data = (await res.json()) as {
         success?: boolean;
@@ -109,6 +119,11 @@ export default function LoginPage() {
         <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
           Sign in or sign up
         </h1>
+        {toBooking && (
+          <p className="mt-3 text-lg font-medium text-white">
+            Sign in to book your heat.
+          </p>
+        )}
         <p className="mt-3 text-stone/70 leading-relaxed">
           One field for both. First time here? Your account is created when
           you confirm the link.

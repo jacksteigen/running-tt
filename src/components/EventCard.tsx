@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { dateParts, formatEventDate } from "@/lib/dates";
 
 interface EventCardProps {
   slug: string;
@@ -9,17 +10,8 @@ interface EventCardProps {
   venue: string;
   status: string;
   entryCount?: number;
+  /** Leave out for past events; 0 shows "Free" on an upcoming event. */
   entryFeeCents?: number;
-}
-
-function formatDayMonth(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  const day = d.toLocaleDateString("en-AU", { day: "2-digit" });
-  const month = d.toLocaleDateString("en-AU", { month: "short" }).toUpperCase();
-  const weekday = d
-    .toLocaleDateString("en-AU", { weekday: "short" })
-    .toUpperCase();
-  return { day, month, weekday };
 }
 
 const statusStyles: Record<string, string> = {
@@ -38,10 +30,11 @@ export default function EventCard({
   venue,
   status,
   entryCount = 0,
-  entryFeeCents = 0,
+  entryFeeCents,
 }: EventCardProps) {
-  const { day, month, weekday } = formatDayMonth(date);
+  const { day, month, weekday, tbc } = dateParts(date);
   const statusCls = statusStyles[status] || "bg-stone text-midnight/70";
+  const showFee = entryFeeCents !== undefined && status !== "Completed";
 
   return (
     <Link
@@ -49,12 +42,12 @@ export default function EventCard({
       className="group block bg-white border border-stone/40 hover:border-midnight/30 transition-colors"
     >
       {/* Top band: distance + location like a race bib header */}
-      <div className="flex items-center justify-between bg-midnight text-white px-5 py-3">
-        <p className="font-mono text-xs tracking-[0.2em] uppercase">
+      <div className="flex items-center justify-between gap-3 bg-midnight text-white px-5 py-3">
+        <p className="font-mono text-xs tracking-[0.2em] uppercase truncate">
           {distance} · {location}
         </p>
         <span
-          className={`text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 ${statusCls}`}
+          className={`shrink-0 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 ${statusCls}`}
         >
           {status}
         </span>
@@ -63,16 +56,23 @@ export default function EventCard({
       {/* Body */}
       <div className="px-5 py-5 flex gap-5 items-start">
         {/* Date block */}
-        <div className="shrink-0 text-center border-r border-stone/40 pr-5">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust">
-            {weekday}
-          </p>
-          <p className="font-mono text-3xl font-semibold tracking-tight leading-none mt-1">
-            {day}
-          </p>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mt-1">
-            {month}
-          </p>
+        <div className="shrink-0 min-w-[3.5rem] text-center border-r border-stone/40 pr-5">
+          <span className="sr-only">{formatEventDate(date, "long")}</span>
+          <div aria-hidden>
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust">
+              {weekday}
+            </p>
+            <p
+              className={`font-mono text-3xl font-semibold tracking-tight leading-none mt-1 ${
+                tbc ? "text-midnight/45" : ""
+              }`}
+            >
+              {day}
+            </p>
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mt-1">
+              {month || " "}
+            </p>
+          </div>
         </div>
 
         {/* Name + venue */}
@@ -87,13 +87,15 @@ export default function EventCard({
                 <span className="text-midnight">{entryCount}</span> entered
               </span>
             )}
-            {entryFeeCents > 0 && (
+            {showFee && (
               <>
                 {entryCount > 0 && (
                   <span className="text-stone/70">·</span>
                 )}
                 <span className="font-mono">
-                  ${(entryFeeCents / 100).toFixed(0)} entry
+                  {entryFeeCents > 0
+                    ? `$${(entryFeeCents / 100).toFixed(0)} entry`
+                    : "Free"}
                 </span>
               </>
             )}
