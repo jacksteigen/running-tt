@@ -1,28 +1,47 @@
 import Stripe from "stripe";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-export async function getStripe(): Promise<Stripe> {
+/** Pinned so Stripe behaviour only changes when we choose to change it. */
+const STRIPE_API_VERSION: Stripe.LatestApiVersion = "2026-03-25.dahlia";
+
+async function getKey(): Promise<string> {
   const { env } = await getCloudflareContext();
   const key = (env as unknown as Record<string, string>).STRIPE_SECRET_KEY;
-  if (!key) {
-    throw new Error("STRIPE_SECRET_KEY is not set");
-  }
-  return new Stripe(key, {
+  if (!key) throw new Error("STRIPE_SECRET_KEY is not set");
+  return key;
+}
+
+export async function getStripe(): Promise<Stripe> {
+  return new Stripe(await getKey(), {
+    apiVersion: STRIPE_API_VERSION,
     httpClient: Stripe.createFetchHttpClient(),
   });
 }
 
+/** True while the account is on test keys, when no real money can move. */
+export async function isStripeTestMode(): Promise<boolean> {
+  try {
+    return (await getKey()).startsWith("sk_test_");
+  } catch {
+    return true;
+  }
+}
+
 export async function createCheckoutSession({
+  entryId,
   eventId,
   eventName,
+  heatText,
   entryFeeCents,
   userId,
   userEmail,
   successUrl,
   cancelUrl,
 }: {
+  entryId: string;
   eventId: string;
   eventName: string;
+  heatText: string;
   entryFeeCents: number;
   userId: string;
   userEmail: string;
@@ -31,7 +50,7 @@ export async function createCheckoutSession({
 }) {
   const stripe = await getStripe();
 
-  const session = await stripe.checkout.sessions.create({
+  return stripe.checkout.sessions.create({
     payment_method_types: ["card"],
     line_items: [
       {
@@ -39,7 +58,9 @@ export async function createCheckoutSession({
           currency: "aud",
           product_data: {
             name: eventName,
-            description: "Event entry · Running TT",
+            description: heatText
+              ? `${heatText} · Event entry · Running TT`
+              : "Event entry · Running TT",
           },
           unit_amount: entryFeeCents,
         },
@@ -50,11 +71,27 @@ export async function createCheckoutSession({
     success_url: successUrl,
     cancel_url: cancelUrl,
     customer_email: userEmail,
+    // The heat spot is held for HOLD_MINUTES; the session closes before that.
+    expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
     metadata: {
+      entry_id: entryId,
       event_id: eventId,
       user_id: userId,
     },
   });
+}
 
-  return session;
+export async function retrieveCheckoutSession(id: string) {
+  const stripe = await getStripe();
+  return stripe.checkout.sessions.retrieve(id);
+}
+
+/** Close an abandoned checkout so it can never be paid after its spot is gone. */
+export async function expireCheckoutSession(id: string) {
+  try {
+    const stripe = await getStripe();
+    await stripe.checkout.sessions.expire(id);
+  } catch {
+    // Already expired, completed or unknown: nothing to do.
+  }
 }

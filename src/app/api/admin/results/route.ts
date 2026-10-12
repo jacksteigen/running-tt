@@ -6,7 +6,10 @@ import {
   formatSeconds,
   parsePrizes,
   prizeToCents,
+  stopwatchReading,
+  LONG_TIME_SECONDS,
 } from "@/lib/racetime";
+import { recomputePersonalBest } from "@/lib/personalBests";
 
 export interface Standing {
   userId: string;
@@ -103,19 +106,22 @@ export async function POST(request: NextRequest) {
   let eventId = "";
   let userId = "";
   let time = "";
-  let heat = 1;
+  let heat: number | null = null;
+  let confirmLong = false;
   try {
     const body = (await request.json()) as {
       eventId?: string;
       userId?: string;
       time?: string;
       heat?: number | string;
+      confirmLong?: boolean;
     };
     eventId = typeof body.eventId === "string" ? body.eventId : "";
     userId = typeof body.userId === "string" ? body.userId : "";
     time = typeof body.time === "string" ? body.time.trim() : "";
     const h = Number(body.heat);
-    heat = Number.isInteger(h) && h > 0 && h < 1000 ? h : 1;
+    heat = Number.isInteger(h) && h > 0 && h < 1000 ? h : null;
+    confirmLong = body.confirmLong === true;
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
@@ -125,6 +131,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: `"${time}" is not a time I can read. Try 4:32.10` },
       { status: 400 }
+    );
+  }
+
+  // Over an hour is almost always a stopwatch reading typed with colons.
+  if (seconds > LONG_TIME_SECONDS && !confirmLong) {
+    const suggestion = stopwatchReading(time);
+    return NextResponse.json(
+      {
+        code: "LONG_TIME",
+        error: `"${time}" reads as ${formatSeconds(seconds)}, over an hour.${
+          suggestion ? ` Did you mean ${suggestion.display}?` : ""
+        }`,
+        suggestion: suggestion?.display ?? null,
+      },
+      { status: 422 }
     );
   }
 
@@ -138,10 +159,10 @@ export async function POST(request: NextRequest) {
 
   const entry = await db
     .prepare(
-      "SELECT id, age_group FROM entries WHERE event_id = ? AND user_id = ? AND status = 'confirmed'"
+      "SELECT id, age_group, heat_number FROM entries WHERE event_id = ? AND user_id = ? AND status = 'confirmed'"
     )
     .bind(eventId, userId)
-    .first<{ id: string; age_group: string | null }>();
+    .first<{ id: string; age_group: string | null; heat_number: number | null }>();
   if (!entry) {
     return NextResponse.json(
       { error: "That athlete is not entered in this event" },
@@ -169,35 +190,12 @@ export async function POST(request: NextRequest) {
       entry.id,
       seconds,
       display,
-      heat,
+      heat ?? entry.heat_number ?? 1,
       entry.age_group
     )
     .run();
 
-  // Personal best for this distance.
-  const pb = await db
-    .prepare(
-      "SELECT id, time_seconds FROM personal_bests WHERE user_id = ? AND distance = ?"
-    )
-    .bind(userId, event.distance)
-    .first<{ id: string; time_seconds: number }>();
-
-  if (!pb) {
-    await db
-      .prepare(
-        `INSERT INTO personal_bests (id, user_id, distance, time_seconds, time_display, event_id, verified)
-         VALUES (?, ?, ?, ?, ?, ?, 1)`
-      )
-      .bind(`pb_${generateId()}`, userId, event.distance, seconds, display, eventId)
-      .run();
-  } else if (seconds < pb.time_seconds) {
-    await db
-      .prepare(
-        "UPDATE personal_bests SET time_seconds = ?, time_display = ?, event_id = ?, verified = 1 WHERE id = ?"
-      )
-      .bind(seconds, display, eventId, pb.id)
-      .run();
-  }
+  await recomputePersonalBest(db, userId, event.distance);
 
   const standings = await recompute(db, eventId);
   return NextResponse.json({ success: true, standings });
@@ -225,6 +223,12 @@ export async function DELETE(request: NextRequest) {
     .prepare("DELETE FROM results WHERE event_id = ? AND user_id = ?")
     .bind(eventId, userId)
     .run();
+
+  const event = await db
+    .prepare("SELECT distance FROM events WHERE id = ?")
+    .bind(eventId)
+    .first<{ distance: string }>();
+  if (event) await recomputePersonalBest(db, userId, event.distance);
 
   const standings = await recompute(db, eventId);
   return NextResponse.json({ success: true, standings });

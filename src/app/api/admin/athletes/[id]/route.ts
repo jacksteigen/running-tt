@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { ageGroupOn, isValidDob } from "@/lib/agegroups";
+import { composeLocation, isKnownCountry } from "@/lib/countries";
 
 function clean(value: unknown, limit: number): string {
   return typeof value === "string" ? value.trim().slice(0, limit) : "";
@@ -37,7 +38,9 @@ export async function PATCH(
   const middleName = clean(body.middleName, 60);
   const lastName = clean(body.lastName, 60);
   const dateOfBirth = clean(body.dateOfBirth, 10);
-  const location = clean(body.location, 80);
+  const city = clean(body.city, 60);
+  const country = clean(body.country, 60);
+  const location = composeLocation(city, country);
   const bio = clean(body.bio, 600);
   const isAdmin = body.isAdmin === true;
 
@@ -47,17 +50,20 @@ export async function PATCH(
   if (dateOfBirth && !isValidDob(dateOfBirth)) {
     return NextResponse.json({ error: "Date of birth does not look right" }, { status: 400 });
   }
+  if (country && !isKnownCountry(country)) {
+    return NextResponse.json({ error: "Pick a country from the list" }, { status: 400 });
+  }
   if (id === session.user.id && !isAdmin) {
     return NextResponse.json({ error: "You cannot remove your own admin access" }, { status: 400 });
   }
 
-  const completed = firstName && lastName && dateOfBirth && location ? 1 : 0;
+  const completed = firstName && lastName && dateOfBirth && city && country ? 1 : 0;
 
   await db
     .prepare(
       `UPDATE users
        SET first_name = ?, middle_name = ?, last_name = ?, name = ?,
-           date_of_birth = ?, location = ?, bio = ?, is_admin = ?,
+           date_of_birth = ?, city = ?, country = ?, location = ?, bio = ?, is_admin = ?,
            profile_completed = ?, updated_at = datetime('now')
        WHERE id = ?`
     )
@@ -67,6 +73,8 @@ export async function PATCH(
       lastName,
       `${firstName} ${lastName}`,
       dateOfBirth || null,
+      city || null,
+      country || null,
       location || null,
       bio || null,
       isAdmin ? 1 : 0,

@@ -7,6 +7,7 @@ import {
   generateId,
 } from "@/lib/auth";
 import { CLEAN_SPORT_DECLARATION } from "@/lib/declaration";
+import { safeNextPath } from "@/lib/site";
 
 /**
  * The emailed link lands here as a GET. Email security scanners prefetch
@@ -87,8 +88,12 @@ export async function POST(request: NextRequest) {
     completed = row?.profile_completed === 1;
   }
 
-  return NextResponse.redirect(
-    new URL(completed ? "/dashboard" : "/welcome", request.url),
-    303
-  );
+  const next = safeNextPath(link.next_path);
+  const destination = completed
+    ? next ?? "/dashboard"
+    : next
+      ? `/welcome?next=${encodeURIComponent(next)}`
+      : "/welcome";
+
+  return NextResponse.redirect(new URL(destination, request.url), 303);
 }

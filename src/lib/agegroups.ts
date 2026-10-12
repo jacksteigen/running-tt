@@ -38,6 +38,8 @@ export function ageGroupOn(
   onISO: string
 ): string | null {
   if (!dobISO) return null;
+  // No event date yet means no age group yet; it is set when the date is.
+  if (!onISO || onISO >= "9999-01-01") return null;
   const age = ageOn(dobISO, onISO);
   if (age === null || age < 0) return null;
   return ageGroupFor(age);

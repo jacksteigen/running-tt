@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { getStripe } from "@/lib/stripe";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { confirmPaidCheckout, releaseExpiredCheckout } from "@/lib/bookings";
 
 export async function POST(request: NextRequest) {
   const body = await request.text();
@@ -22,20 +23,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  if (event.type === "checkout.session.completed") {
-    const session = event.data.object;
-    const eventId = session.metadata?.event_id;
-    const userId = session.metadata?.user_id;
+  const db = await getDB();
 
-    if (eventId && userId) {
-      const db = await getDB();
-      await db
-        .prepare(
-          "UPDATE entries SET status = 'confirmed' WHERE event_id = ? AND user_id = ? AND status = 'pending'"
-        )
-        .bind(eventId, userId)
-        .run();
+  if (
+    event.type === "checkout.session.completed" ||
+    event.type === "checkout.session.async_payment_succeeded"
+  ) {
+    const s = event.data.object;
+    const outcome = await confirmPaidCheckout(db, {
+      id: s.id,
+      payment_status: s.payment_status,
+      metadata: (s.metadata ?? null) as Record<string, string> | null,
+    });
+    // Ask Stripe to retry if the entry is missing; it may be a timing gap.
+    if (outcome === "not_found") {
+      return NextResponse.json({ error: "Entry not found" }, { status: 500 });
     }
+  }
+
+  if (event.type === "checkout.session.expired") {
+    await releaseExpiredCheckout(db, event.data.object.id);
   }
 
   return NextResponse.json({ received: true });

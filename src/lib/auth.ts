@@ -18,7 +18,8 @@ export function generateToken(): string {
 export async function createMagicLink(
   db: D1Database,
   email: string,
-  declared: boolean
+  declared: boolean,
+  nextPath: string | null = null
 ) {
   const id = generateId();
   const token = generateToken();
@@ -33,9 +34,9 @@ export async function createMagicLink(
 
   await db
     .prepare(
-      "INSERT INTO magic_links (id, email, token, expires_at, declared) VALUES (?, ?, ?, ?, ?)"
+      "INSERT INTO magic_links (id, email, token, expires_at, declared, next_path) VALUES (?, ?, ?, ?, ?, ?)"
     )
-    .bind(id, normalised, token, expiresAt, declared ? 1 : 0)
+    .bind(id, normalised, token, expiresAt, declared ? 1 : 0, nextPath)
     .run();
 
   return token;
@@ -59,10 +60,10 @@ export async function peekMagicLink(db: D1Database, token: string) {
 export async function consumeMagicLink(db: D1Database, token: string) {
   return db
     .prepare(
-      "UPDATE magic_links SET used = 1 WHERE token = ? AND used = 0 AND expires_at > datetime('now') RETURNING id, email, declared"
+      "UPDATE magic_links SET used = 1 WHERE token = ? AND used = 0 AND expires_at > datetime('now') RETURNING id, email, declared, next_path"
     )
     .bind(token)
-    .first<{ id: string; email: string; declared: number }>();
+    .first<{ id: string; email: string; declared: number; next_path: string | null }>();
 }
 
 export async function createSession(db: D1Database, userId: string) {
@@ -102,6 +103,7 @@ export async function getSession(db: D1Database) {
               u.bio, u.story, u.photo_url, u.instagram, u.strava_url, u.tiktok, u.website,
               u.sponsors, u.sponsor_interests, u.open_to_sponsorship, u.is_admin,
               u.first_name, u.middle_name, u.last_name, u.date_of_birth, u.profile_completed,
+              u.city, u.country,
               (u.password_hash IS NOT NULL) as has_password
        FROM sessions s
        JOIN users u ON s.user_id = u.id
@@ -134,6 +136,8 @@ export async function getSession(db: D1Database) {
       last_name: string | null;
       date_of_birth: string | null;
       profile_completed: number;
+      city: string | null;
+      country: string | null;
       has_password: number;
     }>();
 
@@ -165,6 +169,8 @@ export async function getSession(db: D1Database) {
       lastName: session.last_name,
       dateOfBirth: session.date_of_birth,
       profileCompleted: session.profile_completed === 1,
+      city: session.city,
+      country: session.country,
       hasPassword: !!session.has_password,
     },
   };

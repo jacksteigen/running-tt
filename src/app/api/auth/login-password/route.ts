@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { createSession, hashPassword, verifyPassword } from "@/lib/auth";
+import { safeNextPath } from "@/lib/site";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MAX_FAILURES = 8;
@@ -10,11 +11,14 @@ const GENERIC_ERROR = "Email or password is incorrect";
 export async function POST(request: NextRequest) {
   let email = "";
   let password = "";
+  let nextPath: string | null = null;
   try {
     const body = (await request.json()) as {
       email?: string;
       password?: string;
+      next?: string;
     };
+    nextPath = safeNextPath(body.next);
     email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     password = typeof body.password === "string" ? body.password : "";
   } catch {
@@ -86,6 +90,11 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    next: user.profile_completed === 1 ? "/dashboard" : "/welcome",
+    next:
+      user.profile_completed === 1
+        ? nextPath ?? "/dashboard"
+        : nextPath
+          ? `/welcome?next=${encodeURIComponent(nextPath)}`
+          : "/welcome",
   });
 }

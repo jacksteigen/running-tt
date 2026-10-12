@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDB } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { normaliseUrl } from "@/lib/urls";
+import { composeLocation, isKnownCountry } from "@/lib/countries";
 
 interface SponsorRef {
   name: string;
@@ -11,6 +12,8 @@ interface SponsorRef {
 interface ProfilePatch {
   name?: string;
   location?: string;
+  city?: string;
+  country?: string;
   bio?: string;
   story?: string;
   instagram?: string;
@@ -62,7 +65,15 @@ export async function PATCH(request: NextRequest) {
     updates.push("name = ?");
     values.push(name);
   }
-  if (body.location !== undefined) {
+  if (body.city !== undefined || body.country !== undefined) {
+    const city = clean(body.city, 60);
+    const country = clean(body.country, 60);
+    if (country && !isKnownCountry(country)) {
+      return NextResponse.json({ error: "Pick your country from the list" }, { status: 400 });
+    }
+    updates.push("city = ?", "country = ?", "location = ?");
+    values.push(city, country, composeLocation(city, country));
+  } else if (body.location !== undefined) {
     updates.push("location = ?");
     values.push(clean(body.location, TEXT_LIMITS.location));
   }
