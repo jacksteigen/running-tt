@@ -22,6 +22,7 @@ interface ProfilePatch {
   website?: string;
   sponsors?: SponsorRef[];
   sponsorInterests?: string;
+  dreamBrands?: string;
   openToSponsorship?: boolean;
 }
 
@@ -35,6 +36,7 @@ const TEXT_LIMITS: Record<string, number> = {
   tiktok: 60,
   website: 300,
   sponsorInterests: 300,
+  dreamBrands: 300,
 };
 
 function clean(value: unknown, limit: number): string {
@@ -136,6 +138,10 @@ export async function PATCH(request: NextRequest) {
   if (body.sponsorInterests !== undefined) {
     updates.push("sponsor_interests = ?");
     values.push(clean(body.sponsorInterests, TEXT_LIMITS.sponsorInterests));
+  }
+  if (body.dreamBrands !== undefined) {
+    updates.push("dream_brands = ?");
+    values.push(clean(body.dreamBrands, TEXT_LIMITS.dreamBrands));
   }
   if (body.openToSponsorship !== undefined) {
     updates.push("open_to_sponsorship = ?");

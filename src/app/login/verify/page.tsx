@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDB } from "@/lib/db";
@@ -30,20 +29,13 @@ export default async function VerifyPage({
     <section className="bg-bone lg:grid lg:grid-cols-12 lg:min-h-[calc(100svh-4rem)]">
       {/* The photograph, desktop only. On a phone the button comes first. */}
       <div className="relative hidden lg:flex lg:col-span-5 bg-midnight text-bone overflow-hidden items-end lg:sticky lg:top-16 lg:self-start lg:h-[calc(100svh-4rem)]">
-        <Image
-          src="/images/athlete-sock-bench.jpg"
-          alt=""
-          fill
-          sizes="42vw"
-          className="object-cover object-center opacity-80 motion-safe:animate-slow-zoom"
-          aria-hidden
-        />
         <div
           aria-hidden
-          className="absolute inset-0 bg-gradient-to-t from-midnight via-midnight/25 to-midnight/0"
+          className="absolute inset-0 opacity-[0.05]"
+          style={{ backgroundImage: "repeating-linear-gradient(90deg, transparent 0 79px, #F5F2EC 79px 80px)" }}
         />
         <p className="relative t-caption px-12 pb-14 max-w-sm text-bone/70">
-          Lacing up. Nearly time.
+          One tap, and you are in.
         </p>
       </div>
 

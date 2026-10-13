@@ -2,7 +2,6 @@ import { getDB } from "@/lib/db";
 import { OUTCOMES, PUBLIC_OUTCOMES, type Outcome } from "@/lib/outcomes";
 import { getSession } from "@/lib/auth";
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import EnterEventButton from "@/components/EnterEventButton";
@@ -20,6 +19,7 @@ import { formatFee } from "@/lib/money";
 export const dynamic = "force-dynamic";
 
 interface EventRow {
+    is_test?: number;
   id: string;
   slug: string;
   name: string;
@@ -755,21 +755,12 @@ export default async function EventPage({
     <>
       {/* Cover */}
       <section className="relative bg-midnight text-bone overflow-hidden">
-        {/* Phones: the photo sits behind the type. Desktop: it takes the
-            right side, like the home page, so the type never sits on it. */}
-        <div aria-hidden className="absolute inset-0 lg:left-[52%] overflow-hidden">
-          <Image
-            src="/images/athlete-track-side.jpg"
-            alt=""
-            fill
-            priority
-            sizes="(min-width: 1024px) 48vw, 100vw"
-            className="object-cover object-[50%_30%] opacity-40 lg:opacity-90 motion-safe:animate-slow-zoom"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-midnight via-midnight/40 to-midnight/0" />
-          <div className="absolute inset-0 hidden lg:block bg-gradient-to-r from-midnight via-midnight/10 to-transparent w-1/3" />
-        </div>
-        <div aria-hidden className="absolute inset-0 lg:hidden bg-gradient-to-r from-midnight/70 via-midnight/30 to-transparent" />
+        {/* A typographic cover: track lines, no photograph. */}
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-[0.05]"
+          style={{ backgroundImage: "repeating-linear-gradient(90deg, transparent 0 79px, #F5F2EC 79px 80px)" }}
+        />
 
         <div className="relative mx-auto max-w-6xl px-6 pt-6 pb-12 md:pb-16 lg:min-h-[86vh] flex flex-col">
           <Link
@@ -783,6 +774,7 @@ export default async function EventPage({
             <p className="t-eyebrow flex flex-wrap items-center gap-x-4 gap-y-2 text-bone/60">
               <span>{event.distance}</span>
               <span className={statusTone[eventStatus] ?? "text-bone/60"}>{eventStatus}</span>
+              {event.is_test ? <span className="text-bone/80">Test run</span> : null}
               {isRaceDay && leaderboard.results.length > 0 && <LiveRefresh />}
             </p>
             <h1 className="t-display mt-5 break-words text-[3.2rem] sm:text-[4.2rem] md:text-[5.2rem] lg:text-[clamp(4rem,5.2vw,5.6rem)]">

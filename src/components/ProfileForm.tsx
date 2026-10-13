@@ -26,6 +26,7 @@ interface ProfileFormProps {
     website?: string | null;
     sponsors?: string | null; // JSON string
     sponsorInterests?: string | null;
+    dreamBrands?: string | null;
     openToSponsorship?: number;
   };
 }
@@ -82,6 +83,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
   const [sponsorInterests, setSponsorInterests] = useState(
     user.sponsorInterests || ""
   );
+  const [dreamBrands, setDreamBrands] = useState(user.dreamBrands || "");
   const [openToSponsorship, setOpenToSponsorship] = useState(
     (user.openToSponsorship ?? 1) === 1
   );
@@ -151,6 +153,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
           website,
           sponsors: sponsors.filter((s) => s.name.trim()),
           sponsorInterests,
+          dreamBrands,
           openToSponsorship,
         }),
       });
@@ -408,6 +411,25 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                 Add a sponsor
               </button>
             )}
+          </div>
+
+          <div className="mt-5">
+            <label htmlFor="dreamBrands" className={labelCls}>
+              Your dream brands
+            </label>
+            <input
+              id="dreamBrands"
+              type="text"
+              value={dreamBrands}
+              onChange={(e) => setDreamBrands(e.target.value)}
+              maxLength={300}
+              placeholder="e.g. Steigen, Nike, Maurten"
+              className={inputCls}
+            />
+            <p className="mt-2 text-[0.88rem] text-midnight/50 leading-relaxed">
+              Who you would love to be backed by. Only the Running TT team sees
+              this, and we reach out to them for you.
+            </p>
           </div>
 
           <div className="mt-5">

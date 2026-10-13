@@ -72,6 +72,7 @@ export default async function DashboardPage({
   }
 
   interface ResultRow {
+    is_test?: number;
     id: string;
     time_display: string;
     heat_number: number;
@@ -106,7 +107,7 @@ export default async function DashboardPage({
   // Fetch user's results
   const results = await db
     .prepare(
-      `SELECT r.*, ev.name as event_name, ev.slug as event_slug, ev.distance
+      `SELECT r.*, ev.name as event_name, ev.slug as event_slug, ev.distance, ev.is_test
        FROM results r
        JOIN events ev ON r.event_id = ev.id
        WHERE r.user_id = ?
@@ -195,9 +196,11 @@ export default async function DashboardPage({
 
   // Summary stats, told as a sentence rather than a row of boxes.
   const upcomingConfirmed = upcomingEntries.filter((e) => e.status === "confirmed").length;
-  const totalRaces = results.results.length;
-  const podiums = results.results.filter((r) => r.rank <= 3).length;
-  const earnings = results.results.reduce(
+  // Test runs show in the history, tagged, but are not part of the tally.
+  const counted = results.results.filter((r) => !r.is_test);
+  const totalRaces = counted.length;
+  const podiums = counted.filter((r) => r.rank <= 3).length;
+  const earnings = counted.reduce(
     (sum, r) => sum + (r.prize_amount_cents || 0),
     0
   );
@@ -287,6 +290,26 @@ export default async function DashboardPage({
                 ? "You are in. Your entry is confirmed and your spot on the start list is locked."
                 : `Welcome to Running TT, ${user.firstName ?? user.name}. Your profile is live.`}
             </p>
+          </div>
+        </section>
+      )}
+
+      {/* Dream brands, for athletes who have not told us yet */}
+      {user.openToSponsorship !== 0 && !user.dreamBrands && (
+        <section className="bg-stone">
+          <div className="mx-auto max-w-6xl px-6 py-8 md:py-10 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+            <div className="max-w-2xl">
+              <p className="t-headline text-[1.5rem] md:text-[1.8rem]">
+                Which brands would you love to run for?
+              </p>
+              <p className="mt-2 text-midnight/70 leading-relaxed">
+                Tell us your dream brands and we will reach out to them for
+                you. Only the Running TT team sees your list.
+              </p>
+            </div>
+            <a href="#profile" className="btn btn-ink shrink-0">
+              Add your dream brands
+            </a>
           </div>
         </section>
       )}

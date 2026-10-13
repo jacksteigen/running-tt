@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getDB } from "@/lib/db";
@@ -132,14 +131,10 @@ export default async function BookedPage({
     <>
       {/* Header */}
       <section className="relative bg-midnight text-bone overflow-hidden">
-        <Image
-          src="/images/athlete-track-side.jpg"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-[center_40%] opacity-25 motion-safe:animate-slow-zoom"
+        <div
           aria-hidden
+          className="absolute inset-0 opacity-[0.05]"
+          style={{ backgroundImage: "repeating-linear-gradient(90deg, transparent 0 79px, #F5F2EC 79px 80px)" }}
         />
         <div
           aria-hidden

@@ -20,6 +20,8 @@ export interface EventFormValues {
   venue: string;
   location: string;
   status: EventStatus;
+  /** A test run: kept off the public race list and out of records. */
+  isTest?: boolean;
   entryFee: number;
   changeFee: number | null;
   startTime: string;
@@ -49,6 +51,7 @@ interface Draft {
   venue: string;
   location: string;
   status: EventStatus;
+  isTest: boolean;
   entryFee: string;
   changeFee: string;
   startTime: string;
@@ -89,6 +92,7 @@ function toDraft(v: EventFormValues): Draft {
     name: v.name,
     distance: v.distance,
     dateTbc: v.dateTbc,
+    isTest: v.isTest ?? false,
     date: v.date,
     venue: v.venue,
     location: v.location,
@@ -113,6 +117,7 @@ function toPayload(d: Draft): EventFormValues {
     name: d.name.trim(),
     distance: d.distance.trim(),
     dateTbc: d.dateTbc,
+    isTest: d.isTest,
     date: d.dateTbc ? "" : d.date,
     venue: d.venue.trim(),
     location: d.location.trim(),
@@ -554,6 +559,17 @@ export default function EventEditor({
                   />
                   <span className="text-sm">Date TBC</span>
                   <span className="text-xs text-midnight/45">Listed, but not bookable</span>
+                </label>
+                <label className="flex items-center gap-2.5 min-h-11 cursor-pointer select-none">
+                  <input
+                    id="ev-test"
+                    type="checkbox"
+                    checked={d.isTest}
+                    onChange={(e) => set("isTest", e.target.checked)}
+                    className="h-4 w-4 accent-[#C4593A]"
+                  />
+                  <span className="text-sm">Test run</span>
+                  <span className="text-xs text-midnight/45">Hidden from the race list, not counted in records</span>
                 </label>
               </div>
               <div>

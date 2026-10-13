@@ -6,6 +6,7 @@ import Countdown from "@/components/Countdown";
 import RaceList from "@/components/RaceList";
 import Sponsors from "@/components/Sponsors";
 import Reveal from "@/components/Reveal";
+import FirstInBand from "@/components/FirstInBand";
 import { displayStatus, todayInMelbourne } from "@/lib/events";
 import { formatEventDate, isDateTbc } from "@/lib/dates";
 import {
@@ -91,7 +92,7 @@ export default async function Home() {
   // "Upcoming" means the event's date is today or later. This lets an event
   // automatically shift from upcoming to past without any manual status change.
   const upcomingEvents = await db
-    .prepare("SELECT * FROM events WHERE date >= ? ORDER BY date ASC")
+    .prepare("SELECT * FROM events WHERE date >= ? AND is_test = 0 ORDER BY date ASC")
     .bind(todayInMelbourne())
     .all() as unknown as { results: EventRow[] };
 
@@ -127,11 +128,20 @@ export default async function Home() {
     .prepare(
       `SELECT ev.id, ev.slug, ev.name, ev.distance, ev.date, ev.venue
        FROM events ev
-       WHERE ev.date < ? AND EXISTS (SELECT 1 FROM results r WHERE r.event_id = ev.id)
+       WHERE ev.date < ? AND ev.is_test = 0
+         AND EXISTS (SELECT 1 FROM results r WHERE r.event_id = ev.id)
        ORDER BY ev.date DESC LIMIT 1`
     )
     .bind(todayInMelbourne())
     .first<{ id: string; slug: string; name: string; distance: string; date: string; venue: string }>();
+
+  const testRun = await db
+    .prepare(
+      `SELECT slug, name, date, venue FROM events
+       WHERE is_test = 1 AND EXISTS (SELECT 1 FROM results r WHERE r.event_id = events.id)
+       ORDER BY date DESC LIMIT 1`
+    )
+    .first<{ slug: string; name: string; date: string; venue: string }>();
 
   const finishers = lastRace
     ? ((await db
@@ -275,40 +285,32 @@ export default async function Home() {
         <section className="bg-bone">
           <div className="mx-auto max-w-6xl px-6 py-24 md:py-36">
             <div className="max-w-4xl">
-              <p className="t-eyebrow text-dust">Why we race</p>
+              <p className="t-eyebrow text-dust">What Running TT is</p>
               <p className="t-headline mt-6 text-[1.9rem] sm:text-[2.4rem] md:text-[3.1rem] text-midnight">
-                For the runner up before sunrise. The one chasing a time
-                nobody else knows about. The one who simply loves how a hard
-                effort feels. <em className="text-terracotta">Running TT is for you.</em>
+                A start line, a clock, and a purse worth racing for.{" "}
+                <em className="text-terracotta">Open to every runner who wants to race.</em>
               </p>
               <p className="mt-8 max-w-xl text-[1.05rem] leading-relaxed text-midnight/70">
-                Every heat is small, so every runner is seen. Every time is
-                recorded, every finisher gets a place, and every race pays
-                prize money. It is racing built around the athlete, not the
-                spectacle.
+                Book a heat, run your best, and your time goes on the record.
+                The fastest times take home prize money, backed by brands who
+                want to support people who run.
               </p>
             </div>
           </div>
         </section>
       </Reveal>
 
-      {/* Photograph */}
-      <section className="bg-bone">
-        <figure className="mx-auto max-w-6xl px-6">
-          <div className="relative w-full aspect-[4/5] sm:aspect-[16/10] md:aspect-[21/9] overflow-hidden">
-            <Image
-              src="/images/athlete-sock-bench.jpg"
-              alt="An athlete lacing up before a heat"
-              fill
-              sizes="(min-width: 1152px) 1104px, 100vw"
-              className="object-cover object-center"
-            />
-          </div>
-          <figcaption className="t-caption text-midnight/55 mt-4">
-            Lacing up. The quiet minute before the gun.
-          </figcaption>
-        </figure>
-      </section>
+      <FirstInBand
+        tone="ink"
+        spots={
+          nextOpen && hasHeats(nextOpen) && nextOpen.heat_capacity
+            ? (nextOpen.heat_count ?? 0) * nextOpen.heat_capacity
+            : null
+        }
+        heats={nextOpen && hasHeats(nextOpen) ? nextOpen.heat_count : null}
+        href={nextOpen ? (spotlight?.cta.href ?? `/events/${nextOpen.slug}`) : "/events"}
+        linkLabel={nextOpen && spotlight?.cta.label === "Book your heat" ? "Book your heat" : "See the races"}
+      />
 
       {/* Races */}
       <Reveal>
@@ -346,6 +348,14 @@ export default async function Home() {
                   Set up your profile
                 </Link>
               </div>
+            )}
+            {testRun && (
+              <p className="t-caption mt-8 text-midnight/55">
+                Test run: {testRun.name}, {formatEventDate(testRun.date, "medium")}.{" "}
+                <Link href={`/events/${testRun.slug}`} className="link-quiet not-italic text-midnight/70">
+                  See the times
+                </Link>
+              </p>
             )}
           </div>
         </section>

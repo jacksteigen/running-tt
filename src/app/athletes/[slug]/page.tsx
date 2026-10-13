@@ -105,6 +105,7 @@ export default async function AthletePage({
   }
 
   interface ResultRow {
+    is_test?: number;
     id: string;
     time_display: string;
     rank: number;
@@ -125,7 +126,7 @@ export default async function AthletePage({
   const results = await db
     .prepare(
       `SELECT r.id, r.time_display, r.rank, r.verified, r.prize_amount_cents,
-              ev.name as event_name, ev.slug as event_slug, ev.distance
+              ev.name as event_name, ev.slug as event_slug, ev.distance, ev.is_test
        FROM results r
        JOIN events ev ON r.event_id = ev.id
        WHERE r.user_id = ?
@@ -199,10 +200,12 @@ export default async function AthletePage({
   const openToSponsors = user.open_to_sponsorship === 1;
 
   // Summary stats, told as a sentence rather than a row of boxes.
-  const totalRaces = results.results.length;
-  const podiums = results.results.filter((r) => r.rank <= 3).length;
-  const wins = results.results.filter((r) => r.rank === 1).length;
-  const earnings = results.results.reduce(
+  // Test runs show in the history, tagged, but are not part of the tally.
+  const counted = results.results.filter((r) => !r.is_test);
+  const totalRaces = counted.length;
+  const podiums = counted.filter((r) => r.rank <= 3).length;
+  const wins = counted.filter((r) => r.rank === 1).length;
+  const earnings = counted.reduce(
     (sum, r) => sum + (r.prize_amount_cents || 0),
     0
   );
@@ -493,7 +496,7 @@ export default async function AthletePage({
                   want to back a runner you see here, reach out through their
                   socials or{" "}
                   <a
-                    href="mailto:partners@runningtt.com?subject=Backing%20a%20Running%20TT%20athlete"
+                    href="/about#brands"
                     className="link-quiet text-midnight"
                   >
                     contact Running TT

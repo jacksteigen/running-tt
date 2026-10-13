@@ -48,6 +48,26 @@ export default async function AdminAthletesPage() {
 
   const today = todayInMelbourne();
 
+  // Which brands athletes most want to run for: the outreach list.
+  const wishes = (await db
+    .prepare(
+      "SELECT dream_brands FROM users WHERE dream_brands IS NOT NULL AND dream_brands != '' AND open_to_sponsorship != 0"
+    )
+    .all()) as unknown as { results: { dream_brands: string }[] };
+  const brandCounts = new Map<string, { label: string; n: number }>();
+  for (const row of wishes.results) {
+    const seen = new Set<string>();
+    for (const raw of row.dream_brands.split(/[,\n;]+/)) {
+      const label = raw.trim();
+      const key = label.toLowerCase();
+      if (!label || seen.has(key)) continue;
+      seen.add(key);
+      const current = brandCounts.get(key);
+      brandCounts.set(key, { label: current?.label ?? label, n: (current?.n ?? 0) + 1 });
+    }
+  }
+  const topBrands = [...brandCounts.values()].sort((a, b) => b.n - a.n || a.label.localeCompare(b.label)).slice(0, 20);
+
   return (
     <>
       <section className="bg-midnight text-bone">
@@ -65,6 +85,27 @@ export default async function AdminAthletesPage() {
       <section className="bg-bone min-h-[60vh]">
         <div className="mx-auto max-w-5xl px-6 py-10 md:py-14 space-y-8">
           <AddAthleteForm />
+
+          <div className="border-t rule pt-6">
+            <h2 className="t-headline text-[1.6rem] md:text-[1.9rem]">Brands athletes want</h2>
+            <p className="mt-2 text-[0.95rem] text-midnight/65 leading-relaxed max-w-2xl">
+              From every athlete open to a sponsor. Use it to choose which brands to approach.
+            </p>
+            {topBrands.length === 0 ? (
+              <p className="mt-4 text-[0.95rem] text-midnight/55">No dream brands yet.</p>
+            ) : (
+              <ol className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-10 border-t rule">
+                {topBrands.map((b) => (
+                  <li key={b.label} className="flex items-baseline justify-between gap-4 border-b rule py-3">
+                    <span className="text-[1rem]">{b.label}</span>
+                    <span className="t-numeral text-[1.2rem] text-terracotta">
+                      {b.n} <span className="t-eyebrow text-dust">{b.n === 1 ? "athlete" : "athletes"}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
 
           <div className="bg-white border border-stone/40 overflow-x-auto">
             <table className="w-full text-sm">

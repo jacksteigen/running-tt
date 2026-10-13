@@ -21,6 +21,7 @@ interface EventRow {
   date: string;
   location: string;
   venue: string;
+  is_test: number;
 }
 
 interface PodiumRow {
@@ -91,6 +92,7 @@ export default async function ResultsPage() {
        FROM results r
        JOIN users u ON r.user_id = u.id
        JOIN events ev ON r.event_id = ev.id
+       WHERE ev.is_test = 0
        ORDER BY r.time_seconds ASC`
     )
     .all() as unknown as { results: RecordRow[] };
@@ -110,15 +112,16 @@ export default async function ResultsPage() {
     .map((d) => recordsByDistance.get(d) as RecordRow);
 
   // Aggregate stats across past events
-  const totalRaces = past.results.length;
+  // Test runs are listed but never counted toward Running TT totals or records.
+  const totalRaces = past.results.filter((e) => !e.is_test).length;
   const totalFinishersRes = await db
     .prepare(
-      "SELECT COUNT(*) as count FROM results r JOIN events ev ON r.event_id = ev.id WHERE ev.date < date('now')"
+      "SELECT COUNT(*) as count FROM results r JOIN events ev ON r.event_id = ev.id WHERE ev.date < date('now') AND ev.is_test = 0"
     )
     .first<{ count: number }>();
   const totalPayoutRes = await db
     .prepare(
-      "SELECT COALESCE(SUM(r.prize_amount_cents), 0) as total FROM results r JOIN events ev ON r.event_id = ev.id WHERE ev.date < date('now')"
+      "SELECT COALESCE(SUM(r.prize_amount_cents), 0) as total FROM results r JOIN events ev ON r.event_id = ev.id WHERE ev.date < date('now') AND ev.is_test = 0"
     )
     .first<{ total: number }>();
 
@@ -303,7 +306,10 @@ export default async function ResultsPage() {
                                 </div>
 
                                 <div className="min-w-0">
-                                  <p className="t-eyebrow text-terracotta">{event.distance}</p>
+                                  <p className="t-eyebrow text-terracotta">
+                                    {event.distance}
+                                    {event.is_test ? <span className="ml-3 text-dust">Test run</span> : null}
+                                  </p>
                                   <h4 className="t-headline text-[1.6rem] md:text-[2.1rem] mt-2">
                                     <Link
                                       href={`/events/${event.slug}`}

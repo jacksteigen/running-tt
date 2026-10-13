@@ -19,7 +19,7 @@ const columns = [
   },
   {
     title: "Partners",
-    links: [{ href: "mailto:partners@runningtt.com", label: "Back the purse" }],
+    links: [{ href: "/about#brands", label: "Back the purse" }],
   },
 ];
 

@@ -21,6 +21,7 @@ export interface EventFields {
   heat_count: number | null;
   heat_capacity: number | null;
   change_fee_cents: number | null;
+  is_test: number;
 }
 
 function str(v: unknown, max: number): string {
@@ -158,6 +159,7 @@ export function parseEventInput(
       heat_count: count,
       heat_capacity: capacity,
       change_fee_cents: changeFee,
+      is_test: body.isTest === true ? 1 : 0,
     },
   };
 }

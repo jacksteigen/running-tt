@@ -4,6 +4,7 @@ import { getDB } from "@/lib/db";
 import EventCard from "@/components/EventCard";
 import GlobeMap from "@/components/GlobeMap";
 import RaceList from "@/components/RaceList";
+import FirstInBand from "@/components/FirstInBand";
 import { displayStatus, todayInMelbourne } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,7 @@ interface EventRow {
   venue: string;
   status: string;
   entry_fee_cents: number;
+  is_test: number;
 }
 
 export default async function EventsPage() {
@@ -38,7 +40,8 @@ export default async function EventsPage() {
   // their date has passed. Past events are reversed so the most recent shows first.
   // Event dates are Melbourne calendar days, as everywhere else.
   const todayISO = todayInMelbourne();
-  const upcoming = allEvents.results.filter((e) => e.date >= todayISO);
+  // Test runs stay out of the public fixture list; their pages still work by link.
+  const upcoming = allEvents.results.filter((e) => e.date >= todayISO && !e.is_test);
   const past = allEvents.results
     .filter((e) => e.date < todayISO)
     .reverse();
@@ -130,6 +133,8 @@ export default async function EventsPage() {
         </div>
       </section>
 
+      <FirstInBand tone="ink" href={upcoming.length > 0 ? `/events/${upcoming[0].slug}` : null} linkLabel="See the next race" />
+
       {past.length > 0 && (
         <section className="bg-stone">
           <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
@@ -152,7 +157,7 @@ export default async function EventsPage() {
                     date={event.date}
                     location={event.location}
                     venue={event.venue}
-                    status={displayStatus(event.status, event.date)}
+                    status={event.is_test ? "Test run" : displayStatus(event.status, event.date)}
                     entryCount={countMap.get(event.id) ?? 0}
                   />
                 </li>

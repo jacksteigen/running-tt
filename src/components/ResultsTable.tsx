@@ -11,6 +11,8 @@ interface ResultRow {
   distance?: string;
   verified?: number;
   prize_amount_cents?: number;
+  /** 1 when the race was a test run, shown with a tag. */
+  is_test?: number;
 }
 
 /**
@@ -78,13 +80,16 @@ export default function ResultsTable({
                 >
                   {r.event_name}
                 </span>
-                {(r.distance || r.verified === 1 || prize > 0) && (
+                {(r.distance || r.verified === 1 || prize > 0 || r.is_test === 1) && (
                   <span
                     className={`mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 t-eyebrow ${
                       dark ? "text-bone/50" : "text-dust"
                     }`}
                   >
                     {r.distance && <span>{r.distance}</span>}
+                    {r.is_test === 1 && (
+                      <span className={dark ? "text-bone/70" : "text-midnight/60"}>Test run</span>
+                    )}
                     {r.verified === 1 && (
                       <span
                         className={`inline-flex items-center gap-1.5 ${dark ? "text-bone/60" : "text-trail"}`}

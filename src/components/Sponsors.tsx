@@ -27,8 +27,9 @@ export default function Sponsors() {
               The purse is backed.
             </h2>
             <p className="mt-5 max-w-sm text-midnight/70 leading-relaxed">
-              Prize money comes from entry fees and from the people who back
-              the runners. You will always see who they are.
+              Athletes race for the purse. Brands get seen by people who
+              genuinely run. We connect the two, starting with the brands our
+              athletes tell us they would love to run for.
             </p>
           </div>
 
@@ -50,7 +51,7 @@ export default function Sponsors() {
             ))}
             <li className="border-b rule">
               <a
-                href="mailto:partners@runningtt.com?subject=Sponsoring%20Running%20TT"
+                href="/about#brands"
                 className="group flex items-baseline justify-between gap-6 py-6"
               >
                 <span className="t-headline text-[1.3rem] md:text-[1.5rem] text-midnight/60 group-hover:text-terracotta transition-colors duration-300">

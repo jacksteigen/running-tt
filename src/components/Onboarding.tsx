@@ -38,8 +38,18 @@ const selectCls = fieldSelectCls;
 const labelCls = fieldLabelCls;
 const helpCls = "text-[0.98rem] text-midnight/65 leading-relaxed";
 
+/** What kind of backing an athlete is after. Saved as a short list. */
+const SUPPORT_OPTIONS = [
+  "Shoes",
+  "Race kit",
+  "Nutrition",
+  "Travel and race costs",
+  "Cash support",
+  "Coaching",
+];
+
 /**
- * First-run profile, in three short steps, then an invitation to the next
+ * First-run profile, in four short steps, then an invitation to the next
  * open event. Nothing else on the site opens until this is done. When the
  * athlete arrived mid-booking (`next`), they go straight back to it instead.
  */
@@ -56,13 +66,16 @@ export default function Onboarding({
   const [form, setForm] = useState<Initial>(initial);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [dreamBrands, setDreamBrands] = useState("");
+  const [support, setSupport] = useState<string[]>([]);
+  const [notSeeking, setNotSeeking] = useState(false);
 
   // Someone part way through booking a heat skips the event offer.
   const offer = next ? null : openEvent;
   // Exactly /events/<slug>/book. A /booked link means the heat is already theirs.
   const toBooking = !!next && /\/events\/[^/]+\/book(\?|$)/.test(next);
   const toBooked = !!next && /\/events\/[^/]+\/booked(\?|$)/.test(next);
-  const totalSteps = offer ? 4 : 3;
+  const totalSteps = offer ? 5 : 4;
 
   function set<K extends keyof Initial>(key: K, value: string) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -82,10 +95,24 @@ export default function Onboarding({
     setStep((s) => s + 1);
   }
 
-  async function submitProfile() {
+  function bioNext() {
     setError("");
     if (form.bio.trim().length < 10) {
       return setError("A sentence or two is all it takes.");
+    }
+    setStep(3);
+  }
+
+  function toggleSupport(option: string) {
+    setSupport((prev) =>
+      prev.includes(option) ? prev.filter((o) => o !== option) : [...prev, option]
+    );
+  }
+
+  async function submitProfile() {
+    setError("");
+    if (!notSeeking && dreamBrands.trim().length < 2) {
+      return setError("Name a brand or two, or tick that you are not after a sponsor.");
     }
     setBusy(true);
     let leaving = false;
@@ -101,6 +128,9 @@ export default function Onboarding({
           city: form.city,
           country: form.country,
           bio: form.bio,
+          dreamBrands: notSeeking ? "" : dreamBrands,
+          sponsorInterests: notSeeking ? "" : support.join(", "),
+          notSeekingSponsor: notSeeking,
         }),
       });
       const data = (await res.json()) as { success?: boolean; error?: string };
@@ -109,7 +139,7 @@ export default function Onboarding({
         return;
       }
       if (offer) {
-        setStep(3);
+        setStep(4);
       } else {
         leaving = true;
         window.location.href = next ?? "/dashboard?welcome=1";
@@ -174,6 +204,14 @@ export default function Onboarding({
       title: (
         <>
           In your <em>own words.</em>
+        </>
+      ),
+    },
+    {
+      kicker: "Step 4 of " + totalSteps,
+      title: (
+        <>
+          Brands you would <em>love to run for.</em>
         </>
       ),
     },
@@ -359,7 +397,7 @@ export default function Onboarding({
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            submitProfile();
+            bioNext();
           }}
           className="mt-6 space-y-6"
         >
@@ -394,6 +432,80 @@ export default function Onboarding({
             >
               Back
             </button>
+            <button type="submit" className="btn btn-primary btn-lg flex-1">
+              Continue
+            </button>
+          </div>
+        </form>
+      )}
+
+      {step === 3 && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            submitProfile();
+          }}
+          className="mt-6 space-y-7"
+        >
+          <p className={helpCls}>
+            Running TT works with brands to back runners. Tell us who you would
+            love to be supported by, and we will reach out to them for you.
+            This stays between you and us.
+          </p>
+          <div>
+            <label htmlFor="dreamBrands" className={labelCls}>
+              Your dream brands
+            </label>
+            <input
+              id="dreamBrands"
+              autoFocus
+              value={dreamBrands}
+              onChange={(e) => setDreamBrands(e.target.value)}
+              disabled={notSeeking}
+              maxLength={300}
+              placeholder="e.g. Steigen, Nike, Maurten"
+              className={`${inputCls} disabled:opacity-50`}
+            />
+            <p className="mt-2 text-[0.88rem] text-midnight/50">Separate a few with commas.</p>
+          </div>
+          <fieldset disabled={notSeeking} className="disabled:opacity-50">
+            <legend className={labelCls}>What would help you most</legend>
+            <div className="flex flex-wrap gap-2">
+              {SUPPORT_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={support.includes(option)}
+                  onClick={() => toggleSupport(option)}
+                  className={`btn btn-sm normal-case tracking-normal ${
+                    support.includes(option) ? "btn-ink" : "btn-ghost"
+                  }`}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </fieldset>
+          <label className="flex items-start gap-3 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={notSeeking}
+              onChange={(e) => setNotSeeking(e.target.checked)}
+              className="mt-1 h-5 w-5 shrink-0 accent-[#C4593A]"
+            />
+            <span className="text-[0.98rem] text-midnight/75 leading-relaxed">
+              I am not after a sponsor right now
+            </span>
+          </label>
+          {error && <p role="alert" className="text-[0.95rem] text-terracotta">{error}</p>}
+          <div className="flex items-center gap-6">
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              className="inline-flex items-center min-h-14 link-quiet text-[0.95rem] text-midnight/65 hover:text-midnight transition-colors"
+            >
+              Back
+            </button>
             <button type="submit" disabled={busy} className="btn btn-primary btn-lg flex-1">
               {busy
                 ? "Saving..."
@@ -409,7 +521,7 @@ export default function Onboarding({
         </form>
       )}
 
-      {step === 3 && offer && (
+      {step === 4 && offer && (
         <div className="mt-6">
           <p className={`${helpCls} mb-8`}>
             {offer.hasHeats

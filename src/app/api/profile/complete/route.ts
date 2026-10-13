@@ -42,6 +42,9 @@ export async function POST(request: NextRequest) {
   const country = clean(body.country, 60);
   const location = composeLocation(city, country);
   const bio = clean(body.bio, 600);
+  const dreamBrands = clean(body.dreamBrands, 300);
+  const sponsorInterests = clean(body.sponsorInterests, 300);
+  const notSeeking = body.notSeekingSponsor === true;
 
   if (!firstName) {
     return NextResponse.json({ error: "First name is required" }, { status: 400 });
@@ -68,6 +71,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  if (!notSeeking && dreamBrands.length < 2) {
+    return NextResponse.json(
+      { error: "Name a brand or two you would love to run for, or tick that you are not after a sponsor" },
+      { status: 400 }
+    );
+  }
+
   const name = `${firstName} ${lastName}`;
 
   await db
@@ -75,6 +85,7 @@ export async function POST(request: NextRequest) {
       `UPDATE users
        SET first_name = ?, middle_name = ?, last_name = ?, name = ?,
            date_of_birth = ?, city = ?, country = ?, location = ?, bio = ?,
+           dream_brands = ?, sponsor_interests = ?, open_to_sponsorship = ?,
            profile_completed = 1, updated_at = datetime('now')
        WHERE id = ?`
     )
@@ -88,6 +99,9 @@ export async function POST(request: NextRequest) {
       country,
       location,
       bio,
+      notSeeking ? null : dreamBrands,
+      notSeeking ? null : sponsorInterests || null,
+      notSeeking ? 0 : 1,
       session.user.id
     )
     .run();

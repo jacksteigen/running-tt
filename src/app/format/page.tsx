@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import TrackDiagram from "@/components/TrackDiagram";
 import HeatsTimeline from "@/components/HeatsTimeline";
@@ -8,29 +7,29 @@ import Reveal from "@/components/Reveal";
 export const metadata: Metadata = {
   title: "The Format · Running TT",
   description:
-    "How a Running TT event unfolds. Rolling heats, every time recorded, prize money at every race.",
+    "How a Running TT race works. Book a heat, race the clock, and the fastest times take the prize money.",
 };
 
 const steps = [
   {
-    title: "Check in",
-    body: "Arrive anytime in the event window. Pick up your bib and warm up before your heat is called.",
+    title: "Book your heat",
+    body: "Pick a heat when you enter. Every heat has a set number of spots, and once it is booked out it is closed. First in, best dressed.",
   },
   {
-    title: "Line up in a small heat",
-    body: "Heats roll off continuously. When your number is called, walk onto the start line. No wave starts, no mass corrals.",
+    title: "Arrive and warm up",
+    body: "Get there with time to warm up before your heat. Check in at the start area so we know you are racing.",
+  },
+  {
+    title: "Line up together",
+    body: "Your heat walks onto the start line as one group. No waves, no corrals, no pacers.",
   },
   {
     title: "Run the clock",
-    body: "Gun goes. You run your distance. Your time gets recorded at the finish.",
+    body: "The gun goes and you run your distance. Your time is recorded at the finish.",
   },
   {
-    title: "Times posted",
-    body: "Times go up on the event page as the race wraps. Your run stays on the page afterwards.",
-  },
-  {
-    title: "Payout",
-    body: "After the final heat closes, prize money is handed out on the day. Everyone else keeps their time on the record.",
+    title: "Times posted, prizes paid",
+    body: "Times go up on the event page. Once the last heat is home, the fastest times take the prize money, handed out on the day.",
   },
 ];
 
@@ -65,13 +64,13 @@ export default function FormatPage() {
         <div className="mx-auto max-w-6xl px-6 pt-20 pb-20 md:pt-28 md:pb-28">
           <div className="max-w-4xl motion-safe:animate-fade-up">
             <h1 className="t-display text-[3rem] sm:text-[4rem] md:text-[5.4rem]">
-              Race against the clock.{" "}
-              <em className="text-bone/75">Not each other.</em>
+              Race the clock.{" "}
+              <em className="text-bone/75">Fastest time wins.</em>
             </h1>
             <p className="t-lede mt-8 max-w-2xl text-bone/80">
-              Time trial events run in rolling heats, with every time recorded
-              and prize money on the line. Built to be honest, fair, and worth
-              your time.
+              Every heat runs the same distance against the same clock. The
+              fastest times across all the heats take the prize money, so you
+              are racing everyone on the day, one heat at a time.
             </p>
           </div>
         </div>
@@ -84,12 +83,12 @@ export default function FormatPage() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-14 lg:gap-12 items-center">
               <div className="lg:col-span-4">
                 <h2 className="t-display text-[2.5rem] md:text-[3.3rem]">
-                  Small heats. One clock. <em>One honest line.</em>
+                  Every heat, one start line
                 </h2>
                 <p className="mt-6 max-w-sm text-midnight/75 leading-relaxed">
-                  Every heat lines up together at the same start. No waves, no
-                  pacers, no corrals. You line up, the gun fires, and the clock
-                  decides.
+                  Your heat lines up together at the same start. The gun fires,
+                  and your time is measured against every other heat on the
+                  day.
                 </p>
               </div>
               <div className="lg:col-span-8">
@@ -122,20 +121,6 @@ export default function FormatPage() {
                   </li>
                 ))}
               </ol>
-              <figure className="lg:col-span-4 lg:row-start-2 lg:self-end">
-                <div className="relative aspect-[4/5] lg:aspect-[3/4] w-full overflow-hidden bg-stone">
-                  <Image
-                    src="/images/athlete-track-lane.jpg"
-                    alt="An athlete standing in lane six of a blue running track"
-                    fill
-                    sizes="(min-width: 1024px) 30vw, 100vw"
-                    className="object-cover object-[45%_40%]"
-                  />
-                </div>
-                <figcaption className="t-caption mt-4 text-midnight/55">
-                  Lane six. Nobody to chase but the clock.
-                </figcaption>
-              </figure>
             </div>
           </div>
         </section>

@@ -121,6 +121,22 @@ export default async function AdminPage() {
     { value: counts?.results ?? 0, label: "results", href: "#events" },
   ];
 
+  const enquiries = (await db
+    .prepare(
+      "SELECT id, name, brand, email, interest, message, created_at FROM partner_enquiries ORDER BY created_at DESC LIMIT 10"
+    )
+    .all()) as unknown as {
+    results: {
+      id: string;
+      name: string;
+      brand: string;
+      email: string;
+      interest: string | null;
+      message: string | null;
+      created_at: string;
+    }[];
+  };
+
   return (
     <>
       <section className="bg-midnight text-bone">
@@ -156,6 +172,35 @@ export default async function AdminPage() {
 
       <section className="bg-bone min-h-[60vh]">
         <div className="mx-auto max-w-5xl px-6 py-12 md:py-16">
+          {/* Brand enquiries */}
+          <div>
+            <h2 className="t-headline text-[1.7rem] md:text-[2rem]">Brand enquiries</h2>
+            <p className="mt-2 text-[0.95rem] text-midnight/65">
+              From the form on the About page. Each one is also emailed to you.
+            </p>
+            {enquiries.results.length === 0 ? (
+              <p className="mt-4 text-[0.95rem] text-midnight/55">None yet.</p>
+            ) : (
+              <ul className="mt-5 border-t rule">
+                {enquiries.results.map((e) => (
+                  <li key={e.id} className="border-b rule py-4">
+                    <p className="text-[1rem]">
+                      <span className="font-semibold">{e.brand}</span>
+                      <span className="text-midnight/60"> · {e.name} · </span>
+                      <a href={`mailto:${e.email}`} className="link-quiet">{e.email}</a>
+                    </p>
+                    {(e.interest || e.message) && (
+                      <p className="mt-1 text-[0.92rem] text-midnight/65">
+                        {[e.interest, e.message].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                    <p className="mt-1 t-eyebrow text-dust">{e.created_at.slice(0, 10)}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           {/* Heat change requests */}
           <div id="requests" className="scroll-mt-24">
             <h2 className="t-headline text-[1.7rem] md:text-[2rem] flex items-center gap-3 mb-5">

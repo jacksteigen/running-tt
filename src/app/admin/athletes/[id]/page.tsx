@@ -44,7 +44,8 @@ export default async function AdminAthletePage({
   const athlete = await db
     .prepare(
       `SELECT id, name, email, first_name, middle_name, last_name, date_of_birth,
-              city, country, location, bio, is_admin, profile_completed, created_at
+              city, country, location, bio, is_admin, profile_completed, created_at,
+              dream_brands, sponsor_interests, open_to_sponsorship
        FROM users WHERE id = ?`
     )
     .bind(id)
@@ -60,6 +61,9 @@ export default async function AdminAthletePage({
       country: string | null;
       location: string | null;
       bio: string | null;
+      dream_brands: string | null;
+      sponsor_interests: string | null;
+      open_to_sponsorship: number;
       is_admin: number;
       profile_completed: number;
       created_at: string;
@@ -141,6 +145,22 @@ export default async function AdminAthletePage({
           </div>
 
           <div>
+            <h2 className="t-headline text-[1.7rem] md:text-[2rem] mb-5">Sponsorship</h2>
+            <dl className="border-t rule mb-14">
+              <div className="grid grid-cols-1 sm:grid-cols-[12rem_1fr] gap-x-6 gap-y-1 border-b rule py-4">
+                <dt className="t-eyebrow text-dust">Dream brands</dt>
+                <dd className="text-[1rem]">
+                  {athlete.open_to_sponsorship === 0
+                    ? "Not after a sponsor right now"
+                    : athlete.dream_brands || "Not told us yet"}
+                </dd>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-[12rem_1fr] gap-x-6 gap-y-1 border-b rule py-4">
+                <dt className="t-eyebrow text-dust">Would help most</dt>
+                <dd className="text-[1rem]">{athlete.sponsor_interests || "Not said"}</dd>
+              </div>
+            </dl>
+
             <h2 className="t-headline text-[1.7rem] md:text-[2rem] mb-5">Entries</h2>
             {entries.results.length === 0 ? (
               <p className="border-t rule pt-4 text-[0.95rem] text-midnight/55">

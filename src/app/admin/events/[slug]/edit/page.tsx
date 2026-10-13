@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 };
 
 interface EventRow extends HeatConfig {
+  is_test?: number;
   id: string;
   slug: string;
   name: string;
@@ -122,6 +123,7 @@ export default async function EditEventPage({
           name: event.name,
           distance: event.distance,
           dateTbc: tbc,
+          isTest: event.is_test === 1,
           date: tbc ? "" : event.date,
           // The server writes these placeholders for blanks; show them as blanks.
           venue: event.venue === "Venue TBC" ? "" : event.venue,
