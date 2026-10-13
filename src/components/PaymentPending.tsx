@@ -27,11 +27,11 @@ export default function PaymentPending({ eventHref }: { eventHref: string }) {
   }, [router, tries, waiting]);
 
   return (
-    <div className="bg-white border border-stone/40 p-7 md:p-10 motion-safe:animate-fade-up">
-      <div aria-hidden className="h-0.5 bg-stone/50 overflow-hidden mb-8">
+    <div className="motion-safe:animate-fade-up">
+      <div aria-hidden className="h-[2px] bg-midnight/10 overflow-hidden mb-10">
         <div
-          className={`h-full bg-terracotta origin-left ${
-            waiting ? "w-1/3 motion-safe:animate-pulse" : "w-full bg-dust"
+          className={`h-full origin-left ${
+            waiting ? "w-1/3 bg-terracotta motion-safe:animate-pulse" : "w-full bg-dust"
           }`}
         />
       </div>
@@ -39,42 +39,34 @@ export default function PaymentPending({ eventHref }: { eventHref: string }) {
       <div aria-live="polite">
         {waiting ? (
           <>
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-3">
-              Payment received
-            </p>
-            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-              Confirming your payment
+            <p className="t-eyebrow text-terracotta">Payment received</p>
+            <h1 className="t-display mt-4 text-[2.5rem] md:text-[3.6rem]">
+              Confirming your <em>payment</em>
             </h1>
-            <p className="mt-3 text-midnight/60 leading-relaxed max-w-lg">
+            <p className="mt-5 text-[1.05rem] text-midnight/65 leading-relaxed max-w-lg">
               This usually takes a few seconds. Stay on this page and your ticket
               will appear here.
             </p>
           </>
         ) : (
           <>
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-dust mb-3">
-              Still confirming
-            </p>
-            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-              This is taking longer than usual
+            <p className="t-eyebrow text-dust">Still confirming</p>
+            <h1 className="t-display mt-4 text-[2.5rem] md:text-[3.6rem]">
+              This is taking <em>longer than usual</em>
             </h1>
-            <p className="mt-3 text-midnight/60 leading-relaxed max-w-lg">
+            <p className="mt-5 text-[1.05rem] text-midnight/65 leading-relaxed max-w-lg">
               Your spot is held while the payment clears. We will email your
               confirmation the moment it lands, and your ticket will be here.
             </p>
-            <div className="mt-7 flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                onClick={() => setTries(0)}
-                className="bg-terracotta text-white text-sm font-medium px-6 py-3.5 min-h-12 hover:bg-terracotta/90 transition-colors"
-              >
+            <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+              <button type="button" onClick={() => setTries(0)} className="btn btn-primary">
                 Check again
               </button>
               <Link
                 href={eventHref}
-                className="inline-flex items-center justify-center border border-midnight/20 text-sm font-medium px-6 py-3.5 min-h-12 hover:border-midnight/50 transition-colors"
+                className="inline-flex min-h-11 items-center justify-center text-[0.95rem] text-midnight"
               >
-                Back to the event
+                <span className="link-quiet">Back to the event</span>
               </Link>
             </div>
           </>

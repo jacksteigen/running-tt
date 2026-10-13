@@ -202,7 +202,7 @@ export default function EntriesManager({
           <div className="flex items-center gap-2 min-w-0">
             <Link
               href={`/admin/athletes/${e.userId}`}
-              className="text-sm font-medium truncate hover:text-terracotta transition-colors"
+              className="t-headline text-[1.1rem] truncate hover:text-terracotta transition-colors"
             >
               {e.name}
             </Link>
@@ -227,7 +227,7 @@ export default function EntriesManager({
               type="button"
               onClick={() => moveEntry(e)}
               disabled={working}
-              className="h-11 px-4 text-xs font-medium bg-midnight text-white hover:bg-midnight/90 transition-colors disabled:opacity-50"
+              className="btn btn-sm btn-ink"
             >
               {working ? "Moving..." : "Move"}
             </button>
@@ -255,20 +255,20 @@ export default function EntriesManager({
     <div className="bg-white border border-stone/40">
       <div className="px-4 sm:px-5 py-4 border-b border-stone/30 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-1">
-            Start list
-          </p>
-          <h2 className="font-semibold tracking-tight">
-            {confirmedCount} entered
-            {payingCount > 0 && (
-              <span className="text-midnight/50 font-normal"> · {payingCount} paying</span>
+          <h2 className="t-headline text-[1.6rem] md:text-[1.8rem]">Start list</h2>
+          <p className="mt-1.5 text-sm text-midnight/60">
+            <span className="t-numeral text-[1.2rem] text-midnight">{confirmedCount}</span> entered
+            {payingCount > 0 && <> · {payingCount} paying</>}
+            {withHeats && (
+              <>
+                {" · "}
+                <span className="font-mono">
+                  {bookedSpots}/{totalSpots}
+                </span>{" "}
+                spots across {heats.length} heats
+              </>
             )}
-          </h2>
-          {withHeats && (
-            <p className="mt-1 font-mono text-[11px] text-dust tabular-nums">
-              {bookedSpots}/{totalSpots} spots across {heats.length} heats
-            </p>
-          )}
+          </p>
         </div>
         <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">
           <button
@@ -276,11 +276,7 @@ export default function EntriesManager({
             onClick={() => setPanel(panel === "existing" ? null : "existing")}
             aria-expanded={panel === "existing"}
             aria-controls="add-athlete-panel"
-            className={`h-11 px-4 text-xs font-medium transition-colors ${
-              panel === "existing"
-                ? "bg-midnight text-white"
-                : "border border-midnight/20 text-midnight hover:border-midnight/60"
-            }`}
+            className={`btn btn-sm ${panel === "existing" ? "btn-ink" : "btn-ghost"}`}
           >
             Add athlete
           </button>
@@ -289,11 +285,7 @@ export default function EntriesManager({
             onClick={() => setPanel(panel === "walkup" ? null : "walkup")}
             aria-expanded={panel === "walkup"}
             aria-controls="add-athlete-panel"
-            className={`h-11 px-4 text-xs font-medium transition-colors ${
-              panel === "walkup"
-                ? "bg-midnight text-white"
-                : "border border-midnight/20 text-midnight hover:border-midnight/60"
-            }`}
+            className={`btn btn-sm ${panel === "walkup" ? "btn-ink" : "btn-ghost"}`}
           >
             Walk-up, no account
           </button>
@@ -342,16 +334,11 @@ export default function EntriesManager({
       </p>
 
       {entries.length === 0 ? (
-        <div className="px-4 sm:px-5 py-12 text-center">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-2">
-            No entries yet
-          </p>
-          <p className="text-sm text-midnight/60 max-w-sm mx-auto">
-            {withHeats
-              ? "Bookings land here by heat as athletes pay. Add someone by hand with the buttons above."
-              : "Entries land here as athletes sign up. Add someone by hand with the buttons above."}
-          </p>
-        </div>
+        <p className="px-4 sm:px-5 py-6 text-[0.95rem] text-midnight/60 max-w-lg leading-relaxed">
+          {withHeats
+            ? "No entries yet. Bookings land here by heat as athletes pay. Add someone by hand with the buttons above."
+            : "No entries yet. Entries land here as athletes sign up. Add someone by hand with the buttons above."}
+        </p>
       ) : withHeats ? (
         <div className="-mt-px">
           {groups.map((g) => (
@@ -498,7 +485,7 @@ function AddExisting({
       {picked ? (
         <div className="flex items-center justify-between gap-3 bg-white border border-terracotta px-4 py-3">
           <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{picked.name}</p>
+            <p className="t-headline text-[1.1rem] truncate">{picked.name}</p>
             <p className="text-[11px] text-midnight/50 truncate">{picked.email}</p>
           </div>
           <button
@@ -513,7 +500,7 @@ function AddExisting({
         <div>
           <label
             htmlFor="add-athlete-search"
-            className="block font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-1.5"
+            className="block text-xs font-medium text-dust mb-1.5"
           >
             Athlete
           </label>
@@ -562,7 +549,7 @@ function AddExisting({
           <div className="sm:w-72">
             <label
               htmlFor="add-athlete-heat"
-              className="block font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-1.5"
+              className="block text-xs font-medium text-dust mb-1.5"
             >
               Heat
             </label>
@@ -580,7 +567,7 @@ function AddExisting({
           type="button"
           onClick={add}
           disabled={busy || !picked}
-          className="h-11 px-6 text-sm font-medium bg-terracotta text-white hover:bg-terracotta/90 transition-colors disabled:opacity-50"
+          className="btn btn-sm btn-primary"
         >
           {busy ? "Adding..." : "Add to start list"}
         </button>

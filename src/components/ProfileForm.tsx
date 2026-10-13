@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import CountrySelect from "@/components/CountrySelect";
 import { isKnownCountry } from "@/lib/countries";
+import { fieldInputCls, fieldLabelCls, fieldTextareaCls } from "@/components/fieldStyles";
 
 interface SponsorRef {
   name: string;
@@ -29,9 +30,12 @@ interface ProfileFormProps {
   };
 }
 
-const inputCls =
-  "w-full border border-stone/40 px-3 py-2 text-sm bg-bone/50 focus:outline-none focus:border-terracotta transition-colors";
-const labelCls = "block text-xs text-dust mb-1";
+// 16px text so phones do not zoom in on focus.
+const inputCls = fieldInputCls;
+const textareaCls = fieldTextareaCls;
+const labelCls = fieldLabelCls;
+const hintCls = "text-[0.8rem] text-midnight/50 mt-1.5 leading-relaxed";
+const groupCls = "border-t border-midnight/10 pt-8";
 
 /**
  * Profiles saved before city and country were split only have a single
@@ -166,134 +170,134 @@ export default function ProfileForm({ user }: ProfileFormProps) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="bg-white border border-stone/40 p-6"
-    >
-      <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-3">
-        Your public profile
+    <form onSubmit={handleSubmit} className="bg-white border rule p-6 md:p-10">
+      <h3 className="t-headline text-[1.6rem] md:text-[1.9rem]">About you</h3>
+      <p className="mt-2 text-[0.95rem] text-midnight/60 leading-relaxed max-w-md">
+        Everything here is shown on your public athlete page.
       </p>
-      <h3 className="font-semibold tracking-tight mb-4">Profile</h3>
 
-      <div className="space-y-4">
+      <div className="mt-8 space-y-8">
         {/* Photo */}
         <div>
           <span className={labelCls}>Profile photo</span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-5">
             {photoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={photoUrl}
                 alt="Profile"
-                className="w-14 h-14 object-cover border border-stone/40"
+                className="w-20 h-24 object-cover bg-stone"
               />
             ) : (
-              <div className="w-14 h-14 bg-stone/40 border border-stone/40" />
+              <div aria-hidden className="w-20 h-24 bg-stone" />
             )}
-            <label className="text-xs font-medium text-terracotta border border-terracotta/30 px-3 py-1.5 hover:bg-terracotta/5 transition-colors cursor-pointer">
-              {photoUploading
-                ? "Uploading..."
-                : photoUrl
-                  ? "Replace photo"
-                  : "Upload photo"}
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                onChange={handlePhotoChange}
-                className="hidden"
-                disabled={photoUploading}
-              />
-            </label>
+            <div>
+              <label
+                className={`btn btn-sm btn-ghost cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-terracotta ${
+                  photoUploading ? "opacity-45 cursor-wait" : ""
+                }`}
+              >
+                {photoUploading
+                  ? "Uploading..."
+                  : photoUrl
+                    ? "Replace photo"
+                    : "Upload photo"}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handlePhotoChange}
+                  className="sr-only"
+                  disabled={photoUploading}
+                />
+              </label>
+              <p className={hintCls}>JPG, PNG or WebP, up to 5 MB.</p>
+            </div>
           </div>
-          <p className="text-[11px] text-midnight/40 mt-1">
-            JPG, PNG or WebP, up to 5 MB.
-          </p>
         </div>
 
-        <div>
-          <label htmlFor="name" className={labelCls}>
-            Name
-          </label>
-          <input
-            id="name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className={inputCls}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
+        <div className="space-y-5">
           <div>
-            <label htmlFor="city" className={labelCls}>
-              Town or city
+            <label htmlFor="name" className={labelCls}>
+              Name
             </label>
             <input
-              id="city"
+              id="name"
               type="text"
-              autoComplete="address-level2"
-              maxLength={60}
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="e.g. Geelong"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               className={inputCls}
             />
           </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+            <div>
+              <label htmlFor="city" className={labelCls}>
+                Town or city
+              </label>
+              <input
+                id="city"
+                type="text"
+                autoComplete="address-level2"
+                maxLength={60}
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="e.g. Geelong"
+                className={inputCls}
+              />
+            </div>
+            <div>
+              <label htmlFor="country" className={labelCls}>
+                Country
+              </label>
+              <CountrySelect
+                id="country"
+                value={country}
+                onChange={setCountry}
+                className={`${inputCls} cursor-pointer [&_option]:text-midnight ${country ? "" : "text-midnight/50"}`}
+              />
+            </div>
+          </div>
+
           <div>
-            <label htmlFor="country" className={labelCls}>
-              Country
+            <label htmlFor="bio" className={labelCls}>
+              Short intro
             </label>
-            <CountrySelect
-              id="country"
-              value={country}
-              onChange={setCountry}
-              className={`${inputCls} cursor-pointer [&_option]:text-midnight ${country ? "" : "text-midnight/50"}`}
+            <textarea
+              id="bio"
+              value={bio}
+              onChange={(e) => setBio(e.target.value)}
+              rows={3}
+              maxLength={600}
+              placeholder="Who you are, what you're chasing."
+              className={textareaCls}
             />
+            <p className={hintCls}>The line that sits under your name.</p>
+          </div>
+
+          <div>
+            <label htmlFor="story" className={labelCls}>
+              Your story
+            </label>
+            <textarea
+              id="story"
+              value={story}
+              onChange={(e) => setStory(e.target.value)}
+              rows={8}
+              maxLength={4000}
+              placeholder="Where you started, what you have run, what you are working towards, who you train with. Anyone looking at your profile reads this."
+              className={textareaCls}
+            />
+            <p className={hintCls}>
+              <span className="t-numeral">{story.length} / 4000</span> characters.
+              Take your time with it.
+            </p>
           </div>
         </div>
 
-        <div>
-          <label htmlFor="bio" className={labelCls}>
-            Short intro
-          </label>
-          <textarea
-            id="bio"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            rows={3}
-            maxLength={600}
-            placeholder="Who you are, what you're chasing."
-            className={inputCls}
-          />
-          <p className="text-[11px] text-midnight/40 mt-1">
-            The line that sits under your name.
-          </p>
-        </div>
-
-        <div>
-          <label htmlFor="story" className={labelCls}>
-            Your story
-          </label>
-          <textarea
-            id="story"
-            value={story}
-            onChange={(e) => setStory(e.target.value)}
-            rows={8}
-            maxLength={4000}
-            placeholder="Where you started, what you have run, what you are working towards, who you train with. Anyone looking at your profile reads this."
-            className={inputCls}
-          />
-          <p className="text-[11px] text-midnight/40 mt-1">
-            {story.length} / 4000 characters. Take your time with it.
-          </p>
-        </div>
-
         {/* Socials */}
-        <div className="pt-2 border-t border-stone/30">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-3 mt-2">
-            Socials
-          </p>
-          <div className="space-y-3">
+        <div className={groupCls}>
+          <h4 className="t-headline text-[1.3rem]">Socials</h4>
+          <div className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
               <label htmlFor="instagram" className={labelCls}>
                 Instagram handle
@@ -347,22 +351,23 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                 placeholder="www.yoursite.com"
                 className={inputCls}
               />
-              <p className="text-[11px] text-midnight/40 mt-1">
-                No need to type https, just the address.
-              </p>
+              <p className={hintCls}>No need to type https, just the address.</p>
             </div>
           </div>
         </div>
 
         {/* Sponsorship */}
-        <div className="pt-2 border-t border-stone/30">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-3 mt-2">
-            Sponsorship
-          </p>
+        <div className={groupCls}>
+          <h4 className="t-headline text-[1.3rem]">Sponsorship</h4>
 
-          <div className="space-y-3">
+          <div className="mt-5 space-y-3">
             {sponsors.map((s, i) => (
-              <div key={i} className="flex gap-2">
+              // Phones: name and remove on one line, website below.
+              // Wider: name, website, remove across one line.
+              <div
+                key={i}
+                className="grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_1fr_auto] gap-2 items-start"
+              >
                 <input
                   type="text"
                   value={s.name}
@@ -378,7 +383,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                   onChange={(e) => updateSponsor(i, "url", e.target.value)}
                   placeholder="www.sponsor.com"
                   aria-label="Sponsor website"
-                  className={inputCls}
+                  className={`${inputCls} col-start-1 sm:col-start-auto`}
                 />
                 <button
                   type="button"
@@ -386,7 +391,7 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                     setSponsors((prev) => prev.filter((_, idx) => idx !== i))
                   }
                   aria-label="Remove sponsor"
-                  className="shrink-0 text-dust hover:text-terracotta px-2 transition-colors"
+                  className="row-start-1 col-start-2 sm:row-start-auto sm:col-start-auto w-11 h-11 flex items-center justify-center text-xl text-dust hover:text-terracotta transition-colors"
                 >
                   ×
                 </button>
@@ -398,14 +403,14 @@ export default function ProfileForm({ user }: ProfileFormProps) {
                 onClick={() =>
                   setSponsors((prev) => [...prev, { name: "", url: "" }])
                 }
-                className="text-xs font-medium text-terracotta hover:text-terracotta/80 transition-colors"
+                className="link-quiet min-h-11 text-[0.95rem] text-midnight"
               >
-                + Add a sponsor
+                Add a sponsor
               </button>
             )}
           </div>
 
-          <div className="mt-4">
+          <div className="mt-5">
             <label htmlFor="sponsorInterests" className={labelCls}>
               What backing are you looking for?
             </label>
@@ -419,32 +424,33 @@ export default function ProfileForm({ user }: ProfileFormProps) {
             />
           </div>
 
-          <label className="flex items-start gap-2.5 cursor-pointer select-none mt-4">
+          <label className="flex items-start gap-3 cursor-pointer select-none mt-6">
             <input
               type="checkbox"
               checked={openToSponsorship}
               onChange={(e) => setOpenToSponsorship(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 accent-[#C4593A]"
+              className="mt-0.5 h-5 w-5 shrink-0 accent-[#C4593A]"
             />
-            <span className="text-xs text-midnight/70 leading-relaxed">
+            <span className="text-[0.95rem] text-midnight/75 leading-relaxed">
               Show an &quot;Open to sponsors&quot; badge on my public profile
             </span>
           </label>
         </div>
 
-        {error && (
-          <p role="alert" className="text-sm text-terracotta">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full bg-midnight text-white text-sm font-medium py-2.5 hover:bg-midnight/90 transition-colors disabled:opacity-50"
-        >
-          {saving ? "Saving..." : saved ? "Saved" : "Update profile"}
-        </button>
+        <div className="border-t border-midnight/10 pt-8">
+          {error && (
+            <p role="alert" className="mb-4 text-[0.95rem] text-terracotta">
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={saving}
+            className="btn btn-ink w-full sm:w-auto"
+          >
+            {saving ? "Saving..." : saved ? "Saved" : "Update profile"}
+          </button>
+        </div>
       </div>
     </form>
   );

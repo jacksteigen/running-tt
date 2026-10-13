@@ -14,6 +14,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+/**
+ * The race-day poster: shown on a screen at the venue or printed and taped
+ * to the registration table. Set like a printed bill, on paper, with the
+ * code as the one thing to look at.
+ */
 export default async function EventQRPage({
   params,
 }: {
@@ -50,45 +55,65 @@ export default async function EventQRPage({
   const when = withHeats ? (heatWindow(event) ?? event.time) : event.time;
 
   return (
-    <section className="bg-midnight text-white min-h-screen">
-      <div className="mx-auto max-w-3xl px-6 py-10 md:py-14 text-center">
-        <p className="font-mono text-xs uppercase tracking-[0.3em] text-terracotta mb-2">
-          Running TT
-        </p>
-        <h1 className="text-2xl md:text-4xl font-semibold tracking-tight">
-          {event.name}
-        </h1>
-        <p className="mt-2 text-stone/70 text-sm md:text-base">
-          {[formatEventDate(event.date, "medium"), when, event.venue]
-            .filter(Boolean)
-            .join(" · ")}
-        </p>
-
-        <div className="mt-8 md:mt-10 inline-block bg-white p-4 md:p-6">
-          <QRCode
-            value={entryUrl}
-            className="w-[280px] h-[280px] md:w-[420px] md:h-[420px] block"
-          />
+    <section className="bg-bone text-midnight min-h-screen">
+      <div className="mx-auto max-w-3xl px-6 py-10 md:py-16">
+        {/* Masthead */}
+        <div className="flex items-baseline justify-between gap-4 border-b border-midnight pb-3">
+          <p className="t-eyebrow text-[0.85rem] tracking-[0.14em]">Running TT</p>
+          {event.location && !/TBC/i.test(event.location) && (
+            <p className="t-eyebrow text-dust truncate">{event.location}</p>
+          )}
         </div>
 
-        <p className="mt-8 text-xl md:text-2xl font-semibold tracking-tight">
-          {withHeats ? "Scan to book your heat" : "Scan to enter"}
-        </p>
-        <p className="mt-3 text-stone/70 text-sm max-w-md mx-auto leading-relaxed">
-          {withHeats
-            ? "Point your phone camera at the code. Sign in with your email, pick a heat and pay, and your spot on the start list is locked."
-            : "Point your phone camera at the code. Sign in with your email, sign the clean sport declaration, and you are on the start list."}
-        </p>
-        <p className="mt-6 font-mono text-sm text-stone/80 break-all">
-          {entryUrl.replace(/^https?:\/\//, "")}
-        </p>
+        <div className="text-center">
+          <h1 className="t-display mt-12 md:mt-16 text-[3rem] sm:text-[4rem] md:text-[5.2rem] break-words">
+            {event.name}
+          </h1>
+          <p className="t-lede mt-5 text-midnight/80">
+            <em>{formatEventDate(event.date, "medium")}</em>
+          </p>
+          <p className="mt-2 text-[0.95rem] md:text-base text-midnight/65">
+            {[when, event.venue].filter(Boolean).join(" · ")}
+          </p>
 
-        <Link
-          href={`/events/${event.slug}`}
-          className="inline-block mt-10 py-2 text-xs text-stone/50 hover:text-stone/70 transition-colors"
-        >
-          Back to the event page
-        </Link>
+          <div className="mt-10 md:mt-14 inline-block border border-midnight bg-white p-3 md:p-5">
+            <QRCode
+              value={entryUrl}
+              className="w-[280px] h-[280px] md:w-[420px] md:h-[420px] block"
+            />
+          </div>
+
+          <p className="t-display mt-10 md:mt-12 text-[2.4rem] md:text-[3.4rem]">
+            {withHeats ? (
+              <>
+                Scan to <em>book your heat.</em>
+              </>
+            ) : (
+              <>
+                Scan to <em>enter.</em>
+              </>
+            )}
+          </p>
+          <p className="mt-4 text-midnight/70 max-w-md mx-auto leading-relaxed">
+            {withHeats
+              ? "Point your phone camera at the code. Sign in with your email, pick a heat and pay, and your spot on the start list is locked."
+              : "Point your phone camera at the code. Sign in with your email, sign the clean sport declaration, and you are on the start list."}
+          </p>
+          <p className="mt-6 t-numeral text-[1.1rem] md:text-[1.25rem] text-midnight/80 break-all">
+            {entryUrl.replace(/^https?:\/\//, "")}
+          </p>
+        </div>
+
+        {/* Foot of the bill */}
+        <div className="mt-14 md:mt-20 flex flex-col sm:flex-row items-center sm:items-baseline justify-between gap-3 border-t border-midnight pt-4">
+          <p className="t-caption text-midnight/60">You. The clock. Nothing else.</p>
+          <Link
+            href={`/events/${event.slug}`}
+            className="print:hidden inline-flex min-h-11 items-center link-quiet text-[0.9rem] text-midnight/60 hover:text-midnight transition-colors"
+          >
+            Back to the event page
+          </Link>
+        </div>
       </div>
     </section>
   );

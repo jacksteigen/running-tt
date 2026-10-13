@@ -9,6 +9,7 @@ import { formatEventDate } from "@/lib/dates";
 import { displayStatus } from "@/lib/events";
 import { HOLD_MINUTES, getHeatAvailability, hasHeats, heatWindow } from "@/lib/heats";
 import { EVENT_BOOKING_COLUMNS, bookingClosedReason, type BookableEvent } from "@/lib/bookings";
+import { formatFee } from "@/lib/money";
 import EntriesManager, { type StartListEntry } from "@/components/EntriesManager";
 import ResultsEditor, { type Standing } from "@/components/ResultsEditor";
 import ChangeRequestsPanel, { type ChangeRequest } from "@/components/ChangeRequestsPanel";
@@ -202,56 +203,49 @@ export default async function AdminEventPage({
   const booked = heats.reduce((n, h) => n + h.booked, 0);
   const stats = [
     withHeats
-      ? { value: `${booked}/${spots}`, label: "Booked", href: "#start-list" }
-      : { value: String(confirmed.length), label: "Entered", href: "#start-list" },
-    { value: String(holding.length), label: "Paying now", href: "#start-list" },
-    { value: `${initialStandings.length}/${confirmed.length}`, label: "Timed", href: "#results" },
+      ? { value: `${booked}/${spots}`, label: "booked", href: "#start-list" }
+      : { value: String(confirmed.length), label: "entered", href: "#start-list" },
+    { value: String(holding.length), label: "paying now", href: "#start-list" },
+    { value: `${initialStandings.length}/${confirmed.length}`, label: "timed", href: "#results" },
     {
       value: String(changeRequests.length),
-      label: "Change requests",
+      label: changeRequests.length === 1 ? "change request" : "change requests",
       href: changeRequests.length ? "#requests" : "#start-list",
+      alert: changeRequests.length > 0,
     },
   ];
 
-  const linkCls =
-    "inline-flex items-center min-h-11 text-xs font-medium text-white border border-white/20 px-4 hover:border-white/50 transition-colors";
-
   return (
     <>
-      <section className="bg-midnight text-white">
+      <section className="bg-midnight text-bone">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 pt-8 pb-10 md:pt-12 md:pb-14">
-          <Link
-            href="/admin"
-            className="text-xs text-stone/60 hover:text-white transition-colors mb-6 inline-block font-mono uppercase tracking-[0.2em]"
-          >
-            &larr; Admin
+          <Link href="/admin" className="link-quiet text-sm text-bone/65 decoration-bone/30 hover:text-bone">
+            Admin
           </Link>
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-3">
-            {event.distance} · Manage event
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">{event.name}</h1>
+          <p className="t-eyebrow text-terracotta mt-6">{event.distance}</p>
+          <div className="mt-3 flex flex-wrap items-end gap-x-4 gap-y-2">
+            <h1 className="t-display text-[2.5rem] md:text-[3.6rem] break-words">{event.name}</h1>
             <span
-              className={`text-[10px] font-medium uppercase tracking-wider px-2.5 py-1 ${statusStyles[status] || "bg-white/15 text-white"}`}
+              className={`mb-1.5 t-eyebrow px-2.5 py-1 ${statusStyles[status] || "bg-white/15 text-white"}`}
             >
               {status}
             </span>
           </div>
-          <p className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm text-stone/80">
+          <p className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[0.95rem] text-bone/75">
             <span>{formatEventDate(event.date, "long")}</span>
-            <span className="text-stone/30">·</span>
+            <span className="text-bone/30">·</span>
             <span className="font-mono">{when}</span>
-            <span className="text-stone/30">·</span>
+            <span className="text-bone/30">·</span>
             <span>{event.venue}</span>
           </p>
           {withHeats && (
-            <p className="mt-1.5 font-mono text-xs text-stone/50">
+            <p className="mt-1.5 font-mono text-[0.85rem] text-bone/50">
               {event.heat_count} heats · every {event.heat_interval_minutes || 15} min ·{" "}
               {event.heat_capacity || 10} per heat
               {!event.first_heat_time && " · first heat time not set"}
             </p>
           )}
-          <p className="mt-4 inline-flex items-center gap-2 text-xs text-stone/70">
+          <p className="mt-4 inline-flex items-center gap-2 text-sm text-bone/70">
             <span
               aria-hidden
               className={`h-1.5 w-1.5 rounded-full ${closedReason ? "bg-stone/40" : "bg-trail"}`}
@@ -260,42 +254,59 @@ export default async function AdminEventPage({
           </p>
 
           <div className="mt-6 flex flex-wrap gap-2">
-            <Link
-              href={`/admin/events/${event.slug}/edit`}
-              className="inline-flex items-center min-h-11 text-xs font-medium bg-terracotta text-white px-5 hover:bg-terracotta/90 transition-colors"
-            >
+            <Link href={`/admin/events/${event.slug}/edit`} className="btn btn-sm btn-primary">
               Edit event
             </Link>
-            <Link href={`/events/${event.slug}`} className={linkCls}>
+            <Link href={`/events/${event.slug}`} className="btn btn-sm btn-light">
               Public page
             </Link>
-            <Link href={`/events/${event.slug}/qr`} className={linkCls}>
+            <Link href={`/events/${event.slug}/qr`} className="btn btn-sm btn-light">
               QR code
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-6 mt-8 pt-7 border-t border-white/10">
+          <ul className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-6 mt-9 pt-7 border-t rule-light">
             {stats.map((s) => (
-              <Link key={s.label} href={s.href} className="group">
-                <p
-                  className={`font-mono text-2xl md:text-3xl font-semibold tabular-nums transition-colors group-hover:text-terracotta ${
-                    s.label === "Change requests" && changeRequests.length ? "text-terracotta" : ""
-                  }`}
-                >
-                  {s.value}
-                </p>
-                <p className="text-[10px] sm:text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                  {s.label}
-                </p>
-              </Link>
+              <li key={s.label}>
+                <Link href={s.href} className="group block">
+                  <span
+                    className={`block t-numeral text-[2.2rem] md:text-[2.6rem] transition-colors group-hover:text-terracotta ${
+                      s.alert ? "text-terracotta" : ""
+                    }`}
+                  >
+                    {s.value}
+                  </span>
+                  <span className="block mt-1.5 text-[0.85rem] text-bone/55">{s.label}</span>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
 
-          {prizes.length > 0 && (
-            <p className="mt-6 font-mono text-xs text-stone/60">
-              Prizes: {prizes.map((p) => `${p.label} ${p.amount}`).join("  ·  ")}
-            </p>
-          )}
+          <p className="mt-7 border-t rule-light pt-5 text-[0.9rem] text-bone/65 leading-relaxed">
+            <span className="text-bone/45">Entry </span>
+            <span className="font-mono text-bone">
+              {event.entry_fee_cents > 0 ? formatFee(event.entry_fee_cents) : "Free"}
+            </span>
+            {prizes.length > 0 && (
+              <>
+                <span className="text-bone/30"> · </span>
+                <span className="text-bone/45">Prizes </span>
+                {prizes.map((p, i) => (
+                  <span key={i}>
+                    {i > 0 && <span className="text-bone/30">, </span>}
+                    {p.label} <span className="font-mono text-gold">{p.amount}</span>
+                  </span>
+                ))}
+              </>
+            )}
+            <span className="text-bone/30"> · </span>
+            <Link
+              href={`/admin/events/${event.slug}/edit#money`}
+              className="link-quiet text-bone decoration-bone/40"
+            >
+              Change price or prizes
+            </Link>
+          </p>
         </div>
       </section>
 

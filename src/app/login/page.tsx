@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import DeclarationBox from "@/components/DeclarationBox";
+import { fieldInputCls, fieldLabelCls } from "@/components/fieldStyles";
 
 const LINK_ERRORS: Record<string, string> = {
   invalid_or_expired:
@@ -22,8 +23,10 @@ function readNext(search: string): string {
   return value.startsWith("/") && !value.startsWith("//") ? value : "";
 }
 
-const inputCls =
-  "w-full border border-stone/40 px-4 py-3.5 text-base bg-bone/50 focus:outline-none focus:border-terracotta transition-colors";
+/* Paper fields on bone. The focus frame tightens the global focus outline
+   onto the border so it reads as one clear 2px terracotta edge. */
+const labelCls = fieldLabelCls;
+const inputCls = fieldInputCls;
 
 export default function LoginPage() {
   const [mode, setMode] = useState<"link" | "password">("link");
@@ -100,92 +103,102 @@ export default function LoginPage() {
   }
 
   return (
-    <section className="relative min-h-[calc(100vh-64px)] bg-midnight text-white overflow-hidden">
-      <Image
-        src="/images/athlete-track-lane.jpg"
-        alt=""
-        fill
-        priority
-        sizes="100vw"
-        className="object-cover object-center opacity-35 motion-safe:animate-slow-zoom"
-        aria-hidden
-      />
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-gradient-to-b from-midnight/60 via-midnight/70 to-midnight"
-      />
-
-      <div className="relative mx-auto max-w-md px-6 py-12 md:py-20 motion-safe:animate-fade-up">
-        <Link
-          href="/"
-          className="text-xs text-stone/60 hover:text-white transition-colors mb-3 -mt-3 inline-flex items-center min-h-11 font-mono uppercase tracking-[0.2em]"
-        >
-          &larr; Home
-        </Link>
-        <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-          Sign in or sign up
-        </h1>
-        {(toBooking || toBooked) && (
-          <p className="mt-3 text-lg font-medium text-white">
-            {toBooking ? "Sign in to book your heat." : "Sign in to see your booking."}
+    <section className="bg-bone lg:grid lg:grid-cols-12 lg:min-h-[calc(100svh-4rem)]">
+      {/* The photograph. A band above the form on phones, the left page
+          of a spread on desktop. */}
+      <div className="relative lg:col-span-5 bg-midnight text-bone overflow-hidden flex items-end min-h-[15rem] sm:min-h-[20rem] lg:min-h-0 lg:sticky lg:top-16 lg:self-start lg:h-[calc(100svh-4rem)]">
+        <Image
+          src="/images/athlete-track-lane.jpg"
+          alt=""
+          fill
+          priority
+          sizes="(min-width: 1024px) 42vw, 100vw"
+          className="object-cover object-[42%_30%] opacity-75 motion-safe:animate-slow-zoom"
+          aria-hidden
+        />
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-t from-midnight via-midnight/35 to-midnight/0"
+        />
+        <div className="relative w-full px-6 pt-20 pb-8 lg:px-12 lg:pb-14 motion-safe:animate-fade-up">
+          <p className="t-display text-[2.7rem] sm:text-[3.4rem] lg:text-[4.4rem]">
+            On your <em className="text-bone/75">marks.</em>
           </p>
-        )}
-        <p className="mt-3 text-stone/70 leading-relaxed">
-          One field for both. First time here? Your account is created when
-          you confirm the link.
-        </p>
+          <p className="t-caption mt-4 max-w-xs text-bone/65">
+            Sign in once and every time you run with us is kept on your
+            athlete page.
+          </p>
+        </div>
+      </div>
 
-        {linkError && (
-          <div
-            role="alert"
-            className="mt-6 border border-terracotta/50 bg-terracotta/15 px-4 py-3 text-sm text-white"
-          >
-            {linkError}
-          </div>
-        )}
+      {/* The form, open on the page */}
+      <div className="lg:col-span-7 lg:flex lg:items-center">
+        <div className="w-full max-w-md mx-auto px-6 pt-12 pb-16 md:pt-16 lg:py-24 motion-safe:animate-fade-up [animation-delay:120ms]">
+          <h1 className="t-display text-[2.6rem] md:text-[3.2rem]">
+            Sign in, <em>or sign up.</em>
+          </h1>
+          {(toBooking || toBooked) && (
+            <p className="t-lede mt-4 text-midnight">
+              {toBooking ? "Sign in to book your heat." : "Sign in to see your booking."}
+            </p>
+          )}
+          <p className="mt-4 text-[0.98rem] text-midnight/65 leading-relaxed text-pretty">
+            One field for both. First time here? Your account is created when
+            you confirm the link.
+          </p>
 
-        <div className="mt-8 bg-white text-midnight border border-stone/40 shadow-2xl shadow-black/40">
+          {linkError && (
+            <div
+              role="alert"
+              className="mt-7 border-l-2 border-terracotta pl-4 py-1 text-[0.95rem] text-midnight leading-relaxed"
+            >
+              {linkError}
+            </div>
+          )}
+
           {submitted ? (
-            <div className="p-8 text-center">
-              <div className="w-12 h-12 bg-trail/10 text-trail mx-auto mb-4 flex items-center justify-center">
-                <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold tracking-tight mb-2">Check your email</h2>
-              <p className="text-sm text-midnight/60 leading-relaxed">
+            <div className="mt-10 border-t rule pt-8">
+              <h2 className="t-headline text-[2rem]">
+                Check your <em>email.</em>
+              </h2>
+              <p className="mt-4 text-[0.98rem] text-midnight/70 leading-relaxed">
                 We sent a sign-in link to{" "}
-                <span className="font-medium text-midnight">{email}</span>. Open the
+                <span className="font-medium text-midnight break-all">{email}</span>. Open the
                 email and press <span className="font-medium text-midnight">Complete sign in</span>.
                 The link expires in 15 minutes.
               </p>
               {resent && (
-                <p className="mt-3 text-xs text-trail">A new link is on its way. Only the newest link works.</p>
+                <p className="t-caption mt-4 text-trail">
+                  A new link is on its way. Only the newest link works.
+                </p>
               )}
               {error && (
-                <p role="alert" className="mt-3 text-sm text-terracotta">{error}</p>
+                <p role="alert" className="mt-4 text-[0.95rem] text-terracotta">{error}</p>
               )}
               <button
                 onClick={() => handleLinkSubmit()}
                 disabled={loading}
-                className="mt-4 inline-flex items-center min-h-11 px-2 text-sm text-terracotta hover:text-terracotta/80 transition-colors disabled:opacity-50"
+                className="mt-5 inline-flex items-center min-h-11 link-quiet text-[0.95rem] text-midnight disabled:opacity-50"
               >
                 {loading ? "Sending..." : "Send it again"}
               </button>
             </div>
           ) : (
-            <div className="p-6 md:p-8">
-              <div className="flex gap-1 mb-6 border border-stone/40 p-1">
+            <div className="mt-10">
+              <div className="flex border-b rule mb-8">
                 {(["link", "password"] as const).map((m) => (
                   <button
                     key={m}
                     type="button"
+                    aria-pressed={mode === m}
                     onClick={() => {
                       setMode(m);
                       setError("");
                     }}
-                    className={`flex-1 min-h-11 text-xs font-medium py-2.5 transition-colors ${
-                      mode === m ? "bg-midnight text-white" : "text-midnight/60 hover:text-midnight"
+                    className={`t-eyebrow min-h-11 mr-7 -mb-px border-b-2 transition-colors ${
+                      mode === m
+                        ? "border-terracotta text-midnight"
+                        : "border-transparent text-midnight/45 hover:text-midnight"
                     }`}
                   >
                     {m === "link" ? "Email me a link" : "Use a password"}
@@ -195,7 +208,7 @@ export default function LoginPage() {
 
               {mode === "link" ? (
                 <form onSubmit={handleLinkSubmit}>
-                  <label htmlFor="email" className="block text-sm font-medium mb-2">
+                  <label htmlFor="email" className={labelCls}>
                     Email address
                   </label>
                   <input
@@ -208,26 +221,26 @@ export default function LoginPage() {
                     autoComplete="email"
                     className={inputCls}
                   />
-                  <div className="mt-5">
+                  <div className="mt-8">
                     <DeclarationBox declared={declared} onDeclaredChange={setDeclared} />
                   </div>
                   {error && (
-                    <p role="alert" className="mt-3 text-sm text-terracotta">{error}</p>
+                    <p role="alert" className="mt-3 text-[0.95rem] text-terracotta">{error}</p>
                   )}
                   <button
                     type="submit"
                     disabled={loading || !declared}
-                    className="w-full mt-5 bg-terracotta text-white text-sm font-medium py-3.5 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
+                    className="btn btn-primary btn-lg w-full mt-6"
                   >
                     {loading ? "Sending..." : "Send sign-in link"}
                   </button>
-                  <p className="mt-4 text-xs text-dust text-center">
+                  <p className="t-caption mt-4 text-midnight/55">
                     No password to remember. Sign the declaration once and it covers every event.
                   </p>
                 </form>
               ) : (
                 <form onSubmit={handlePasswordSubmit}>
-                  <label htmlFor="pw-email" className="block text-sm font-medium mb-2">
+                  <label htmlFor="pw-email" className={labelCls}>
                     Email address
                   </label>
                   <input
@@ -240,7 +253,7 @@ export default function LoginPage() {
                     autoComplete="email"
                     className={inputCls}
                   />
-                  <label htmlFor="pw-password" className="block text-sm font-medium mb-2 mt-4">
+                  <label htmlFor="pw-password" className={`${labelCls} mt-6`}>
                     Password
                   </label>
                   <input
@@ -254,16 +267,16 @@ export default function LoginPage() {
                     className={inputCls}
                   />
                   {error && (
-                    <p role="alert" className="mt-3 text-sm text-terracotta">{error}</p>
+                    <p role="alert" className="mt-3 text-[0.95rem] text-terracotta">{error}</p>
                   )}
                   <button
                     type="submit"
                     disabled={loading || !email || !password}
-                    className="w-full mt-5 bg-terracotta text-white text-sm font-medium py-3.5 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
+                    className="btn btn-primary btn-lg w-full mt-7"
                   >
                     {loading ? "Signing in..." : "Sign in"}
                   </button>
-                  <p className="mt-4 text-xs text-dust text-center">
+                  <p className="t-caption mt-4 text-midnight/55">
                     Passwords are optional. Set yours from the dashboard after
                     signing in with an email link. Forgot it? Use an email link instead.
                   </p>
@@ -271,6 +284,13 @@ export default function LoginPage() {
               )}
             </div>
           )}
+
+          <Link
+            href="/"
+            className="mt-10 inline-flex items-center min-h-11 link-quiet text-[0.92rem] text-midnight/60"
+          >
+            Back to the home page
+          </Link>
         </div>
       </div>
     </section>

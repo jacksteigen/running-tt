@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import TrackDiagram from "@/components/TrackDiagram";
 import HeatsTimeline from "@/components/HeatsTimeline";
+import Reveal from "@/components/Reveal";
 
 export const metadata: Metadata = {
   title: "The Format · Running TT",
@@ -11,27 +13,22 @@ export const metadata: Metadata = {
 
 const steps = [
   {
-    number: "01",
     title: "Check in",
     body: "Arrive anytime in the event window. Pick up your bib and warm up before your heat is called.",
   },
   {
-    number: "02",
     title: "Line up in a small heat",
     body: "Heats roll off continuously. When your number is called, walk onto the start line. No wave starts, no mass corrals.",
   },
   {
-    number: "03",
     title: "Run the clock",
     body: "Gun goes. You run your distance. Your time gets recorded at the finish.",
   },
   {
-    number: "04",
     title: "Times posted",
     body: "Times go up on the event page as the race wraps. Your run stays on the page afterwards.",
   },
   {
-    number: "05",
     title: "Payout",
     body: "After the final heat closes, prize money is handed out on the day. Everyone else keeps their time on the record.",
   },
@@ -52,7 +49,7 @@ const rules = [
   },
   {
     label: "Entry fee",
-    body: "A flat $15 to enter. No tiers, no surprises. If an event is free, the event page says so before you enter.",
+    body: "One entry fee per race, set for that race and shown on the event page before you enter. No tiers, no surprises. If a race is free, the event page says so.",
   },
   {
     label: "Prize money",
@@ -63,153 +60,144 @@ const rules = [
 export default function FormatPage() {
   return (
     <>
-      {/* Hero */}
-      <section className="bg-midnight text-white relative overflow-hidden">
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, transparent 0 79px, #F5F2EC 79px 80px)",
-          }}
-        />
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-24 relative">
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-5">
-            The format
-          </p>
-          <h1 className="text-3xl md:text-5xl lg:text-6xl font-semibold tracking-tight leading-[1.05] max-w-3xl">
-            Race against the clock. Not each other.
-          </h1>
-          <p className="mt-5 text-lg text-stone/70 max-w-2xl leading-relaxed">
-            Time trial events run in rolling heats, with every time recorded
-            and prize money on the line. Built to be honest, fair, and worth
-            your time.
-          </p>
-        </div>
-      </section>
-
-      {/* Track diagram */}
-      <section className="bg-bone border-b border-stone/40">
-        <div className="mx-auto max-w-6xl px-6 py-20 md:py-28">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
-            <div className="lg:col-span-1">
-              <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-3">
-                On the line
-              </p>
-              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-5">
-                Small heats. One clock. One honest line.
-              </h2>
-              <p className="text-midnight/60 leading-relaxed">
-                Every heat lines up together at the same start. No waves, no
-                pacers, no corrals. You line up, the gun fires, and the clock
-                decides.
-              </p>
-            </div>
-            <div className="lg:col-span-2 pt-12 lg:pt-0">
-              <TrackDiagram />
-            </div>
+      {/* Opener */}
+      <section className="bg-midnight text-bone">
+        <div className="mx-auto max-w-6xl px-6 pt-20 pb-20 md:pt-28 md:pb-28">
+          <div className="max-w-4xl motion-safe:animate-fade-up">
+            <h1 className="t-display text-[3rem] sm:text-[4rem] md:text-[5.4rem]">
+              Race against the clock.{" "}
+              <em className="text-bone/75">Not each other.</em>
+            </h1>
+            <p className="t-lede mt-8 max-w-2xl text-bone/80">
+              Time trial events run in rolling heats, with every time recorded
+              and prize money on the line. Built to be honest, fair, and worth
+              your time.
+            </p>
           </div>
         </div>
       </section>
 
-      {/* Unfolds */}
-      <section className="bg-bone">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-2">
-            The day
-          </p>
-          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-12">
-            How it unfolds
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            {steps.map((s) => (
-              <div
-                key={s.number}
-                className="border-t-2 border-midnight/10 pt-5"
-              >
-                <p className="font-mono text-terracotta text-sm mb-3">
-                  {s.number}
-                </p>
-                <h3 className="font-semibold tracking-tight mb-2">
-                  {s.title}
-                </h3>
-                <p className="text-sm text-midnight/60 leading-relaxed">
-                  {s.body}
+      {/* On the line */}
+      <Reveal>
+        <section className="bg-bone">
+          <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-14 lg:gap-12 items-center">
+              <div className="lg:col-span-4">
+                <h2 className="t-display text-[2.5rem] md:text-[3.3rem]">
+                  Small heats. One clock. <em>One honest line.</em>
+                </h2>
+                <p className="mt-6 max-w-sm text-midnight/75 leading-relaxed">
+                  Every heat lines up together at the same start. No waves, no
+                  pacers, no corrals. You line up, the gun fires, and the clock
+                  decides.
                 </p>
               </div>
-            ))}
+              <div className="lg:col-span-8">
+                <TrackDiagram />
+              </div>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      </Reveal>
 
-      {/* Rolling heats timeline */}
+      {/* How the day unfolds */}
+      <Reveal>
+        <section className="bg-bone">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="border-t rule py-24 md:py-32 grid grid-cols-1 lg:grid-cols-12 gap-x-12 gap-y-10">
+              <h2 className="lg:col-span-4 t-display text-[2.5rem] md:text-[3.3rem]">
+                How the day unfolds
+              </h2>
+              <ol className="lg:col-span-8 lg:col-start-5 lg:row-span-2 border-t rule">
+                {steps.map((s, i) => (
+                  <li
+                    key={s.title}
+                    className="grid grid-cols-[2.5rem_1fr] md:grid-cols-[4rem_1fr] gap-4 border-b rule py-7"
+                  >
+                    <span className="t-numeral text-[1.6rem] text-terracotta">{i + 1}</span>
+                    <div>
+                      <h3 className="text-[1.45rem] md:text-[1.6rem] leading-tight">{s.title}</h3>
+                      <p className="mt-2 max-w-xl text-midnight/70 leading-relaxed">{s.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <figure className="lg:col-span-4 lg:row-start-2 lg:self-end">
+                <div className="relative aspect-[4/5] lg:aspect-[3/4] w-full overflow-hidden bg-stone">
+                  <Image
+                    src="/images/athlete-track-lane.jpg"
+                    alt="An athlete standing in lane six of a blue running track"
+                    fill
+                    sizes="(min-width: 1024px) 30vw, 100vw"
+                    className="object-cover object-[45%_40%]"
+                  />
+                </div>
+                <figcaption className="t-caption mt-4 text-midnight/55">
+                  Lane six. Nobody to chase but the clock.
+                </figcaption>
+              </figure>
+            </div>
+          </div>
+        </section>
+      </Reveal>
+
+      {/* Rolling heats */}
+      <Reveal>
+        <section className="bg-stone">
+          <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+            <div className="max-w-2xl">
+              <h2 className="t-display text-[2.5rem] md:text-[3.3rem]">
+                A steady rolling start
+              </h2>
+              <p className="mt-6 max-w-xl text-midnight/75 leading-relaxed">
+                Heats are spread across the event window. That means short
+                queues at the start, a steady rhythm through the day, and a
+                full record of times by the end.
+              </p>
+            </div>
+            <div className="mt-16 md:mt-20">
+              <HeatsTimeline />
+            </div>
+          </div>
+        </section>
+      </Reveal>
+
+      {/* Ground rules */}
+      <Reveal>
+        <section className="bg-bone">
+          <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+              <h2 className="lg:col-span-4 t-display text-[2.5rem] md:text-[3.3rem]">
+                Fair game, fast courses
+              </h2>
+              <dl className="lg:col-span-8 border-t rule">
+                {rules.map((r) => (
+                  <div
+                    key={r.label}
+                    className="grid grid-cols-1 md:grid-cols-[11rem_1fr] gap-x-8 gap-y-2 border-b rule py-7 md:py-8"
+                  >
+                    <dt className="t-headline text-[1.45rem] md:text-[1.6rem]">{r.label}</dt>
+                    <dd className="max-w-[36rem] text-midnight/75 leading-relaxed">{r.body}</dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </div>
+        </section>
+      </Reveal>
+
+      {/* Close */}
       <section className="bg-stone">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          <div className="max-w-2xl mb-10">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-2">
-              Rolling heats
-            </p>
-            <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-4">
-              A steady rolling start
+        <div className="mx-auto max-w-6xl px-6 py-24 md:py-28">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-10">
+            <h2 className="t-display text-[2.8rem] md:text-[4rem] max-w-2xl">
+              Seen enough. Now find your distance.
             </h2>
-            <p className="text-midnight/60 leading-relaxed">
-              Heats are spread across the event window. That means short
-              queues at the start, a steady rhythm through the day, and a
-              full record of times by the end.
-            </p>
-          </div>
-
-          <div className="bg-bone border border-stone/40 p-5 sm:p-8 md:p-12">
-            <HeatsTimeline />
-          </div>
-        </div>
-      </section>
-
-      {/* Rules */}
-      <section className="bg-bone">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-2">
-            Ground rules
-          </p>
-          <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-10">
-            Fair game, fast courses
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-8 max-w-4xl">
-            {rules.map((r) => (
-              <div key={r.label} className="border-l-2 border-terracotta pl-5">
-                <p className="font-mono text-xs uppercase tracking-[0.2em] text-terracotta mb-2">
-                  {r.label}
-                </p>
-                <p className="text-midnight/70 leading-relaxed">{r.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="bg-midnight text-white">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-8">
-            <div>
-              <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-3">
-                Next up
-              </p>
-              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight max-w-xl">
-                Seen enough. Found your distance.
-              </h2>
-            </div>
             <div className="flex flex-wrap gap-3">
-              <Link
-                href="/events"
-                className="inline-block bg-terracotta text-white font-medium px-7 py-3.5 text-sm hover:bg-terracotta/90 transition-colors"
-              >
+              <Link href="/events" className="btn btn-primary btn-lg">
                 Find an event
               </Link>
-              <Link
-                href="/about"
-                className="inline-block border border-stone/20 text-white px-7 py-3.5 text-sm hover:border-stone/40 transition-colors"
-              >
+              <Link href="/about" className="btn btn-ghost btn-lg">
                 Why we built it
               </Link>
             </div>

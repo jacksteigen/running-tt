@@ -114,20 +114,22 @@ export default async function AdminPage() {
   const stripeTestMode = await isStripeTestMode();
   const openRequests = requests.results;
 
+  const tally = [
+    { value: counts?.athletes ?? 0, label: "athletes", href: "/admin/athletes" },
+    { value: counts?.completed ?? 0, label: "profiles complete", href: "/admin/athletes" },
+    { value: counts?.entries ?? 0, label: "entries", href: "#events" },
+    { value: counts?.results ?? 0, label: "results", href: "#events" },
+  ];
+
   return (
     <>
-      <section className="bg-midnight text-white">
-        <div className="mx-auto max-w-5xl px-6 py-12 md:py-16">
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-3">
-            Running TT
-          </p>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-              Admin
-            </h1>
+      <section className="bg-midnight text-bone">
+        <div className="mx-auto max-w-5xl px-6 pt-12 pb-10 md:pt-16 md:pb-12">
+          <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+            <h1 className="t-display text-[2.8rem] md:text-[4rem]">Admin</h1>
             {stripeTestMode && (
               <span
-                className="inline-flex items-center gap-2 border border-gold/50 bg-gold/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-gold"
+                className="mb-2 inline-flex items-center gap-2 border border-gold/50 px-2.5 py-1 t-eyebrow text-gold"
                 title="Paid bookings cannot take real money until live Stripe keys are added"
               >
                 <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold" />
@@ -135,27 +137,20 @@ export default async function AdminPage() {
               </span>
             )}
           </div>
-          <p className="mt-3 text-stone/70 text-sm">
-            Signed in as {session.user.email}
-          </p>
+          <p className="t-caption mt-3 text-bone/55">Signed in as {session.user.email}</p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-10 pt-8 border-t border-white/10">
-            {[
-              { value: counts?.athletes ?? 0, label: "Athletes", href: "/admin/athletes" },
-              { value: counts?.completed ?? 0, label: "Profiles done", href: "/admin/athletes" },
-              { value: counts?.entries ?? 0, label: "Entries", href: "#events" },
-              { value: counts?.results ?? 0, label: "Results", href: "#events" },
-            ].map((s) => (
-              <Link key={s.label} href={s.href} className="group">
-                <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums group-hover:text-terracotta transition-colors">
-                  {s.value}
-                </p>
-                <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                  {s.label}
-                </p>
-              </Link>
+          <ul className="mt-10 pt-6 border-t rule-light flex flex-wrap gap-x-9 gap-y-4">
+            {tally.map((s) => (
+              <li key={s.label}>
+                <Link href={s.href} className="group inline-flex items-baseline gap-2">
+                  <span className="t-numeral text-[2rem] md:text-[2.4rem] group-hover:text-terracotta transition-colors">
+                    {s.value}
+                  </span>
+                  <span className="text-[0.9rem] text-bone/60">{s.label}</span>
+                </Link>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       </section>
 
@@ -163,30 +158,20 @@ export default async function AdminPage() {
         <div className="mx-auto max-w-5xl px-6 py-12 md:py-16">
           {/* Heat change requests */}
           <div id="requests" className="scroll-mt-24">
-            <div className="mb-4">
-              <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-1.5">
-                Needs a reply
-              </p>
-              <h2 className="text-xl font-semibold tracking-tight flex items-center gap-2.5">
-                Heat change requests
-                {openRequests.length > 0 && (
-                  <span className="font-mono text-xs font-medium bg-terracotta text-white px-2 py-0.5 tabular-nums">
-                    {openRequests.length}
-                  </span>
-                )}
-              </h2>
-            </div>
+            <h2 className="t-headline text-[1.7rem] md:text-[2rem] flex items-center gap-3 mb-5">
+              Heat change requests
+              {openRequests.length > 0 && (
+                <span className="t-numeral text-[1rem] bg-terracotta text-bone px-2 py-1">
+                  {openRequests.length}
+                </span>
+              )}
+            </h2>
 
             {openRequests.length === 0 ? (
-              <div className="bg-white border border-stone/40 px-6 py-8 text-center">
-                <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-2">
-                  All clear
-                </p>
-                <p className="text-sm text-midnight/60 max-w-sm mx-auto leading-relaxed">
-                  When an athlete asks to change heats, it lands here and in your
-                  inbox. Move them from the event page.
-                </p>
-              </div>
+              <p className="border-t rule pt-4 text-[0.95rem] text-midnight/60 max-w-lg leading-relaxed">
+                All clear. When an athlete asks to change heats, it lands here and
+                in your inbox, and you move them from the event page.
+              </p>
             ) : (
               <ul className="bg-white border border-stone/40 divide-y divide-stone/30">
                 {openRequests.map((r) => (
@@ -196,27 +181,20 @@ export default async function AdminPage() {
                       className="group flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6 px-5 py-4 hover:bg-bone/60 transition-colors"
                     >
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm">
-                          <span className="font-semibold">{r.athlete_name}</span>
-                          <span className="text-midnight/50"> · {r.event_name}</span>
+                        <p>
+                          <span className="t-headline text-[1.15rem]">{r.athlete_name}</span>
+                          <span className="text-sm text-midnight/50"> · {r.event_name}</span>
                         </p>
                         {r.note && (
-                          <p className="text-sm text-midnight/65 mt-1 leading-relaxed break-words">
+                          <p className="t-caption text-midnight/65 mt-1 break-words">
                             &ldquo;{r.note}&rdquo;
                           </p>
                         )}
                       </div>
                       <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0">
-                        <p className="font-mono text-xs tabular-nums text-midnight">{heatMove(r)}</p>
-                        <p className="font-mono text-[10px] uppercase tracking-[0.15em] text-dust whitespace-nowrap">
-                          {timeAgo(r.created_at)}
-                        </p>
-                        <span
-                          aria-hidden
-                          className="hidden sm:inline text-terracotta group-hover:translate-x-0.5 motion-safe:transition-transform"
-                        >
-                          →
-                        </span>
+                        <p className="font-mono text-sm text-midnight">{heatMove(r)}</p>
+                        <p className="text-xs text-dust whitespace-nowrap">{timeAgo(r.created_at)}</p>
+                        <span className="hidden sm:inline text-sm text-terracotta link-draw">Open</span>
                       </div>
                     </Link>
                   </li>
@@ -225,41 +203,29 @@ export default async function AdminPage() {
             )}
           </div>
 
-          <div className="flex items-end justify-between mb-6 mt-12">
-            <h2 className="text-xl font-semibold tracking-tight">Athletes</h2>
-            <Link
-              href="/admin/athletes"
-              className="text-sm text-terracotta hover:text-terracotta/80 transition-colors"
-            >
-              Manage all →
+          <div className="flex flex-wrap items-baseline justify-between gap-4 mt-14 border-t rule pt-6">
+            <h2 className="t-headline text-[1.7rem] md:text-[2rem]">Athletes</h2>
+            <Link href="/admin/athletes" className="link-quiet text-[0.95rem] text-midnight">
+              Manage athletes
             </Link>
           </div>
 
-          <div className="flex items-center justify-between gap-4 mb-6 mt-12">
-            <h2 id="events" className="text-xl font-semibold tracking-tight scroll-mt-24">
+          <div className="flex items-center justify-between gap-4 mb-6 mt-14 border-t rule pt-6">
+            <h2 id="events" className="t-headline text-[1.7rem] md:text-[2rem] scroll-mt-24">
               Events
             </h2>
-            <Link
-              href="/admin/events/new"
-              className="inline-flex items-center gap-2 min-h-11 bg-terracotta text-white text-sm font-medium px-5 hover:bg-terracotta/90 transition-colors"
-            >
-              <span aria-hidden className="text-base leading-none">+</span>
+            <Link href="/admin/events/new" className="btn btn-primary btn-sm">
               New event
             </Link>
           </div>
 
           {events.results.length === 0 ? (
-            <div className="bg-white border border-stone/40 p-10 text-center">
-              <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-2">
-                No events yet
+            <div className="border-t rule pt-5">
+              <p className="text-[0.95rem] text-midnight/65 max-w-md leading-relaxed">
+                No events yet. Create the first one. It can sit on the site as
+                Coming Soon with the date TBC.
               </p>
-              <p className="text-sm text-midnight/60 mb-5">
-                Create the first one. It can sit as Coming Soon with the date TBC.
-              </p>
-              <Link
-                href="/admin/events/new"
-                className="inline-flex items-center min-h-11 bg-midnight text-white text-sm font-medium px-5 hover:bg-midnight/90 transition-colors"
-              >
+              <Link href="/admin/events/new" className="btn btn-ink btn-sm mt-5">
                 Create an event
               </Link>
             </div>
@@ -276,7 +242,7 @@ export default async function AdminPage() {
                     className="bg-white border border-stone/40 p-5 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6"
                   >
                     <div className="flex-1 min-w-0">
-                      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-terracotta mb-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <p className="t-eyebrow text-terracotta mb-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span className="inline-flex items-center gap-1.5">
                           <span aria-hidden className={`h-1.5 w-1.5 rounded-full ${statusDot[status] ?? "bg-stone"}`} />
                           {event.distance} · {status}
@@ -295,52 +261,43 @@ export default async function AdminPage() {
                           </Link>
                         )}
                       </p>
-                      <p className="font-semibold tracking-tight">{event.name}</p>
-                      <p className="text-xs text-midnight/60 mt-0.5">
+                      <p className="t-headline text-[1.4rem] md:text-[1.55rem]">{event.name}</p>
+                      <p className="text-[0.82rem] text-midnight/60 mt-1">
                         {formatEventDate(event.date, "short")} · {when} · {event.venue}
                       </p>
                     </div>
-                    <div className="flex items-center gap-6 sm:gap-8 shrink-0">
-                      <div className="text-center">
+                    <div className="flex items-center gap-7 sm:gap-8 shrink-0">
+                      <div>
                         {heats ? (
                           <>
-                            <p className="font-mono text-lg font-semibold tabular-nums">
+                            <p className="t-numeral text-[1.7rem]">
                               {event.entries}
-                              <span className="text-midnight/35 font-normal"> / {spots}</span>
+                              <span className="text-midnight/35"> / {spots}</span>
                             </p>
-                            <p className="text-[10px] uppercase tracking-wider text-dust">
+                            <p className="text-xs text-midnight/55 mt-1">
                               booked{event.holding > 0 ? ` · ${event.holding} paying` : ""}
                             </p>
                           </>
                         ) : (
                           <>
-                            <p className="font-mono text-lg font-semibold tabular-nums">{event.entries}</p>
-                            <p className="text-[10px] uppercase tracking-wider text-dust">entered</p>
+                            <p className="t-numeral text-[1.7rem]">{event.entries}</p>
+                            <p className="text-xs text-midnight/55 mt-1">entered</p>
                           </>
                         )}
                       </div>
-                      <div className="text-center">
-                        <p className="font-mono text-lg font-semibold tabular-nums">{event.results}</p>
-                        <p className="text-[10px] uppercase tracking-wider text-dust">timed</p>
+                      <div>
+                        <p className="t-numeral text-[1.7rem]">{event.results}</p>
+                        <p className="text-xs text-midnight/55 mt-1">timed</p>
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 sm:flex sm:flex-col gap-2 shrink-0 sm:w-28">
-                      <Link
-                        href={`/admin/events/${event.slug}`}
-                        className="min-h-11 sm:min-h-0 flex items-center justify-center text-xs font-medium bg-midnight text-white px-4 py-2 hover:bg-midnight/90 transition-colors text-center"
-                      >
+                    <div className="grid grid-cols-3 sm:flex sm:flex-col gap-2 shrink-0 sm:w-32">
+                      <Link href={`/admin/events/${event.slug}`} className="btn btn-sm btn-ink">
                         Manage
                       </Link>
-                      <Link
-                        href={`/admin/events/${event.slug}/edit`}
-                        className="min-h-11 sm:min-h-0 flex items-center justify-center text-xs font-medium text-midnight border border-stone px-4 py-2 hover:border-midnight/40 transition-colors text-center"
-                      >
+                      <Link href={`/admin/events/${event.slug}/edit`} className="btn btn-sm btn-ghost">
                         Edit
                       </Link>
-                      <Link
-                        href={`/events/${event.slug}/qr`}
-                        className="min-h-11 sm:min-h-0 flex items-center justify-center text-xs font-medium text-terracotta border border-terracotta/30 px-4 py-2 hover:bg-terracotta/5 transition-colors text-center"
-                      >
+                      <Link href={`/events/${event.slug}/qr`} className="btn btn-sm btn-ghost">
                         QR code
                       </Link>
                     </div>
@@ -350,8 +307,8 @@ export default async function AdminPage() {
             </div>
           )}
 
-          <div className="mt-10">
-            <Link href="/dashboard" className="text-sm text-terracotta hover:text-terracotta/80 transition-colors">
+          <div className="mt-12">
+            <Link href="/dashboard" className="link-quiet text-[0.95rem] text-midnight">
               Back to your dashboard
             </Link>
           </div>

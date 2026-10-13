@@ -231,7 +231,7 @@ export default async function Home() {
                 <div className="mt-8">
                   <Link
                     href={spotlight.cta.href}
-                    className="btn btn-lg bg-bone text-midnight hover:bg-midnight hover:text-bone"
+                    className="btn btn-bone btn-lg"
                   >
                     {spotlight.cta.label}
                   </Link>
@@ -408,7 +408,7 @@ export default async function Home() {
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
               <div className="lg:col-span-4">
                 <h2 className="t-display text-[2.8rem] md:text-[3.8rem]">
-                  How a race <em>works</em>
+                  How a race works
                 </h2>
                 <Link href="/format" className="inline-block mt-6 link-quiet text-midnight">
                   The full format

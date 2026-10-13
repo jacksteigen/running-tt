@@ -14,9 +14,10 @@ function spotsText(h: HeatAvailability) {
 }
 
 /**
- * The heats for an event at a glance: when each one goes and how many spots
- * are left. Rows lead straight into booking with that heat picked when the
- * event is taking bookings. Server-safe, no hooks.
+ * The heats for an event at a glance, set like a start list: when each one
+ * goes and how many spots are left, on hairlines rather than in a box. Rows
+ * lead straight into booking with that heat picked when the event is taking
+ * bookings. Server-safe, no hooks.
  */
 export default function HeatSchedule({
   heats,
@@ -47,51 +48,43 @@ export default function HeatSchedule({
         : "All heats started";
 
   return (
-    <div className="bg-white border border-stone/40">
-      <div className="bg-midnight text-white px-4 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-stone/70">
+    <div>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 pb-4">
+        <p className="t-eyebrow text-dust">
           {heats.length} heats{interval ? ` · ${interval} min apart` : ""}
         </p>
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-stone/50">
-          {timeWindow ?? "Times TBC"}
-        </p>
+        <p className="t-eyebrow text-dust">{timeWindow ?? "Times TBC"}</p>
       </div>
 
-      <ul className="grid grid-cols-1 sm:grid-cols-2 gap-px bg-stone/30">
+      <ul className="grid grid-cols-1 sm:grid-cols-2 sm:gap-x-10 border-t rule">
         {heats.map((h) => {
           const low = h.bookable && h.remaining <= 3;
           const row = (
             <>
-              <span className="font-mono text-[11px] tracking-[0.15em] text-dust w-8 shrink-0">
-                H{pad(h.number)}
-              </span>
+              <span className="t-eyebrow text-dust w-9 shrink-0">H{pad(h.number)}</span>
               <span
-                className={`flex-1 min-w-0 truncate font-mono text-sm tabular-nums ${
+                className={`flex-1 min-w-0 truncate t-numeral text-[1.3rem] md:text-[1.45rem] ${
                   !showSpots
-                    ? "font-medium"
+                    ? ""
                     : h.closed
                       ? "text-midnight/40"
                       : h.full
-                        ? "text-midnight/40 line-through decoration-midnight/30"
-                        : "font-medium"
+                        ? "text-midnight/40 line-through decoration-midnight/30 decoration-1"
+                        : ""
                 }`}
               >
                 {h.label}
               </span>
               {showSpots ? (
                 <span
-                  className={`shrink-0 font-mono text-[11px] uppercase tracking-[0.12em] tabular-nums px-1.5 py-0.5 ${
-                    !h.bookable
-                      ? "text-midnight/40"
-                      : low
-                        ? "bg-gold/25 text-midnight"
-                        : "text-midnight/60"
+                  className={`shrink-0 t-eyebrow ${
+                    !h.bookable ? "text-midnight/40" : low ? "text-terracotta" : "text-midnight/60"
                   }`}
                 >
                   {spotsText(h)}
                 </span>
               ) : (
-                <span className="shrink-0 font-mono text-[11px] uppercase tracking-[0.12em] text-midnight/50 tabular-nums">
+                <span className="shrink-0 t-eyebrow text-midnight/50">
                   {h.booked} {h.booked === 1 ? "runner" : "runners"}
                 </span>
               )}
@@ -99,27 +92,27 @@ export default function HeatSchedule({
           );
 
           return (
-            <li key={h.number} className="bg-white">
+            <li key={h.number} className="border-b rule">
               {bookHref && h.bookable ? (
                 <Link
                   href={`${bookHref}?heat=${h.number}`}
                   aria-label={`Book heat ${h.number}, ${h.label}, ${spotsText(h).toLowerCase()}`}
-                  className="group flex items-center gap-3 px-4 sm:px-5 min-h-12 hover:bg-bone transition-colors"
+                  className="group flex items-center gap-4 min-h-14 py-2 hover:text-terracotta transition-colors duration-300"
                 >
                   {row}
                   <span
                     aria-hidden
-                    className="shrink-0 text-midnight/30 group-hover:text-terracotta group-hover:translate-x-0.5 transition-all"
+                    className="shrink-0 t-eyebrow text-midnight/35 group-hover:text-terracotta transition-colors duration-300"
                   >
-                    &rarr;
+                    Book
                   </span>
                 </Link>
               ) : (
-                <div className="flex items-center gap-3 px-4 sm:px-5 min-h-12">
+                <div className="flex items-center gap-4 min-h-14 py-2">
                   {row}
                   {bookHref && (
-                    <span aria-hidden className="shrink-0 invisible">
-                      &rarr;
+                    <span aria-hidden className="shrink-0 t-eyebrow invisible">
+                      Book
                     </span>
                   )}
                 </div>
@@ -127,16 +120,16 @@ export default function HeatSchedule({
             </li>
           );
         })}
-        {heats.length % 2 === 1 && <li aria-hidden className="hidden sm:block bg-white" />}
+        {heats.length % 2 === 1 && <li aria-hidden className="hidden sm:block border-b rule" />}
       </ul>
 
-      <div className="px-4 sm:px-5 py-3 border-t border-stone/30 flex flex-wrap items-center justify-between gap-2 text-xs text-midnight/60">
-        <p>
+      <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+        <p className="t-caption text-midnight/60">
           {timeWindow
             ? "Pick the heat that suits you. Same course, same clock."
             : "Heat times are confirmed with the date."}
         </p>
-        <p className="font-mono tabular-nums text-midnight/50">
+        <p className="t-eyebrow text-midnight/50">
           {capacity} per heat{showSpots ? ` · ${spotsSummary}` : ""}
         </p>
       </div>

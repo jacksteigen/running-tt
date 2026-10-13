@@ -108,31 +108,31 @@ function spotsText(h: PickerHeat, preview: boolean) {
   return `${h.remaining} spots left`;
 }
 
-/** Seat-map meter: one segment per spot, or a bar for big heats. */
+/** Seat-map meter: one segment per spot, or a bar for big heats. Kept quiet. */
 function Meter({ heat, selected }: { heat: PickerHeat; selected: boolean }) {
   const low = heat.bookable && heat.remaining <= 3;
   if (heat.capacity > 16) {
     const pct = Math.min(100, ((heat.booked + (selected ? 1 : 0)) / heat.capacity) * 100);
     return (
-      <div aria-hidden className="h-1.5 bg-stone/70">
+      <div aria-hidden className="h-[3px] bg-stone">
         <div
-          className={`h-full transition-[width] duration-500 ${selected ? "bg-terracotta" : "bg-midnight/70"}`}
+          className={`h-full transition-[width] duration-500 ${selected ? "bg-terracotta" : "bg-midnight/55"}`}
           style={{ width: `${pct}%` }}
         />
       </div>
     );
   }
   return (
-    <div aria-hidden className="flex gap-[3px]">
+    <div aria-hidden className="flex gap-[2px]">
       {Array.from({ length: heat.capacity }, (_, i) => {
         const taken = i < heat.booked;
         const yours = selected && i === heat.booked;
         return (
           <span
             key={i}
-            className={`h-1.5 flex-1 transition-colors duration-300 ${
+            className={`h-[3px] flex-1 transition-colors duration-300 ${
               taken
-                ? "bg-midnight/70"
+                ? "bg-midnight/55"
                 : yours
                   ? "bg-terracotta"
                   : low
@@ -148,7 +148,7 @@ function Meter({ heat, selected }: { heat: PickerHeat; selected: boolean }) {
 
 function Check() {
   return (
-    <span className="flex h-5 w-5 items-center justify-center bg-terracotta text-white motion-safe:animate-page-in">
+    <span className="flex h-5 w-5 items-center justify-center bg-terracotta text-bone motion-safe:animate-page-in">
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
         <path d="M2 6.5 4.8 9 10 3" />
       </svg>
@@ -463,14 +463,12 @@ export default function HeatPicker({
 
   /* ---------- CTA, shared by the side panel and the phone bar ---------- */
 
-  const ctaBase =
-    "flex w-full items-center justify-center gap-2 text-sm font-medium px-5 min-h-12 transition-colors";
-  const ctaPrimary = `${ctaBase} bg-terracotta text-white hover:bg-terracotta/90`;
+  const ctaPrimary = "btn btn-primary w-full";
+  // Working, not unavailable: the button stays near full strength while busy.
+  const busyStyle: React.CSSProperties = { opacity: 0.85, cursor: "wait" };
 
   function renderCta(dark: boolean) {
-    const ctaDisabled = `${ctaBase} cursor-not-allowed ${
-      dark ? "bg-white/10 text-stone/50" : "bg-midnight/15 text-midnight/50"
-    }`;
+    const ctaDisabled = `btn w-full ${dark ? "btn-light" : "btn-ghost"}`;
     if (preview || allFull) {
       return (
         <button type="button" disabled className={ctaDisabled}>
@@ -505,10 +503,11 @@ export default function HeatPicker({
         onClick={book}
         disabled={!!busy}
         aria-busy={!!busy}
-        className={`${ctaPrimary} disabled:cursor-wait disabled:bg-terracotta/80`}
+        className={ctaPrimary}
+        style={busy ? busyStyle : undefined}
       >
         {busy && (
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-white motion-safe:animate-pulse" />
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-bone motion-safe:animate-pulse" />
         )}
         {busy === "holding"
           ? "Holding your spot..."
@@ -529,7 +528,7 @@ export default function HeatPicker({
     return (
       <p
         role={info ? "status" : "alert"}
-        className={`text-sm leading-snug ${dark ? "text-white" : info ? "text-trail" : "text-terracotta"}`}
+        className={`text-[0.92rem] leading-snug ${dark ? "text-bone" : info ? "text-trail" : "text-terracotta"}`}
       >
         {dark && (
           <span
@@ -543,9 +542,7 @@ export default function HeatPicker({
             {" "}
             <Link
               href={error.href}
-              className={`inline-flex min-h-11 items-center underline underline-offset-2 font-medium ${
-                dark ? "text-terracotta" : "hover:text-midnight"
-              }`}
+              className={`inline-flex min-h-11 items-center link-quiet ${dark ? "text-terracotta" : "text-midnight"}`}
             >
               {error.linkText}
             </Link>
@@ -571,24 +568,20 @@ export default function HeatPicker({
     const inner = (
       <>
         <div className="flex items-start justify-between gap-2">
-          <span
-            className={`font-mono text-[10px] uppercase tracking-[0.25em] ${
-              isSelected ? "text-terracotta" : "text-dust"
-            }`}
-          >
+          <span className={`t-eyebrow ${isSelected ? "text-terracotta" : "text-dust"}`}>
             Heat {pad(h.number)}
           </span>
           {isSelected ? <Check /> : <span aria-hidden className="h-5" />}
         </div>
         <p
-          className={`mt-3 font-mono font-semibold tracking-tight tabular-nums leading-none ${
-            t.main.length > 7 ? "text-base" : "text-2xl md:text-[1.75rem]"
+          className={`t-numeral mt-4 whitespace-nowrap ${
+            t.main.length > 7 ? "text-[1.15rem]" : "text-[2.4rem] md:text-[2.75rem]"
           }`}
         >
           <span
             className={
               h.closed
-                ? "text-midnight/50"
+                ? "text-midnight/35"
                 : h.full
                   ? "line-through decoration-1 decoration-midnight/50"
                   : undefined
@@ -596,23 +589,21 @@ export default function HeatPicker({
           >
             {t.main}
           </span>
-          {t.suffix && <span className="ml-0.5 text-sm font-medium text-midnight/50">{t.suffix}</span>}
+          {t.suffix && <span className="t-eyebrow ml-1 text-midnight/45">{t.suffix}</span>}
         </p>
-        <p className="mt-1.5 h-4 font-mono text-[10px] uppercase tracking-[0.15em] text-midnight/40 truncate">
-          {t.caption ?? ""}
-        </p>
+        <p className="mt-2 h-[1.3rem] t-caption text-midnight/50 truncate">{t.caption ?? ""}</p>
         <div className="mt-4">
           <Meter heat={h} selected={isSelected} />
         </div>
-        <p className="mt-2.5 flex items-center gap-1.5 text-xs">
+        <p className="mt-3 flex items-center gap-1.5 min-h-[1.1rem]">
           {low && !preview && <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold shrink-0" />}
           <span
             className={
               unavailable
-                ? "font-mono uppercase tracking-[0.15em] text-[10px] text-midnight/50"
+                ? `t-eyebrow ${h.closed ? "text-midnight/45" : "text-dust"}`
                 : low && !preview
-                  ? "font-medium text-midnight"
-                  : "text-midnight/60"
+                  ? "text-[0.82rem] font-medium text-midnight"
+                  : "text-[0.82rem] text-midnight/60"
             }
           >
             {status}
@@ -623,7 +614,7 @@ export default function HeatPicker({
 
     if (preview) {
       return (
-        <li key={h.number} className="bg-white border border-stone/40 p-4 md:p-5">
+        <li key={h.number} className="bg-white border border-midnight/10 p-4 md:p-5">
           {inner}
         </li>
       );
@@ -644,12 +635,12 @@ export default function HeatPicker({
         tabIndex={i === focusIndex ? 0 : -1}
         onClick={() => choose(h.number)}
         onKeyDown={(e) => onKeyDown(e, i)}
-        className={`relative text-left p-4 md:p-5 border transition-[border-color,background-color,transform,box-shadow] duration-200 ${
+        className={`relative text-left p-4 md:p-5 border transition-[border-color,background-color,box-shadow] duration-200 ${
           unavailable
-            ? "bg-bone/70 border-stone/40 opacity-60 cursor-not-allowed"
+            ? "bg-transparent border-midnight/10 opacity-70 cursor-not-allowed"
             : isSelected
-              ? "bg-terracotta/[0.06] border-terracotta ring-1 ring-inset ring-terracotta"
-              : "bg-white border-stone/50 hover:border-midnight/40 motion-safe:hover:-translate-y-0.5 hover:shadow-[0_12px_24px_-16px_rgba(26,26,24,0.35)]"
+              ? "bg-terracotta/[0.05] border-terracotta ring-1 ring-inset ring-terracotta"
+              : "bg-white border-midnight/12 hover:border-midnight/45"
         }`}
       >
         {inner}
@@ -657,45 +648,45 @@ export default function HeatPicker({
     );
   };
 
+  const heatCount = `${heats.length} ${heats.length === 1 ? "heat" : "heats"}`;
+
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 lg:gap-12">
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-12 lg:gap-14">
       <div className="lg:col-span-2 min-w-0">
         {/* Banners */}
         {preview && (
           <div
-            className={`mb-8 border-l-2 bg-white border-y border-r border-y-stone/40 border-r-stone/40 px-5 py-4 ${
+            className={`mb-10 border-l-2 pl-5 py-1 ${
               closedKind === "soon" ? "border-terracotta" : "border-dust"
             }`}
           >
-            <p
-              className={`font-mono text-[10px] uppercase tracking-[0.25em] mb-1 ${
-                closedKind === "soon" ? "text-terracotta" : "text-dust"
-              }`}
-            >
+            <p className={`t-eyebrow ${closedKind === "soon" ? "text-terracotta" : "text-dust"}`}>
               {closedKind === "soon" ? "Preview" : "Bookings closed"}
             </p>
-            <p className="text-sm text-midnight/80">
+            <p className="mt-1.5 max-w-xl text-[0.98rem] text-midnight/80 leading-relaxed">
               {closedKind === "soon" ? `${closedReason} Have a look at the heats in the meantime.` : closedReason}
             </p>
           </div>
         )}
         {!preview && cancelled && (
-          <div className="mb-8 border-l-2 border-dust bg-white border-y border-r border-y-stone/40 border-r-stone/40 px-5 py-4 motion-safe:animate-page-in">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-dust mb-1">Checkout closed</p>
-            <p className="text-sm text-midnight/80">Payment not finished. Pick your heat again to continue.</p>
+          <div className="mb-10 border-l-2 border-dust pl-5 py-1 motion-safe:animate-page-in">
+            <p className="t-eyebrow text-dust">Checkout closed</p>
+            <p className="mt-1.5 text-[0.98rem] text-midnight/80 leading-relaxed">
+              Payment not finished. Pick your heat again to continue.
+            </p>
           </div>
         )}
         {!preview && !cancelled && hold && (
-          <div className="mb-8 border-l-2 border-dust bg-white border-y border-r border-y-stone/40 border-r-stone/40 px-5 py-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-dust mb-1">Unfinished checkout</p>
-            <p className="text-sm text-midnight/80">
+          <div className="mb-10 border-l-2 border-dust pl-5 py-1">
+            <p className="t-eyebrow text-dust">Unfinished checkout</p>
+            <p className="mt-1.5 text-[0.98rem] text-midnight/80 leading-relaxed">
               You started booking Heat {hold}. Book again to pick up where you left off.
             </p>
           </div>
         )}
         {allFull && (
-          <div className="mb-8 border-l-2 border-terracotta bg-white border-y border-r border-y-stone/40 border-r-stone/40 px-5 py-4">
-            <p className="text-sm text-midnight/80">
+          <div className="mb-10 border-l-2 border-terracotta pl-5 py-1">
+            <p className="max-w-xl text-[0.98rem] text-midnight/80 leading-relaxed">
               {allStarted
                 ? "Bookings have closed. The last heat has started."
                 : someStarted
@@ -706,42 +697,38 @@ export default function HeatPicker({
         )}
 
         {/* Heading */}
-        <div className="mb-6">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-2">
-              {heats.length} heats · {intervalMinutes} min apart
+        <div className="mb-8">
+          <h2 id="heat-picker-heading" className="t-display text-[2.5rem] md:text-[3.4rem]">
+            Choose your <em>heat</em>
+          </h2>
+          <p className="mt-4 max-w-xl text-[1.02rem] text-midnight/70 leading-relaxed">
+            {heatCount}, {intervalMinutes} minutes apart, {heats[0]?.capacity ?? 10} athletes per heat.
+            Same course, same clock, your choice of start.
+          </p>
+          {!timesConfirmed && (
+            <p className="mt-2 max-w-xl t-caption text-midnight/55">
+              Heat times are confirmed with the date. Until then, times show from the first gun.
             </p>
-            <h2 id="heat-picker-heading" className="text-2xl md:text-3xl font-semibold tracking-tight">
-              Choose your heat
-            </h2>
-            <p className="mt-2 text-sm text-midnight/60">
-              {heats[0]?.capacity ?? 10} athletes per heat. Same course, same clock, your choice of start.
-            </p>
-            {!timesConfirmed && (
-              <p className="mt-1 text-sm text-midnight/60">
-                Heat times are confirmed with the date. Until then, times show from the first gun.
-              </p>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Legend, and a pulse to show the counts are live */}
-        <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 mb-5 font-mono text-[10px] uppercase tracking-[0.2em] text-midnight/50">
-          <div aria-hidden className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2 border-t rule pt-4 mb-5 t-eyebrow text-midnight/50">
+          <div aria-hidden className="flex flex-wrap items-center gap-x-5 gap-y-2">
             <span className="inline-flex items-center gap-2">
-              <span className="h-1.5 w-4 bg-midnight/70" /> Booked
+              <span className="h-[3px] w-4 bg-midnight/55" /> Booked
             </span>
             <span className="inline-flex items-center gap-2">
-              <span className="h-1.5 w-4 bg-stone" /> Open
+              <span className="h-[3px] w-4 bg-stone" /> Open
             </span>
             {!preview && (
               <span className="inline-flex items-center gap-2">
-                <span className="h-1.5 w-4 bg-terracotta" /> Yours
+                <span className="h-[3px] w-4 bg-terracotta" /> Yours
               </span>
             )}
           </div>
           {!preview && (
-            <span className="inline-flex items-center gap-2 text-dust">
+            <span className="inline-flex items-center gap-2 text-trail">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full rounded-full bg-trail opacity-60 motion-safe:animate-ping" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-trail" />
@@ -751,7 +738,10 @@ export default function HeatPicker({
           )}
         </div>
 
-        <p aria-live="polite" className={notice ? "mb-5 border-l-2 border-gold bg-gold/10 px-4 py-3 text-sm text-midnight" : "sr-only"}>
+        <p
+          aria-live="polite"
+          className={notice ? "mb-5 border-l-2 border-gold pl-4 py-1 text-[0.95rem] text-midnight" : "sr-only"}
+        >
           {notice}
         </p>
 
@@ -770,18 +760,18 @@ export default function HeatPicker({
           </div>
         )}
 
-        <p className="mt-6 text-xs text-midnight/50 leading-relaxed lg:hidden">{finePrint}</p>
+        <p className="mt-7 max-w-xl text-[0.82rem] text-midnight/55 leading-relaxed lg:hidden">{finePrint}</p>
 
         {/* Phone and tablet: summary bar pinned above the tab bar while the heats are on screen */}
-        <div className="lg:hidden sticky z-40 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] md:bottom-0 -mx-6 mt-6">
-          <div className="bg-midnight/95 backdrop-blur-md text-white border-t border-white/10 px-6 py-3 md:pb-[calc(0.75rem+env(safe-area-inset-bottom))] shadow-[0_-12px_30px_-12px_rgba(0,0,0,0.5)]">
+        <div className="lg:hidden sticky z-40 bottom-[calc(4.25rem+env(safe-area-inset-bottom))] md:bottom-0 -mx-6 mt-8">
+          <div className="bg-midnight/95 backdrop-blur-md text-bone border-t border-bone/10 px-6 py-3 md:pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
             {error && <div className="mb-3">{errorBox(true)}</div>}
             <div className="flex items-center gap-4">
               <div className="min-w-0 shrink-0">
-                <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-stone/50">
+                <p className="t-eyebrow text-bone/50">
                   {chosen ? `Heat ${pad(chosen.number)}` : preview ? "Heats" : "No heat yet"}
                 </p>
-                <p className="font-mono text-base font-semibold tabular-nums mt-0.5" key={chosen?.number ?? 0}>
+                <p className="t-numeral text-[1.35rem] mt-1" key={chosen?.number ?? 0}>
                   {chosen ? (CLOCK.test(chosen.label) ? chosen.label : timeParts(chosen).main) : price === "Free" ? "Free" : `${price} AUD`}
                 </p>
               </div>
@@ -793,30 +783,28 @@ export default function HeatPicker({
 
       {/* Desktop: booking summary */}
       <aside className="hidden lg:block">
-        <div className="sticky top-24 bg-white border border-stone/40">
-          <div className="bg-midnight text-white px-6 py-4">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-stone/50">Your booking</p>
-            <p className="mt-1 font-semibold tracking-tight truncate">{eventName}</p>
+        <div className="sticky top-24 bg-white border border-midnight/12">
+          <div className="bg-midnight text-bone px-6 py-5">
+            <p className="t-eyebrow text-bone/55">Your booking</p>
+            <p className="t-headline mt-2 text-[1.45rem] truncate">{eventName}</p>
           </div>
           <div className="p-6">
             <div key={chosen?.number ?? 0} className="motion-safe:animate-page-in">
-              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-dust">Heat</p>
+              <p className="t-eyebrow text-dust">Heat</p>
               {chosen ? (
-                <div className="mt-1 flex items-end justify-between gap-4">
-                  <p className="font-mono text-6xl font-semibold tracking-tighter leading-none tabular-nums">
-                    {pad(chosen.number)}
-                  </p>
+                <div className="mt-2 flex items-end justify-between gap-4">
+                  <p className="t-numeral text-[4.75rem]">{pad(chosen.number)}</p>
                   <div className="text-right pb-1">
-                    <p className="font-mono text-lg font-semibold tabular-nums">
+                    <p className="t-numeral text-[1.6rem]">
                       {CLOCK.test(chosen.label) ? chosen.label : timeParts(chosen).main}
                     </p>
-                    <p className="text-xs text-midnight/50">
+                    <p className="mt-1.5 t-caption text-midnight/55">
                       {CLOCK.test(chosen.label) ? "Start time" : chosen.label}
                     </p>
                   </div>
                 </div>
               ) : (
-                <p className="mt-2 text-sm text-midnight/50">
+                <p className="mt-3 t-caption text-midnight/55">
                   {preview
                     ? closedKind === "soon"
                       ? "Heats open for booking soon."
@@ -828,22 +816,22 @@ export default function HeatPicker({
               )}
             </div>
 
-            <dl className="mt-6 border-t border-stone/40 divide-y divide-stone/30 text-sm">
-              <div className="flex items-center justify-between py-3">
+            <dl className="mt-6 border-t rule text-[0.92rem]">
+              <div className="flex items-baseline justify-between gap-4 py-3.5 border-b rule">
                 <dt className="text-midnight/60">Entry</dt>
-                <dd className="font-mono font-semibold tabular-nums">{paid ? `${price} AUD` : "Free"}</dd>
+                <dd className="t-numeral text-[1.2rem]">{paid ? `${price} AUD` : "Free"}</dd>
               </div>
               {chosen && (
-                <div className="flex items-center justify-between py-3">
+                <div className="flex items-baseline justify-between gap-4 py-3.5 border-b rule">
                   <dt className="text-midnight/60">Spots left in heat</dt>
-                  <dd className="font-mono tabular-nums">{chosen.remaining}</dd>
+                  <dd className="t-numeral text-[1.2rem]">{chosen.remaining}</dd>
                 </div>
               )}
             </dl>
 
-            {error && <div className="mt-4">{errorBox(false)}</div>}
+            {error && <div className="mt-5">{errorBox(false)}</div>}
             <div className="mt-5">{renderCta(false)}</div>
-            <p className="mt-4 text-xs text-midnight/50 leading-relaxed">{finePrint}</p>
+            <p className="mt-4 text-[0.8rem] text-midnight/55 leading-relaxed">{finePrint}</p>
           </div>
         </div>
       </aside>

@@ -84,51 +84,67 @@ export default async function WelcomePage({
   const heatTimes = offer && withHeats ? heatWindow(offer) : null;
 
   return (
-    <section className="relative min-h-[calc(100vh-64px)] bg-midnight text-white overflow-hidden">
-      <Image
-        src="/images/athlete-track-side.jpg"
-        alt=""
-        fill
-        priority
-        sizes="100vw"
-        className="object-cover object-center opacity-40 scale-105 motion-safe:animate-slow-zoom"
-        aria-hidden
-      />
-      <div
-        aria-hidden
-        className="absolute inset-0 bg-gradient-to-b from-midnight/70 via-midnight/60 to-midnight"
-      />
-      <div className="relative mx-auto max-w-xl px-6 py-12 md:py-20">
-        <Onboarding
-          next={next}
-          initial={{
-            firstName: user.firstName ?? "",
-            middleName: user.middleName ?? "",
-            lastName: user.lastName ?? "",
-            dateOfBirth: user.dateOfBirth ?? "",
-            city: user.city ?? "",
-            country: user.country ?? "",
-            bio: user.bio ?? "",
-          }}
-          openEvent={
-            offer
-              ? {
-                  id: offer.id,
-                  slug: offer.slug,
-                  name: offer.name,
-                  distance: offer.distance,
-                  date: offer.date,
-                  time: offer.time,
-                  venue: offer.venue,
-                  entryFeeCents: offer.entry_fee_cents,
-                  hasHeats: withHeats,
-                  heatSummary: withHeats
-                    ? [`${offer.heat_count} heats`, heatTimes].filter(Boolean).join(" · ")
-                    : null,
-                }
-              : null
-          }
+    <section className="bg-bone lg:grid lg:grid-cols-12 lg:min-h-[calc(100svh-4rem)]">
+      {/* The welcome. A band above the steps on phones, the left page of a
+          spread on desktop, held in place while the steps change. */}
+      <div className="relative lg:col-span-5 bg-midnight text-bone overflow-hidden flex items-end min-h-[13rem] sm:min-h-[18rem] lg:min-h-0 lg:sticky lg:top-16 lg:self-start lg:h-[calc(100svh-4rem)]">
+        <Image
+          src="/images/athlete-track-side.jpg"
+          alt=""
+          fill
+          priority
+          sizes="(min-width: 1024px) 42vw, 100vw"
+          className="object-cover object-[50%_30%] opacity-75 motion-safe:animate-slow-zoom"
+          aria-hidden
         />
+        <div
+          aria-hidden
+          className="absolute inset-0 bg-gradient-to-t from-midnight via-midnight/35 to-midnight/0"
+        />
+        <div className="relative w-full px-6 pt-16 pb-7 lg:px-12 lg:pb-14 motion-safe:animate-fade-up">
+          <p className="t-display text-[2.5rem] sm:text-[3.2rem] lg:text-[4.2rem]">
+            Good to <em className="text-bone/75">have you.</em>
+          </p>
+          <p className="t-caption mt-4 max-w-xs text-bone/65">
+            A few quick questions and your athlete page is ready. Every race
+            you run with us is kept on it.
+          </p>
+        </div>
+      </div>
+
+      <div className="lg:col-span-7 lg:flex lg:items-center">
+        <div className="w-full max-w-lg mx-auto px-6 pt-10 pb-16 md:pt-14 lg:py-24">
+          <Onboarding
+            next={next}
+            initial={{
+              firstName: user.firstName ?? "",
+              middleName: user.middleName ?? "",
+              lastName: user.lastName ?? "",
+              dateOfBirth: user.dateOfBirth ?? "",
+              city: user.city ?? "",
+              country: user.country ?? "",
+              bio: user.bio ?? "",
+            }}
+            openEvent={
+              offer
+                ? {
+                    id: offer.id,
+                    slug: offer.slug,
+                    name: offer.name,
+                    distance: offer.distance,
+                    date: offer.date,
+                    time: offer.time,
+                    venue: offer.venue,
+                    entryFeeCents: offer.entry_fee_cents,
+                    hasHeats: withHeats,
+                    heatSummary: withHeats
+                      ? [`${offer.heat_count} heats`, heatTimes].filter(Boolean).join(" · ")
+                      : null,
+                  }
+                : null
+            }
+          />
+        </div>
       </div>
     </section>
   );

@@ -23,10 +23,10 @@ export default function LiveRefresh({ intervalMs = 20000 }: { intervalMs?: numbe
   }, [router, intervalMs]);
 
   return (
-    <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-terracotta">
-      <span className="relative flex h-2 w-2">
+    <span className="t-eyebrow inline-flex items-center gap-2 text-terracotta">
+      <span className="relative flex h-1.5 w-1.5">
         <span className="absolute inline-flex h-full w-full rounded-full bg-terracotta opacity-75 motion-safe:animate-ping" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-terracotta" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-terracotta" />
       </span>
       Live
     </span>

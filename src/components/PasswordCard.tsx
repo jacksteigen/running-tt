@@ -1,6 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { fieldInputCls } from "@/components/fieldStyles";
+
+const inputCls = fieldInputCls;
 
 interface PasswordCardProps {
   hasPassword: boolean;
@@ -57,40 +60,38 @@ export default function PasswordCard({ hasPassword }: PasswordCardProps) {
   }
 
   return (
-    <div className="bg-white border border-stone/40 p-6">
-      <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-3">
-        Account
-      </p>
-      <h3 className="font-semibold tracking-tight mb-2">Password</h3>
+    <div className="bg-white border rule p-6 md:p-8">
+      <h3 className="t-headline text-[1.5rem]">Password</h3>
 
       {!open ? (
         <>
-          <p className="text-xs text-midnight/50 leading-relaxed mb-4">
+          <p className="mt-3 text-[0.95rem] text-midnight/65 leading-relaxed">
             {saved
               ? "Password sign-in is on. You can sign in with your email and password on any device."
               : "Optional. Set a password so you can sign in without waiting for an email link."}
           </p>
           <div aria-live="polite">
             {justSaved && (
-              <p className="text-xs text-trail mb-3">Password saved.</p>
+              <p className="mt-3 text-[0.9rem] text-trail">Password saved.</p>
             )}
           </div>
           <button
+            type="button"
             onClick={() => {
               setOpen(true);
               setJustSaved(false);
             }}
-            className="text-xs font-medium text-terracotta border border-terracotta/30 px-3 py-1.5 hover:bg-terracotta/5 transition-colors"
+            className="btn btn-sm btn-ghost mt-5"
           >
             {saved ? "Change password" : "Set a password"}
           </button>
         </>
       ) : (
-        <form onSubmit={handleSave} className="space-y-3">
+        <form onSubmit={handleSave} className="mt-5 space-y-4">
           <div>
             <label
               htmlFor="new-password"
-              className="block text-xs font-medium mb-1.5"
+              className="block text-[0.85rem] text-midnight/70 mb-2"
             >
               New password
             </label>
@@ -102,13 +103,13 @@ export default function PasswordCard({ hasPassword }: PasswordCardProps) {
               autoComplete="new-password"
               minLength={8}
               required
-              className="w-full border border-stone/40 px-3 py-2 text-sm bg-bone/50 focus:outline-none focus:border-terracotta transition-colors"
+              className={inputCls}
             />
           </div>
           <div>
             <label
               htmlFor="confirm-password"
-              className="block text-xs font-medium mb-1.5"
+              className="block text-[0.85rem] text-midnight/70 mb-2"
             >
               Confirm password
             </label>
@@ -120,23 +121,19 @@ export default function PasswordCard({ hasPassword }: PasswordCardProps) {
               autoComplete="new-password"
               minLength={8}
               required
-              className="w-full border border-stone/40 px-3 py-2 text-sm bg-bone/50 focus:outline-none focus:border-terracotta transition-colors"
+              className={inputCls}
             />
           </div>
-          <p className="text-[11px] text-dust leading-relaxed">
+          <p className="t-caption text-midnight/55">
             At least 8 characters. Email links keep working either way.
           </p>
           {error && (
-            <p role="alert" className="text-xs text-terracotta">
+            <p role="alert" className="text-[0.9rem] text-terracotta">
               {error}
             </p>
           )}
-          <div className="flex gap-2">
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 bg-terracotta text-white text-xs font-medium py-2 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
-            >
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1">
+            <button type="submit" disabled={saving} className="btn btn-sm btn-ink">
               {saving ? "Saving..." : "Save password"}
             </button>
             <button
@@ -145,7 +142,7 @@ export default function PasswordCard({ hasPassword }: PasswordCardProps) {
                 setOpen(false);
                 setError("");
               }}
-              className="px-3 text-xs text-midnight/60 hover:text-midnight transition-colors"
+              className="link-quiet min-h-11 text-[0.9rem] text-midnight/70 hover:text-midnight transition-colors"
             >
               Cancel
             </button>

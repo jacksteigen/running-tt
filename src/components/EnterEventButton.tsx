@@ -84,18 +84,14 @@ export default function EnterEventButton({
   if (alreadyEntered) {
     return (
       <div>
-        <div className="w-full bg-trail/10 text-trail text-sm font-medium py-3.5 text-center">
-          You are entered
-        </div>
+        <p className="t-eyebrow text-trail inline-flex items-center gap-2">
+          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-trail" />
+          You are in
+        </p>
         {eventSlug && (
-          <div className="mt-1 text-center">
-            <Link
-              href={`/events/${eventSlug}/booked`}
-              className="inline-flex min-h-11 items-center px-3 text-xs font-medium text-midnight/60 underline underline-offset-2 hover:text-terracotta transition-colors"
-            >
-              View your ticket
-            </Link>
-          </div>
+          <Link href={`/events/${eventSlug}/booked`} className="btn btn-ghost mt-4">
+            View your booking
+          </Link>
         )}
       </div>
     );
@@ -103,10 +99,7 @@ export default function EnterEventButton({
 
   if (eventStatus !== "Open") {
     return (
-      <button
-        disabled
-        className="w-full bg-midnight/20 text-white text-sm font-medium py-3.5 cursor-not-allowed"
-      >
+      <button type="button" disabled className="btn btn-ghost w-full">
         {eventStatus === "Coming Soon" ? "Entries opening soon" : eventStatus}
       </button>
     );
@@ -116,10 +109,7 @@ export default function EnterEventButton({
 
   if (!isLoggedIn) {
     return (
-      <Link
-        href={loginHref}
-        className="inline-flex w-full min-h-11 items-center justify-center bg-terracotta text-white text-sm font-medium py-3.5 text-center hover:bg-terracotta/90 transition-colors"
-      >
+      <Link href={loginHref} className="btn btn-primary w-full">
         Sign in to enter{feeDisplay}
       </Link>
     );
@@ -127,10 +117,7 @@ export default function EnterEventButton({
 
   if (!profileCompleted) {
     return (
-      <Link
-        href={welcomeHref}
-        className="inline-flex w-full min-h-11 items-center justify-center bg-terracotta text-white text-sm font-medium py-3.5 text-center hover:bg-terracotta/90 transition-colors"
-      >
+      <Link href={welcomeHref} className="btn btn-primary w-full">
         Set up your profile to enter
       </Link>
     );
@@ -139,14 +126,17 @@ export default function EnterEventButton({
   return (
     <div>
       <button
+        type="button"
         onClick={handleEnter}
         disabled={loading}
-        className="w-full bg-terracotta text-white text-sm font-medium py-3.5 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
+        aria-busy={loading}
+        className="btn btn-primary w-full"
+        style={loading ? { opacity: 0.85, cursor: "wait" } : undefined}
       >
         {loading ? "Entering..." : `Enter now${feeDisplay}`}
       </button>
       {error && (
-        <p role="alert" className="mt-3 text-xs text-terracotta">
+        <p role="alert" className="mt-3 text-[0.85rem] text-terracotta">
           {error}
         </p>
       )}

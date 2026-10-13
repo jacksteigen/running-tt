@@ -117,7 +117,7 @@ export function HeatSelect({
 
 const inputCls =
   "w-full h-11 border border-stone/40 px-3 text-base sm:text-sm bg-bone/50 focus:outline-none focus:border-terracotta transition-colors";
-const labelCls = "block font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-1.5";
+const labelCls = "block text-xs font-medium text-dust mb-1.5";
 
 interface Fields {
   firstName: string;
@@ -309,7 +309,7 @@ export default function WalkUpForm({
         </div>
         <div>
           <label htmlFor="walkup-dob" className={labelCls}>
-            Date of birth <span className="normal-case tracking-normal text-midnight/40">(optional, sets age group)</span>
+            Date of birth <span className="font-normal text-midnight/40">(optional, sets age group)</span>
           </label>
           <input
             id="walkup-dob"
@@ -365,7 +365,7 @@ export default function WalkUpForm({
               type="button"
               onClick={addExisting}
               disabled={busy}
-              className="mt-3 h-11 px-4 text-sm font-medium bg-midnight text-white hover:bg-midnight/90 transition-colors disabled:opacity-50"
+              className="mt-3 btn btn-sm btn-ink"
             >
               Add the existing account instead
             </button>
@@ -386,7 +386,7 @@ export default function WalkUpForm({
         <button
           type="submit"
           disabled={busy}
-          className="h-11 px-6 text-sm font-medium bg-terracotta text-white hover:bg-terracotta/90 transition-colors disabled:opacity-50"
+          className="btn btn-primary"
         >
           {busy ? "Adding..." : created ? `Add ${created.name} to the start list` : "Create and add"}
         </button>

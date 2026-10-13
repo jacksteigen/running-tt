@@ -24,7 +24,7 @@ export function BookingSteps({
 }) {
   const steps = [withHeats ? "Choose your heat" : "Enter", free ? "Confirm" : "Pay", "You are in"];
   return (
-    <ol aria-label="Booking progress" className="grid grid-cols-3 gap-3 sm:gap-5">
+    <ol aria-label="Booking progress" className="grid grid-cols-3 gap-3 sm:gap-6">
       {steps.map((label, i) => {
         const n = i + 1;
         const done = n < current;
@@ -33,11 +33,11 @@ export function BookingSteps({
           <li key={label} aria-current={active ? "step" : undefined}>
             <div
               aria-hidden
-              className={`h-0.5 transition-colors duration-500 ${n <= current ? "bg-terracotta" : "bg-white/15"}`}
+              className={`h-[2px] transition-colors duration-500 ${n <= current ? "bg-terracotta" : "bg-bone/15"}`}
             />
             <p
-              className={`mt-3 font-mono text-[10px] tracking-[0.25em] flex items-center gap-1.5 ${
-                active ? "text-terracotta" : done ? "text-stone/70" : "text-stone/40"
+              className={`mt-3.5 t-numeral text-[1rem] flex items-center gap-1.5 ${
+                active ? "text-terracotta" : done ? "text-bone/65" : "text-bone/35"
               }`}
             >
               {done ? (
@@ -49,8 +49,8 @@ export function BookingSteps({
               {done && <span className="sr-only">, done</span>}
             </p>
             <p
-              className={`mt-1 text-[11px] sm:text-sm leading-snug ${
-                active ? "text-white font-medium" : done ? "text-stone/70" : "text-stone/40"
+              className={`mt-1.5 font-serif text-[0.98rem] sm:text-[1.2rem] leading-snug tracking-[-0.01em] ${
+                active ? "text-bone" : done ? "text-bone/65" : "text-bone/35"
               }`}
             >
               {label}
@@ -164,19 +164,24 @@ function Field({
   label,
   children,
   className = "",
-  mono = false,
+  as = "text",
 }: {
   label: string;
   children: React.ReactNode;
   className?: string;
-  mono?: boolean;
+  /** text: plain set. name: the athlete, in the serif. numeral: refs and codes. */
+  as?: "text" | "name" | "numeral";
 }) {
+  const value =
+    as === "name"
+      ? "t-headline text-[1.45rem] md:text-[1.6rem]"
+      : as === "numeral"
+        ? "t-numeral text-[1.45rem] md:text-[1.6rem]"
+        : "text-[1rem] leading-snug";
   return (
     <div className={`min-w-0 ${className}`}>
-      <dt className="font-mono text-[10px] uppercase tracking-[0.25em] text-dust">{label}</dt>
-      <dd className={`mt-1.5 text-[15px] font-medium leading-snug ${mono ? "font-mono tabular-nums" : ""}`}>
-        {children}
-      </dd>
+      <dt className="t-eyebrow text-dust">{label}</dt>
+      <dd className={`mt-2 break-words ${value}`}>{children}</dd>
     </div>
   );
 }
@@ -264,17 +269,22 @@ export default function BookingTicket({
   return (
     <div>
       <div className="motion-safe:animate-fade-up">
-        <p className="font-mono text-sm md:text-base uppercase tracking-[0.3em] text-terracotta">
-          You are in
-        </p>
-        <h1 className="mt-3 text-3xl md:text-5xl font-semibold tracking-tight leading-[1.05]">
-          {heatNumber ? `Heat ${heatNumber} is yours, ${firstName}.` : `See you on the line, ${firstName}.`}
+        <h1 className="t-display text-[2.6rem] sm:text-[3.2rem] md:text-[4rem]">
+          {heatNumber ? (
+            <>
+              Heat {heatNumber} is <em>yours</em>, {firstName}.
+            </>
+          ) : (
+            <>
+              See you on <em>the line</em>, {firstName}.
+            </>
+          )}
         </h1>
-        <p className="mt-3 text-midnight/60 leading-relaxed max-w-xl">
+        <p className="mt-5 text-[1.05rem] text-midnight/65 leading-relaxed max-w-xl">
           {emailed ? (
             <>
               Your confirmation is on its way to{" "}
-              <span className="text-midnight font-medium break-words">{email}</span>.{" "}
+              <span className="text-midnight break-words">{email}</span>.{" "}
             </>
           ) : null}
           This page is your ticket, so come back any time.
@@ -284,24 +294,20 @@ export default function BookingTicket({
       {/* Ticket */}
       <article
         aria-label={`Ticket for ${eventName}`}
-        className="relative mt-10 bg-white shadow-[0_40px_80px_-40px_rgba(26,26,24,0.55)] motion-safe:animate-fade-up [animation-delay:120ms]"
+        className="relative mt-12 md:mt-14 bg-white ring-1 ring-midnight/10 shadow-[0_32px_64px_-44px_rgba(26,26,24,0.5)] motion-safe:animate-fade-up [animation-delay:120ms]"
       >
         <div className="flex flex-col md:flex-row">
           {/* Main body */}
           <div className="flex-1 min-w-0">
-            <div className="bg-midnight text-white h-14 px-5 md:px-7 flex items-center justify-between gap-4">
-              <span className="font-semibold tracking-tight text-sm">RUNNING TT</span>
-              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-stone/60 truncate">
-                Entry ticket
-              </span>
+            <div className="bg-midnight text-bone h-14 px-5 md:px-8 flex items-center justify-between gap-4">
+              <span className="t-eyebrow text-[0.85rem] text-bone">Running TT</span>
+              <span className="t-eyebrow text-bone/55 truncate">Entry ticket</span>
             </div>
-            <div className="px-5 md:px-7 pt-6 pb-7">
-              <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta">{distance}</p>
-              <h2 className="mt-1.5 text-2xl md:text-3xl font-semibold tracking-tight leading-tight">
-                {eventName}
-              </h2>
-              <dl className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5">
-                <Field label="Athlete" className="col-span-2 sm:col-span-1">
+            <div className="px-5 md:px-8 pt-7 pb-8 md:pt-8 md:pb-9">
+              <p className="t-eyebrow text-terracotta">{distance}</p>
+              <h2 className="t-display mt-3 text-[2.1rem] md:text-[2.7rem]">{eventName}</h2>
+              <dl className="mt-8 border-t rule pt-6 grid grid-cols-2 gap-x-6 gap-y-6">
+                <Field label="Athlete" as="name" className="col-span-2 sm:col-span-1">
                   {athleteName}
                 </Field>
                 <Field label="Date" className="col-span-2 sm:col-span-1">
@@ -309,10 +315,10 @@ export default function BookingTicket({
                 </Field>
                 <Field label="Venue" className="col-span-2">
                   {venue}
-                  {location && <span className="block text-sm font-normal text-midnight/60">{location}</span>}
+                  {location && <span className="block mt-0.5 t-caption text-midnight/55">{location}</span>}
                 </Field>
                 <Field label="Entry">{entryText}</Field>
-                <Field label="Booking ref" mono>
+                <Field label="Booking ref" as="numeral">
                   {bookingRef}
                 </Field>
               </dl>
@@ -321,50 +327,40 @@ export default function BookingTicket({
 
           {/* Perforation: across on phones, down the middle from md */}
           <div aria-hidden className="relative h-0 md:h-auto md:w-0">
-            <div className="absolute left-5 right-5 top-0 border-t-2 border-dashed border-stone md:left-0 md:right-auto md:top-5 md:bottom-5 md:border-t-0 md:border-l-2" />
+            <div className="absolute left-5 right-5 top-0 border-t-2 border-dotted border-midnight/20 md:left-0 md:right-auto md:top-6 md:bottom-6 md:border-t-0 md:border-l-2" />
             <span className="absolute -left-3 -top-3 h-6 w-6 rounded-full bg-bone" />
             <span className="absolute -right-3 -top-3 h-6 w-6 rounded-full bg-bone md:right-auto md:top-auto md:-left-3 md:-bottom-3" />
           </div>
 
           {/* Stub */}
-          <div className="md:w-60 shrink-0">
-            <div className="hidden md:flex bg-midnight text-white h-14 px-7 items-center">
-              <span className="font-mono text-[10px] uppercase tracking-[0.25em] text-stone/60">
-                {heatNumber ? "Your heat" : "Race day"}
-              </span>
+          <div className="md:w-64 shrink-0">
+            <div className="hidden md:flex bg-midnight text-bone h-14 px-8 items-center">
+              <span className="t-eyebrow text-bone/55">{heatNumber ? "Your heat" : "Race day"}</span>
             </div>
-            <div className="px-5 md:px-7 pt-6 pb-7 flex md:flex-col items-end md:items-start justify-between gap-4">
+            <div className="px-5 md:px-8 pt-7 pb-8 md:pt-8 md:pb-9 flex md:flex-col items-end md:items-start justify-between gap-5">
               {heatNumber ? (
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-dust">Heat</p>
-                  <p className="font-mono text-7xl md:text-8xl font-semibold tracking-tighter leading-none tabular-nums mt-1">
-                    {pad(heatNumber)}
-                  </p>
+                  <p className="t-eyebrow text-dust">Heat</p>
+                  <p className="t-numeral text-[5.5rem] md:text-[6.75rem] mt-2">{pad(heatNumber)}</p>
                 </div>
               ) : (
                 <div>
-                  <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-dust">{parts.weekday}</p>
-                  <p className="font-mono text-6xl md:text-7xl font-semibold tracking-tighter leading-none tabular-nums mt-1">
-                    {parts.day}
-                  </p>
-                  {parts.month && (
-                    <p className="font-mono text-sm uppercase tracking-[0.2em] text-midnight/60 mt-1">{parts.month}</p>
-                  )}
+                  <p className="t-eyebrow text-dust">{parts.weekday}</p>
+                  <p className="t-numeral text-[4.5rem] md:text-[5.5rem] mt-2">{parts.day}</p>
+                  {parts.month && <p className="t-eyebrow text-midnight/60 mt-2">{parts.month}</p>}
                 </div>
               )}
               <div className="text-right md:text-left">
                 {heatNumber && (
                   <>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-dust">Start</p>
-                    <p className="font-mono text-xl font-semibold tabular-nums mt-1">
-                      {heatStart ? heatLabel : "Time TBC"}
-                    </p>
+                    <p className="t-eyebrow text-dust">Start</p>
+                    <p className="t-numeral text-[1.9rem] mt-1.5">{heatStart ? heatLabel : "Time TBC"}</p>
                     {!heatStart && heatLabel && (
-                      <p className="text-xs text-midnight/50 mt-0.5">{heatLabel}</p>
+                      <p className="t-caption text-midnight/55 mt-1">{heatLabel}</p>
                     )}
                   </>
                 )}
-                <span className="mt-4 inline-block border-2 border-trail text-trail font-mono text-[10px] font-semibold uppercase tracking-[0.25em] px-2 py-1 -rotate-6">
+                <span className="mt-5 inline-block border-2 border-trail text-trail t-eyebrow px-2 py-1 -rotate-6">
                   Confirmed
                 </span>
               </div>
@@ -372,15 +368,14 @@ export default function BookingTicket({
           </div>
         </div>
       </article>
+      <p className="t-caption text-midnight/55 mt-5 motion-safe:animate-fade-up [animation-delay:180ms]">
+        Thank you for racing with us.
+      </p>
 
       {/* Actions */}
-      <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-3 motion-safe:animate-fade-up [animation-delay:240ms]">
+      <div className="mt-8 flex flex-col sm:flex-row sm:items-center gap-x-8 gap-y-3 motion-safe:animate-fade-up [animation-delay:240ms]">
         {canCalendar ? (
-          <button
-            type="button"
-            onClick={addToCalendar}
-            className="inline-flex items-center justify-center gap-2 bg-midnight text-white text-sm font-medium px-5 py-3.5 min-h-12 hover:bg-midnight/85 transition-colors"
-          >
+          <button type="button" onClick={addToCalendar} className="btn btn-ink">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" aria-hidden>
               <rect x="3" y="5" width="18" height="16" />
               <path d="M3 10h18M8 3v4M16 3v4" />
@@ -388,22 +383,16 @@ export default function BookingTicket({
             {saved ? "Calendar file saved" : "Add to calendar"}
           </button>
         ) : (
-          <p className="flex items-center justify-center border border-dashed border-stone px-4 py-3 min-h-12 text-xs text-midnight/50 text-center">
-            {calendarWaitText}
-          </p>
+          <p className="text-[0.92rem] text-midnight/60 leading-relaxed">{calendarWaitText}</p>
         )}
-        <Link
-          href={`/events/${eventSlug}`}
-          className="inline-flex items-center justify-center border border-midnight/20 text-sm font-medium px-5 py-3.5 min-h-12 hover:border-midnight/50 transition-colors"
-        >
-          Event details
-        </Link>
-        <Link
-          href="/dashboard"
-          className="inline-flex items-center justify-center border border-midnight/20 text-sm font-medium px-5 py-3.5 min-h-12 hover:border-midnight/50 transition-colors"
-        >
-          Your dashboard
-        </Link>
+        <div className="flex items-center gap-7 text-[0.95rem]">
+          <Link href={`/events/${eventSlug}`} className="inline-flex min-h-11 items-center text-midnight">
+            <span className="link-quiet">Event details</span>
+          </Link>
+          <Link href="/dashboard" className="inline-flex min-h-11 items-center text-midnight">
+            <span className="link-quiet">Your dashboard</span>
+          </Link>
+        </div>
       </div>
       <p aria-live="polite" className="sr-only">
         {saved ? "Calendar file downloaded. Open it to add your heat to your calendar." : ""}

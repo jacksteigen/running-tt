@@ -88,27 +88,22 @@ export default async function EditEventPage({
 
   return (
     <>
-      <section className="bg-midnight text-white">
-        <div className="mx-auto max-w-6xl px-6 py-10 md:py-14">
+      <section className="bg-midnight text-bone">
+        <div className="mx-auto max-w-6xl px-6 pt-10 pb-10 md:pt-14 md:pb-12">
           <Link
             href={`/admin/events/${event.slug}`}
-            className="text-xs text-stone/60 hover:text-stone/80 transition-colors mb-4 inline-block"
+            className="link-quiet text-sm text-bone/65 decoration-bone/30 hover:text-bone"
           >
-            &larr; Manage event
+            Manage event
           </Link>
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-2">
-            {event.distance} · Edit event
-          </p>
-          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">{event.name}</h1>
-          <p className="mt-2 text-stone/70 text-sm">
+          <p className="t-eyebrow text-terracotta mt-6">Editing · {event.distance}</p>
+          <h1 className="t-display mt-3 text-[2.6rem] md:text-[3.6rem] break-words">{event.name}</h1>
+          <p className="mt-3 text-[0.95rem] text-bone/65">
             {formatEventDate(event.date, "long")} · {displayStatus(event.status, event.date)} ·{" "}
-            {bookedCount} booked
+            <span className="font-mono text-bone">{bookedCount}</span> booked
           </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <Link
-              href={`/events/${event.slug}`}
-              className="text-xs font-medium text-white border border-white/20 px-4 py-2 hover:border-white/50 transition-colors"
-            >
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link href={`/events/${event.slug}`} className="btn btn-sm btn-light">
               Public page
             </Link>
           </div>

@@ -45,7 +45,7 @@ export default function MobileTabBar() {
     },
     {
       href: signedIn ? "/dashboard" : "/login",
-      label: signedIn ? "You" : "Sign in",
+      label: signedIn ? "Your page" : "Sign in",
       match: (p: string) => p.startsWith("/dashboard") || p.startsWith("/admin"),
       icon: (
         <>
@@ -59,7 +59,7 @@ export default function MobileTabBar() {
   return (
     <nav
       aria-label="Primary"
-      className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-midnight/92 backdrop-blur-md border-t border-white/10 pb-[env(safe-area-inset-bottom)]"
+      className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-midnight/92 backdrop-blur-md border-t rule-light pb-[env(safe-area-inset-bottom)]"
     >
       <div className="grid grid-cols-4">
         {tabs.map((t) => {
@@ -69,17 +69,24 @@ export default function MobileTabBar() {
               key={t.label}
               href={t.href}
               aria-current={active ? "page" : undefined}
-              className={`flex flex-col items-center justify-center gap-1 py-2.5 text-[10px] font-medium uppercase tracking-[0.15em] transition-colors ${
-                active ? "text-terracotta" : "text-stone/60 hover:text-white"
+              className={`relative flex flex-col items-center justify-center gap-1 py-2.5 t-eyebrow transition-colors ${
+                active ? "text-bone" : "text-bone/50 hover:text-bone"
               }`}
             >
+              {/* The active tab carries a short terracotta mark, like a lane line. */}
+              <span
+                aria-hidden
+                className={`absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-7 bg-terracotta transition-opacity ${
+                  active ? "opacity-100" : "opacity-0"
+                }`}
+              />
               <svg
                 width="22"
                 height="22"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.75"
+                strokeWidth="1.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 aria-hidden

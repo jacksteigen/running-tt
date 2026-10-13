@@ -1,47 +1,47 @@
 /**
- * Abstract horizontal timeline showing heats rolling off across the event
- * window. Deliberately keeps off specific clock times or heat counts because
- * those vary per event. Responsive: shows fewer dots on mobile so labels
- * don't collide.
+ * Heats rolling off across the event window, drawn like a timing tape: one
+ * baseline, a tick for every heat. Deliberately keeps off specific clock
+ * times or heat counts because those vary per event. Responsive: shows fewer
+ * heats on mobile so labels don't collide.
  */
 export default function HeatsTimeline() {
-  // Twelve dots on desktop, but every other one is hidden on mobile (so six show).
+  // Twelve heats on desktop, but every other one is hidden on mobile (so six show).
   const heats = Array.from({ length: 12 }, (_, i) => i + 1);
 
   return (
-    <div className="w-full">
-      <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-[0.2em] text-dust mb-4">
+    <figure className="w-full">
+      <div className="flex items-baseline justify-between t-eyebrow text-dust mb-6 md:mb-8">
         <span>Event opens</span>
         <span>Event closes</span>
       </div>
 
       <div className="relative">
-        <div className="h-px bg-midnight/15 w-full absolute top-1/2" />
-        <div className="flex justify-between relative">
+        <div aria-hidden className="absolute inset-x-0 bottom-0 h-px bg-midnight/30" />
+        <ol className="relative flex justify-between">
           {heats.map((num, i) => {
-            // Hide every other dot on mobile to give labels room to breathe.
+            // Hide every other heat on mobile to give labels room to breathe.
             const hideOnMobile =
               i !== 0 && i !== heats.length - 1 && i % 2 !== 0;
             return (
-              <div
+              <li
                 key={num}
                 className={`flex flex-col items-center ${
                   hideOnMobile ? "hidden sm:flex" : ""
                 }`}
               >
-                <span className="font-mono text-[9px] sm:text-[10px] text-dust mb-1">
+                <span className="t-numeral text-[0.95rem] sm:text-[1.05rem] text-midnight/70 mb-3">
                   H{num}
                 </span>
-                <span className="inline-block w-1.5 h-1.5 sm:w-2 sm:h-2 bg-terracotta rounded-full" />
-              </div>
+                <span aria-hidden className="block w-[2px] h-6 sm:h-8 bg-terracotta" />
+              </li>
             );
           })}
-        </div>
+        </ol>
       </div>
 
-      <p className="mt-6 text-sm text-midnight/60 text-center">
+      <figcaption className="t-caption mt-6 text-[1rem] text-midnight/60">
         Heats roll off continuously across the event window.
-      </p>
-    </div>
+      </figcaption>
+    </figure>
   );
 }

@@ -7,6 +7,24 @@ function pad(n: number) {
   return String(n).padStart(2, "0");
 }
 
+const LABELS = ["days", "hrs", "min", "sec"] as const;
+
+/** One unit of the clock: race-bib digits over a small label. */
+function Unit({ value, label, dim = false }: { value: string; label: string; dim?: boolean }) {
+  return (
+    <div>
+      <div
+        className={`t-numeral text-[2.5rem] sm:text-[3rem] md:text-[3.4rem] lg:text-[3.8rem] ${
+          dim ? "opacity-40" : ""
+        }`}
+      >
+        {value}
+      </div>
+      <div className="t-eyebrow opacity-60 mt-2.5">{label}</div>
+    </div>
+  );
+}
+
 /**
  * Counts down to the start gun. Renders nothing while the date is TBC, so
  * callers can drop it in anywhere and fall back to their own copy.
@@ -35,19 +53,13 @@ export default function Countdown({
 
   if (tbc) return null;
 
+  // Before hydration: hold the shape so nothing jumps when the clock starts.
   if (remaining === null) {
     return (
-      <div className={`font-mono ${className}`}>
-        <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-5">
-          {["--", "--", "--", "--"].map((v, i) => (
-            <div key={i} className="text-center opacity-40">
-              <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight tabular-nums">
-                {v}
-              </div>
-              <div className="text-[10px] md:text-xs uppercase tracking-[0.2em] opacity-60 mt-1">
-                &nbsp;
-              </div>
-            </div>
+      <div className={className}>
+        <div className="flex items-start gap-5 sm:gap-6 lg:gap-7">
+          {LABELS.map((label) => (
+            <Unit key={label} value="--" label={label} dim />
           ))}
         </div>
       </div>
@@ -59,25 +71,13 @@ export default function Countdown({
   const mins = Math.floor((remaining / (1000 * 60)) % 60);
   const secs = Math.floor((remaining / 1000) % 60);
 
-  const units: Array<{ value: string; label: string }> = [
-    { value: String(days), label: "days" },
-    { value: pad(hours), label: "hrs" },
-    { value: pad(mins), label: "min" },
-    { value: pad(secs), label: "sec" },
-  ];
+  const values = [String(days), pad(hours), pad(mins), pad(secs)];
 
   return (
-    <div className={`font-mono ${className}`}>
-      <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-5">
-        {units.map((u) => (
-          <div key={u.label} className="text-center">
-            <div className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold tracking-tight tabular-nums">
-              {u.value}
-            </div>
-            <div className="text-[10px] md:text-xs uppercase tracking-[0.2em] opacity-60 mt-1">
-              {u.label}
-            </div>
-          </div>
+    <div className={className}>
+      <div className="flex items-start gap-5 sm:gap-6 lg:gap-7">
+        {LABELS.map((label, i) => (
+          <Unit key={label} value={values[i]} label={label} />
         ))}
       </div>
     </div>

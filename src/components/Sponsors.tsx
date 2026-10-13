@@ -24,7 +24,7 @@ export default function Sponsors() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-end">
           <div className="lg:col-span-5">
             <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
-              The purse is <em>backed.</em>
+              The purse is backed.
             </h2>
             <p className="mt-5 max-w-sm text-midnight/70 leading-relaxed">
               Prize money comes from entry fees and from the people who back

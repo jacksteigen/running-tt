@@ -50,16 +50,14 @@ export default async function AdminAthletesPage() {
 
   return (
     <>
-      <section className="bg-midnight text-white">
-        <div className="mx-auto max-w-5xl px-6 py-10 md:py-14">
-          <Link href="/admin" className="text-xs text-stone/60 hover:text-stone/80 transition-colors mb-4 inline-block">
-            &larr; Admin
+      <section className="bg-midnight text-bone">
+        <div className="mx-auto max-w-5xl px-6 pt-10 pb-10 md:pt-14 md:pb-12">
+          <Link href="/admin" className="link-quiet text-sm text-bone/65 decoration-bone/30 hover:text-bone">
+            Admin
           </Link>
-          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-            Athletes
-          </h1>
-          <p className="mt-2 text-stone/70 text-sm">
-            {athletes.results.length} registered
+          <h1 className="t-display mt-5 text-[2.6rem] md:text-[3.6rem]">Athletes</h1>
+          <p className="mt-3 text-[0.95rem] text-bone/65">
+            <span className="t-numeral text-[1.25rem] text-bone">{athletes.results.length}</span> registered
           </p>
         </div>
       </section>
@@ -71,7 +69,7 @@ export default async function AdminAthletesPage() {
           <div className="bg-white border border-stone/40 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-midnight text-stone/60 text-left text-[10px] uppercase tracking-[0.2em] font-mono">
+                <tr className="border-b rule text-left t-eyebrow text-dust">
                   <th className="px-4 py-3">Athlete</th>
                   <th className="px-4 py-3 hidden md:table-cell">Location</th>
                   <th className="px-4 py-3 text-right">Age</th>
@@ -87,18 +85,18 @@ export default async function AdminAthletesPage() {
                   return (
                     <tr key={a.id} className="border-b border-stone/20 last:border-b-0 hover:bg-bone/60 transition-colors">
                       <td className="px-4 py-3">
-                        <Link href={`/admin/athletes/${a.id}`} className="font-medium hover:text-terracotta transition-colors">
+                        <Link href={`/admin/athletes/${a.id}`} className="t-headline text-[1.1rem] hover:text-terracotta transition-colors">
                           {a.name}
                         </Link>
                         {a.is_admin === 1 && (
-                          <span className="ml-2 text-[10px] uppercase tracking-wider text-terracotta">admin</span>
+                          <span className="ml-2 t-eyebrow text-terracotta">Admin</span>
                         )}
                         <p className="text-xs text-midnight/50">{a.email}</p>
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell text-midnight/70">{place || "-"}</td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums">{age ?? "-"}</td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums hidden sm:table-cell">{a.entries}</td>
-                      <td className="px-4 py-3 text-right font-mono tabular-nums hidden sm:table-cell">{a.results}</td>
+                      <td className="px-4 py-3 text-right t-numeral text-[1.05rem]">{age ?? "-"}</td>
+                      <td className="px-4 py-3 text-right t-numeral text-[1.05rem] hidden sm:table-cell">{a.entries}</td>
+                      <td className="px-4 py-3 text-right t-numeral text-[1.05rem] hidden sm:table-cell">{a.results}</td>
                       <td className="px-4 py-3">
                         <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 ${a.profile_completed ? "bg-trail/10 text-trail" : "bg-gold/20 text-midnight"}`}>
                           {a.profile_completed ? "Complete" : "Incomplete"}

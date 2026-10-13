@@ -591,15 +591,12 @@ export default function ResultsEditor({
     return (
       <div className="bg-white border border-stone/40">
         <div className="px-4 sm:px-5 py-4 border-b border-stone/30">
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-1">
-            Race day · Live results
-          </p>
-          <h2 className="font-semibold tracking-tight">Nobody to time yet</h2>
+          <h2 className="t-headline text-[1.6rem] md:text-[1.8rem]">Live results</h2>
         </div>
-        <p className="px-4 sm:px-5 py-10 text-sm text-midnight/60 text-center max-w-md mx-auto leading-relaxed">
-          Athletes appear here once their entry is confirmed. Add walk-ups in
-          the start list below, or put the QR code on a screen and let them
-          sign themselves up.
+        <p className="px-4 sm:px-5 py-6 text-[0.95rem] text-midnight/60 max-w-lg leading-relaxed">
+          Nobody to time yet. Athletes appear here once their entry is
+          confirmed. Add walk-ups in the start list below, or put the QR code
+          on a screen and let them sign themselves up.
         </p>
       </div>
     );
@@ -677,11 +674,7 @@ export default function ResultsEditor({
         <span className="block font-mono text-[10px] text-dust mt-0.5 whitespace-nowrap">
           {sub}
         </span>
-        <span
-          className={`block font-mono text-[11px] tabular-nums mt-1 ${
-            complete ? "text-trail font-semibold" : ""
-          }`}
-        >
+        <span className={`block t-numeral text-[0.95rem] mt-1 ${complete ? "text-trail" : ""}`}>
           {timed}/{total}
         </span>
       </button>
@@ -692,15 +685,12 @@ export default function ResultsEditor({
     <div className="bg-white border border-stone/40">
       <div className="px-4 sm:px-5 py-4 border-b border-stone/30 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-1">
-            Race day · Live results
+          <h2 className="t-headline text-[1.6rem] md:text-[1.8rem]">Live results</h2>
+          <p className="mt-1.5 text-sm text-midnight/60">
+            <span className="t-numeral text-[1.2rem] text-midnight">{done}</span> of{" "}
+            <span className="t-numeral text-[1.2rem] text-midnight">{entrants.length}</span> timed
+            {marked > 0 && <> · {marked} DNF, DNS or DQ</>}
           </p>
-          <h2 className="font-semibold tracking-tight">
-            {done} of {entrants.length} timed
-            {marked > 0 && (
-              <span className="font-normal text-midnight/50"> · {marked} DNF, DNS or DQ</span>
-            )}
-          </h2>
         </div>
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <input
@@ -714,7 +704,7 @@ export default function ResultsEditor({
           <Link
             href={`/events/${eventSlug}`}
             target="_blank"
-            className="h-11 inline-flex items-center text-xs font-medium text-terracotta border border-terracotta/30 px-3 hover:bg-terracotta/5 transition-colors whitespace-nowrap"
+            className="btn btn-sm btn-ghost whitespace-nowrap"
           >
             Public board
           </Link>
@@ -725,17 +715,13 @@ export default function ResultsEditor({
         <ol aria-label="Leaders" className="grid grid-cols-3 border-b border-stone/30 divide-x divide-stone/30">
           {standings.slice(0, 3).map((s) => (
             <li key={s.userId} className="px-3 sm:px-5 py-3 min-w-0">
-              <p
-                className={`font-mono text-[10px] uppercase tracking-[0.2em] ${
-                  s.rank === 1 ? "text-gold font-semibold" : "text-dust"
-                }`}
-              >
+              <p className={`t-eyebrow ${s.rank === 1 ? "text-gold" : "text-dust"}`}>
                 {ordinal(s.rank)}
               </p>
-              <p className="text-sm font-medium truncate mt-0.5">
+              <p className="t-headline text-[1.05rem] truncate mt-1">
                 {entrantById.get(s.userId)?.name ?? "Athlete"}
               </p>
-              <p className="font-mono text-sm tabular-nums">{s.timeDisplay}</p>
+              <p className="t-numeral text-[1.35rem] mt-1">{s.timeDisplay}</p>
             </li>
           ))}
         </ol>
@@ -786,7 +772,7 @@ export default function ResultsEditor({
                   key={String(t)}
                   type="button"
                   onClick={() => selectTab(t)}
-                  className="min-h-11 px-3 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] border border-midnight/30 text-midnight hover:border-midnight transition-colors"
+                  className="btn btn-sm btn-ghost"
                 >
                   {t === "all" ? "Show all" : `Show H${t}`}
                 </button>
@@ -827,7 +813,7 @@ export default function ResultsEditor({
         )}
 
         {visible.length === 0 ? (
-          <p className="px-4 sm:px-5 py-10 text-sm text-midnight/50 text-center">
+          <p className="px-4 sm:px-5 py-8 text-[0.95rem] text-midnight/55">
             {query
               ? `Nobody matches "${filter.trim()}".`
               : currentHeat
@@ -877,7 +863,7 @@ export default function ResultsEditor({
                           : "--"}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{entrant.name}</p>
+                      <p className="t-headline text-[1.1rem] truncate">{entrant.name}</p>
                       <p className="text-[11px] text-midnight/50 truncate">{meta}</p>
                     </div>
                     <div
@@ -935,8 +921,8 @@ export default function ResultsEditor({
                         type="button"
                         onClick={() => saveRow(entrant.userId)}
                         disabled={row.status === "saving" || !value.trim()}
-                        className={`h-11 min-w-[4.75rem] px-4 text-xs font-medium text-white transition-colors disabled:opacity-40 ${
-                          row.status === "saved" ? "bg-trail" : "bg-midnight hover:bg-midnight/90"
+                        className={`btn btn-sm min-w-[4.75rem] ${
+                          row.status === "saved" ? "bg-trail text-bone" : "btn-ink"
                         }`}
                       >
                         {row.status === "saving"
@@ -989,7 +975,7 @@ export default function ResultsEditor({
                             type="button"
                             onClick={() => saveRow(entrant.userId, { time: capture.time })}
                             disabled={row.status === "saving"}
-                            className="h-11 px-4 text-xs font-medium bg-midnight text-white hover:bg-midnight/90 transition-colors disabled:opacity-40"
+                            className="btn btn-sm btn-ink"
                           >
                             {row.status === "saving" ? (
                               "Saving"
@@ -1004,7 +990,7 @@ export default function ResultsEditor({
                             onClick={() => dismissCapture(entrant.userId)}
                             disabled={row.status === "saving"}
                             aria-label={`Discard ${capture.time} for ${entrant.name}`}
-                            className="h-11 px-4 text-xs font-medium border border-midnight/30 text-midnight hover:border-midnight transition-colors disabled:opacity-40"
+                            className="btn btn-sm btn-ghost"
                           >
                             Discard
                           </button>
@@ -1025,10 +1011,8 @@ export default function ResultsEditor({
                         disabled={row.status === "saving" || mark === o}
                         aria-pressed={mark === o}
                         title={OUTCOMES[o].name}
-                        className={`h-9 min-w-[3.25rem] px-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.12em] border transition-colors ${
-                          mark === o
-                            ? "bg-terracotta border-terracotta text-white"
-                            : "border-stone/50 text-midnight/60 hover:border-midnight hover:text-midnight disabled:opacity-40"
+                        className={`btn btn-sm min-w-[3.5rem] px-3 ${
+                          mark === o ? "btn-primary disabled:opacity-100 disabled:cursor-default" : "btn-ghost"
                         }`}
                       >
                         {OUTCOMES[o].label}
@@ -1050,7 +1034,7 @@ export default function ResultsEditor({
                           <button
                             type="button"
                             onClick={() => saveRow(entrant.userId, { time: row.suggestion as string })}
-                            className="h-11 px-4 text-xs font-medium bg-midnight text-white hover:bg-midnight/90 transition-colors"
+                            className="btn btn-sm btn-ink"
                           >
                             Use <span className="font-mono">{row.suggestion}</span>
                           </button>
@@ -1060,7 +1044,7 @@ export default function ResultsEditor({
                           onClick={() =>
                             saveRow(entrant.userId, { time: row.asked, confirmLong: true })
                           }
-                          className="h-11 px-4 text-xs font-medium border border-midnight/30 text-midnight hover:border-midnight transition-colors"
+                          className="btn btn-sm btn-ghost"
                         >
                           Keep as typed
                         </button>

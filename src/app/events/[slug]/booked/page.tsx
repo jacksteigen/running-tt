@@ -131,7 +131,7 @@ export default async function BookedPage({
   return (
     <>
       {/* Header */}
-      <section className="relative bg-midnight text-white overflow-hidden">
+      <section className="relative bg-midnight text-bone overflow-hidden">
         <Image
           src="/images/athlete-track-side.jpg"
           alt=""
@@ -145,24 +145,26 @@ export default async function BookedPage({
           aria-hidden
           className="absolute inset-0 bg-gradient-to-b from-midnight/50 via-midnight/75 to-midnight"
         />
-        <div className="relative mx-auto max-w-3xl px-6 pt-10 pb-10 md:pt-14 md:pb-12">
+        <div className="relative mx-auto max-w-3xl px-6 pt-8 pb-10 md:pt-12 md:pb-14">
           <Link
             href={`/events/${slug}`}
-            className="text-xs text-stone/60 hover:text-white transition-colors mb-6 inline-flex items-center min-h-11 font-mono uppercase tracking-[0.2em]"
+            className="inline-flex min-h-11 items-center text-[0.9rem] text-bone/60 hover:text-bone transition-colors"
           >
-            &larr; Event details
+            <span className="link-draw">Event details</span>
           </Link>
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-3">
-            {event.distance} · {event.location}
-          </p>
-          <p className="text-2xl md:text-3xl font-semibold tracking-tight">{event.name}</p>
           <div className="mt-8 md:mt-10">
+            <p className="t-eyebrow text-bone/60">
+              {event.distance} · {event.location}
+            </p>
+            <p className="t-headline mt-3 text-[1.9rem] md:text-[2.6rem]">{event.name}</p>
+          </div>
+          <div className="mt-10 md:mt-12">
             <BookingSteps current={confirmed ? 3 : 2} free={free} withHeats={withHeats} />
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-3xl px-6 py-12 md:py-16 space-y-10 md:space-y-12">
+      <section className="mx-auto max-w-3xl px-6 py-14 md:py-20 space-y-16 md:space-y-20">
         {confirmed ? (
           <>
             <BookingTicket
@@ -188,14 +190,11 @@ export default async function BookedPage({
         ) : checkoutId ? (
           <PaymentPending eventHref={`/events/${slug}`} />
         ) : (
-          <div className="bg-white border border-stone/40 p-7 md:p-10 motion-safe:animate-fade-up">
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-dust mb-3">
-              Not paid yet
-            </p>
-            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-              Your booking is not finished
+          <div className="motion-safe:animate-fade-up">
+            <h1 className="t-display text-[2.5rem] md:text-[3.6rem]">
+              Your booking is not <em>finished.</em>
             </h1>
-            <p className="mt-3 text-midnight/60 leading-relaxed max-w-lg">
+            <p className="mt-5 text-[1.05rem] text-midnight/65 leading-relaxed max-w-lg">
               {heat
                 ? `You started booking Heat ${heat.number}, but the payment did not go through. Pick up where you left off and your spot is yours.`
                 : "The payment did not go through. Pick up where you left off and your spot is yours."}
@@ -206,7 +205,7 @@ export default async function BookedPage({
                   ? `/events/${slug}/book${heat ? `?heat=${heat.number}` : ""}`
                   : `/events/${slug}`
               }
-              className="mt-7 inline-flex items-center justify-center bg-terracotta text-white text-sm font-medium px-7 py-3.5 min-h-12 hover:bg-terracotta/90 transition-colors"
+              className="btn btn-primary btn-lg mt-8"
             >
               Finish booking
             </Link>

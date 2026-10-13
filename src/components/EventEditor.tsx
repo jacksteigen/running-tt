@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { buildHeats, formatClock, heatWindow, isValidClock } from "@/lib/heats";
 import { dateParts } from "@/lib/dates";
 import { EVENT_STATUSES, slugify } from "@/lib/eventInput";
-import type { PrizeSlot } from "@/lib/racetime";
+import { prizeToCents, type PrizeSlot } from "@/lib/racetime";
+import { formatFee } from "@/lib/money";
 
 export type EventStatus = (typeof EVENT_STATUSES)[number];
 
@@ -387,24 +388,63 @@ export default function EventEditor({
   }
 
   const bringCount = d.whatToBring.split("\n").filter((l) => l.trim()).length;
+  // The cash total of the prize rows, for display only. A non-cash prize
+  // (a voucher, kit) counts as nothing, the same as when results are saved.
+  const cashPrizes = d.prizes
+    .filter((p) => p.label.trim() && p.amount.trim())
+    .map((p) => prizeToCents(p.amount))
+    .filter((cents) => cents > 0);
+  const purseCents = cashPrizes.reduce((n, cents) => n + cents, 0);
   const cancelHref = mode === "edit" && slug ? `/admin/events/${slug}` : "/admin";
   const busy = saving || deleting || done;
 
   const sections = [
     { id: "basics", label: "Basics" },
-    { id: "when", label: "When" },
+    { id: "when", label: "Date and status" },
     { id: "heats", label: "Heats" },
-    { id: "money", label: "Money" },
-    { id: "prizes", label: "Prizes" },
-    { id: "details", label: "Details" },
+    { id: "money", label: "Price and fees" },
+    { id: "prizes", label: "Prize money" },
+    { id: "details", label: "Race-day details" },
   ];
+
+  // In edit mode the event page already exists, so link to it (in a new tab,
+  // so nothing typed here is lost).
+  const eventPageLink =
+    mode === "edit" && slug ? (
+      <Link href={`/events/${slug}`} target="_blank" className="link-quiet text-midnight">
+        event page
+      </Link>
+    ) : (
+      "event page"
+    );
 
   return (
     <form onSubmit={handleSubmit} noValidate className="bg-bone">
       <div className="mx-auto max-w-6xl px-6 py-10 md:py-14 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem] gap-8 lg:gap-10">
         <div className="space-y-6 min-w-0">
-          {/* 01 Basics */}
-          <Section id="basics" n="01" kicker="Basics" title="What and where">
+          {/* Jump to a section, phones and tablets */}
+          <nav
+            aria-label="Form sections"
+            className="lg:hidden -mx-6 px-6 -mt-4 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          >
+            <ul className="flex gap-x-5 whitespace-nowrap border-b rule">
+              {sections.map((s) => (
+                <li key={s.id}>
+                  <a
+                    href={`#${s.id}`}
+                    className={`inline-flex items-center min-h-11 text-sm transition-colors hover:text-terracotta ${
+                      s.id === "money" || s.id === "prizes" ? "text-midnight" : "text-midnight/60"
+                    }`}
+                  >
+                    {s.label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
+          {/* 1 Basics */}
+          <Section id="basics" n="1" title="What and where">
             <div>
               <label htmlFor="ev-name" className={labelCls}>
                 Event name
@@ -448,11 +488,7 @@ export default function EventEditor({
                       type="button"
                       aria-pressed={active}
                       onClick={() => set("distance", pick)}
-                      className={`min-h-11 min-w-[3.25rem] px-4 font-mono text-xs uppercase tracking-[0.15em] border transition-colors ${
-                        active
-                          ? "bg-midnight border-midnight text-white"
-                          : "bg-white border-stone/60 text-midnight/70 hover:border-midnight/40 hover:text-midnight"
-                      }`}
+                      className={`btn btn-sm min-w-[3.25rem] ${active ? "btn-ink" : "btn-ghost"}`}
                     >
                       {pick}
                     </button>
@@ -493,8 +529,8 @@ export default function EventEditor({
             </div>
           </Section>
 
-          {/* 02 When */}
-          <Section id="when" n="02" kicker="When" title="Date and status">
+          {/* 2 When */}
+          <Section id="when" n="2" title="Date and status">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-4">
               <div>
                 <label htmlFor="ev-date" className={labelCls}>
@@ -620,8 +656,8 @@ export default function EventEditor({
             </div>
           </Section>
 
-          {/* 03 Heats */}
-          <Section id="heats" n="03" kicker="Heats" title="Heat booking">
+          {/* 3 Heats */}
+          <Section id="heats" n="3" title="Heat booking">
             <button
               type="button"
               role="switch"
@@ -746,7 +782,7 @@ export default function EventEditor({
                 {/* Live schedule */}
                 <div className="border border-stone/50">
                   <div className="px-4 py-3 bg-midnight text-white flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-stone/60">
+                    <p className="t-eyebrow text-stone/60">
                       Schedule
                     </p>
                     <p className="font-mono text-xs tabular-nums" aria-live="polite">
@@ -821,8 +857,18 @@ export default function EventEditor({
             )}
           </Section>
 
-          {/* 04 Money */}
-          <Section id="money" n="04" kicker="Money" title="Entry and fees">
+          {/* 4 Money */}
+          <Section
+            id="money"
+            n="4"
+            title="Price and fees"
+            intro={
+              <>
+                What athletes pay to enter. These appear on the {eventPageLink}, and
+                changing them never affects anyone who has already paid.
+              </>
+            }
+          >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 sm:gap-4">
               <div>
                 <label htmlFor="ev-fee" className={labelCls}>
@@ -878,61 +924,95 @@ export default function EventEditor({
             )}
           </Section>
 
-          {/* 05 Prizes */}
-          <Section id="prizes" n="05" kicker="Prizes" title="Prize money">
+          {/* 5 Prizes */}
+          <Section
+            id="prizes"
+            n="5"
+            title="Prize money"
+            intro={
+              <>
+                These appear on the {eventPageLink}. List them in finishing order:
+                the first row is paid to the fastest time, the second row to the next,
+                and so on.
+              </>
+            }
+          >
             {d.prizes.length === 0 ? (
-              <p className="text-sm text-midnight/55">No prizes yet. Add a place and what it wins.</p>
+              <p className="text-sm text-midnight/60 leading-relaxed">
+                No prizes yet, so the event page leaves prize money out. Add a place
+                and what it wins.
+              </p>
             ) : (
-              <ul className="space-y-2">
-                {d.prizes.map((p, i) => (
-                  <li key={p.key} className="flex items-center gap-2">
-                    <span className="font-mono text-[10px] text-dust w-5 shrink-0 tabular-nums" aria-hidden>
-                      {String(i + 1).padStart(2, "0")}
-                    </span>
-                    <input
-                      id={`ev-prize-${p.key}-label`}
-                      value={p.label}
-                      maxLength={40}
-                      onChange={(e) => updatePrize(p.key, { label: e.target.value })}
-                      placeholder="1st"
-                      aria-label={`Prize ${i + 1} place`}
-                      className={`${inputCls} w-24 sm:w-40 shrink-0`}
-                    />
-                    <input
-                      id={`ev-prize-${p.key}-amount`}
-                      value={p.amount}
-                      maxLength={40}
-                      onChange={(e) => updatePrize(p.key, { amount: e.target.value })}
-                      placeholder="$100"
-                      aria-label={`Prize ${i + 1} amount`}
-                      className={`${inputCls} min-w-0 flex-1 font-mono`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removePrize(p.key)}
-                      aria-label={`Remove prize ${i + 1}`}
-                      className="h-11 w-11 shrink-0 flex items-center justify-center border border-stone/50 text-midnight/50 hover:text-terracotta hover:border-terracotta/50 transition-colors"
-                    >
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
-                        <path d="M2 2l10 10M12 2L2 12" />
-                      </svg>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+              <div>
+                <div aria-hidden className="flex items-center gap-2 mb-1.5 text-xs font-medium text-dust">
+                  <span className="w-5 shrink-0" />
+                  <span className="w-24 sm:w-40 shrink-0">Place</span>
+                  <span className="flex-1">Amount</span>
+                  <span className="w-11 shrink-0" />
+                </div>
+                <ul className="space-y-2">
+                  {d.prizes.map((p, i) => (
+                    <li key={p.key} className="flex items-center gap-2">
+                      <span className="t-numeral text-[1.05rem] text-dust w-5 shrink-0" aria-hidden>
+                        {i + 1}
+                      </span>
+                      <input
+                        id={`ev-prize-${p.key}-label`}
+                        value={p.label}
+                        maxLength={40}
+                        onChange={(e) => updatePrize(p.key, { label: e.target.value })}
+                        placeholder="1st"
+                        aria-label={`Prize ${i + 1} place`}
+                        className={`${inputCls} w-24 sm:w-40 shrink-0`}
+                      />
+                      <input
+                        id={`ev-prize-${p.key}-amount`}
+                        value={p.amount}
+                        maxLength={40}
+                        onChange={(e) => updatePrize(p.key, { amount: e.target.value })}
+                        placeholder="$100"
+                        aria-label={`Prize ${i + 1} amount`}
+                        className={`${inputCls} min-w-0 flex-1 font-mono`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removePrize(p.key)}
+                        aria-label={`Remove prize ${i + 1}`}
+                        className="h-11 w-11 shrink-0 flex items-center justify-center border border-stone/50 text-midnight/50 hover:text-terracotta hover:border-terracotta/50 transition-colors"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                          <path d="M2 2l10 10M12 2L2 12" />
+                        </svg>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <p className={helpCls}>
+                  Write the amount as athletes should read it, for example $100.
+                </p>
+              </div>
             )}
-            <button
-              type="button"
-              onClick={addPrize}
-              disabled={d.prizes.length >= MAX_PRIZES}
-              className="min-h-11 px-4 text-sm font-medium text-terracotta border border-terracotta/30 hover:bg-terracotta/5 transition-colors disabled:opacity-40"
-            >
-              + Add prize
-            </button>
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
+              <button
+                type="button"
+                onClick={addPrize}
+                disabled={d.prizes.length >= MAX_PRIZES}
+                className="btn btn-sm btn-ghost"
+              >
+                Add a prize
+              </button>
+              {purseCents > 0 && (
+                <p className="text-sm text-midnight/60" aria-live="polite">
+                  Total{" "}
+                  <span className="t-numeral text-[1.35rem] text-midnight">{formatFee(purseCents)}</span>{" "}
+                  across {cashPrizes.length} {cashPrizes.length === 1 ? "place" : "places"}
+                </p>
+              )}
+            </div>
           </Section>
 
-          {/* 06 Details */}
-          <Section id="details" n="06" kicker="Details" title="Race-day details">
+          {/* 6 Details */}
+          <Section id="details" n="6" title="Race-day details">
             <div>
               <label htmlFor="ev-description" className={labelCls}>
                 Description
@@ -991,7 +1071,7 @@ export default function EventEditor({
                   type="button"
                   onClick={handleDelete}
                   disabled={busy}
-                  className="min-h-11 text-sm text-midnight/50 hover:text-terracotta underline-offset-4 hover:underline transition-colors disabled:opacity-40"
+                  className="min-h-11 link-quiet text-sm text-midnight/55 hover:text-terracotta transition-colors disabled:opacity-40"
                 >
                   {deleting ? "Deleting..." : "Delete event"}
                 </button>
@@ -1008,9 +1088,7 @@ export default function EventEditor({
         <aside className="hidden lg:block" aria-label="Event preview">
           <div className="sticky top-24 space-y-6">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-dust mb-2">
-                At a glance
-              </p>
+              <p className="t-eyebrow text-dust mb-2.5">At a glance</p>
               <Glance
                 draft={d}
                 heatsSummary={
@@ -1030,11 +1108,9 @@ export default function EventEditor({
                   <li key={s.id}>
                     <a
                       href={`#${s.id}`}
-                      className="flex items-center gap-3 pl-4 py-1.5 text-sm text-midnight/60 hover:text-terracotta transition-colors"
+                      className="flex items-baseline gap-3 pl-4 py-1.5 text-sm text-midnight/60 hover:text-terracotta transition-colors"
                     >
-                      <span className="font-mono text-[10px] text-dust tabular-nums">
-                        {String(i + 1).padStart(2, "0")}
-                      </span>
+                      <span className="t-numeral w-3 text-[0.95rem] text-dust">{i + 1}</span>
                       {s.label}
                     </a>
                   </li>
@@ -1071,15 +1147,11 @@ export default function EventEditor({
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href={cancelHref}
-              className="min-h-11 px-4 flex items-center justify-center text-sm text-midnight/60 hover:text-midnight transition-colors"
+              className="min-h-11 px-4 flex items-center justify-center link-quiet text-sm text-midnight/65 hover:text-midnight transition-colors"
             >
               Cancel
             </Link>
-            <button
-              type="submit"
-              disabled={busy}
-              className="flex-1 sm:flex-none min-h-11 bg-terracotta text-white text-sm font-medium px-7 hover:bg-terracotta/90 transition-colors disabled:opacity-60"
-            >
+            <button type="submit" disabled={busy} className="btn btn-primary flex-1 sm:flex-none">
               {done
                 ? "Saved"
                 : saving
@@ -1100,14 +1172,15 @@ export default function EventEditor({
 function Section({
   id,
   n,
-  kicker,
   title,
+  intro,
   children,
 }: {
   id: string;
   n: string;
-  kicker: string;
   title: string;
+  /** One or two plain lines under the title, when the section needs explaining. */
+  intro?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -1116,13 +1189,18 @@ function Section({
       aria-labelledby={`${id}-title`}
       className="bg-white border border-stone/40 scroll-mt-24"
     >
-      <header className="px-5 md:px-7 pt-6 pb-5 border-b border-stone/30">
-        <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-1.5">
-          {n} · {kicker}
-        </p>
-        <h2 id={`${id}-title`} className="text-lg font-semibold tracking-tight">
-          {title}
-        </h2>
+      <header className="px-5 md:px-7 pt-6 pb-5 border-b border-stone/30 flex items-baseline gap-4">
+        <span aria-hidden className="t-numeral text-[1.6rem] text-terracotta w-4 shrink-0">
+          {n}
+        </span>
+        <div className="min-w-0">
+          <h2 id={`${id}-title`} className="t-headline text-[1.55rem] md:text-[1.8rem]">
+            {title}
+          </h2>
+          {intro && (
+            <p className="mt-2 max-w-xl text-sm text-midnight/65 leading-relaxed">{intro}</p>
+          )}
+        </div>
       </header>
       <div className="px-5 md:px-7 py-6 space-y-5">{children}</div>
     </section>
@@ -1150,7 +1228,7 @@ function RuleItem({ met, label, onFix }: { met: boolean; label: string; onFix: (
         <button
           type="button"
           onClick={onFix}
-          className="text-midnight/80 underline underline-offset-2 decoration-stone hover:text-terracotta hover:decoration-terracotta transition-colors"
+          className="inline-flex min-h-11 items-center link-quiet text-midnight/80 hover:text-terracotta transition-colors"
         >
           {label}
         </button>
@@ -1217,11 +1295,11 @@ function Glance({
   return (
     <div className="bg-midnight text-white">
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-stone/70 truncate">
+        <p className="t-eyebrow text-stone/70 truncate">
           {draft.distance.trim() || "Distance"} · {draft.location.trim() || "Location TBC"}
         </p>
         <span
-          className={`shrink-0 text-[10px] font-medium uppercase tracking-wider px-2 py-0.5 ${
+          className={`shrink-0 t-eyebrow px-2 py-0.5 ${
             statusChip[draft.status] ?? statusChip["Coming Soon"]
           }`}
         >
@@ -1230,22 +1308,14 @@ function Glance({
       </div>
       <div className="px-4 py-5 flex gap-4 items-start">
         <div className="shrink-0 w-14 text-center border-r border-white/10 pr-4">
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-stone/50">{parts.weekday}</p>
-          <p
-            className={`font-mono font-semibold tracking-tight leading-none mt-1 ${
-              parts.tbc ? "text-lg text-gold" : "text-3xl"
-            }`}
-          >
+          <p className="t-eyebrow text-stone/50">{parts.weekday}</p>
+          <p className={`t-numeral mt-1 ${parts.tbc ? "text-[1.2rem] text-gold" : "text-[2.3rem]"}`}>
             {parts.day}
           </p>
-          {parts.month && (
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-stone/50 mt-1">
-              {parts.month}
-            </p>
-          )}
+          {parts.month && <p className="t-eyebrow text-stone/50 mt-1">{parts.month}</p>}
         </div>
         <div className="min-w-0">
-          <p className="font-semibold tracking-tight leading-snug break-words">
+          <p className="t-headline text-[1.3rem] break-words">
             {draft.name.trim() || "Untitled event"}
           </p>
           <p className="text-xs text-stone/60 mt-1 truncate">{draft.venue.trim() || "Venue TBC"}</p>

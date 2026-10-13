@@ -129,7 +129,7 @@ export default function AthleteEditor({
       <button
         type="submit"
         disabled={saving}
-        className="bg-midnight text-white text-sm font-medium px-6 py-2.5 hover:bg-midnight/90 transition-colors disabled:opacity-50"
+        className="btn btn-ink"
       >
         {saving ? "Saving..." : saved ? "Saved" : "Save changes"}
       </button>

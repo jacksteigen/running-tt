@@ -2,33 +2,42 @@ interface PBCardProps {
   distance: string;
   time: string;
   verified?: boolean;
+  /** "dark" when it sits on midnight. */
+  tone?: "light" | "dark";
 }
 
-export default function PBCard({ distance, time, verified }: PBCardProps) {
+/**
+ * A personal best as one line of a record book: the distance in serif on
+ * the left, the time on the right. Render inside a <dl> with a top rule.
+ */
+export default function PBCard({ distance, time, verified, tone = "light" }: PBCardProps) {
+  const dark = tone === "dark";
   return (
-    <div className="bg-white border border-stone/40 overflow-hidden">
-      <div className="bg-midnight text-white px-4 py-2 flex items-center justify-between">
-        <p className="font-mono text-[10px] uppercase tracking-[0.2em]">
-          {distance}
-        </p>
+    <div
+      className={`grid grid-cols-[1fr_auto] items-baseline gap-x-6 border-b py-5 ${
+        dark ? "rule-light" : "rule"
+      }`}
+    >
+      <dt className={`t-headline text-[1.35rem] md:text-[1.6rem] ${dark ? "text-bone" : "text-midnight"}`}>
+        {distance}
         {verified && (
           <span
-            className="inline-flex items-center gap-1 text-[10px] text-trail"
-            title="Verified"
+            className={`t-eyebrow ml-3 inline-flex items-center gap-1.5 align-middle ${
+              dark ? "text-bone/55" : "text-trail"
+            }`}
+            title="Verified time"
           >
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-trail" />
-            verified
+            <span
+              aria-hidden
+              className={`inline-block w-1.5 h-1.5 rounded-full ${dark ? "bg-bone/55" : "bg-trail"}`}
+            />
+            Verified
           </span>
         )}
-      </div>
-      <div className="px-4 py-5">
-        <p className="text-3xl font-mono font-semibold tracking-tight tabular-nums">
-          {time}
-        </p>
-        <p className="text-[10px] uppercase tracking-[0.2em] text-dust mt-1">
-          Personal best
-        </p>
-      </div>
+      </dt>
+      <dd className={`t-numeral text-[2rem] md:text-[2.5rem] ${dark ? "text-bone" : "text-midnight"}`}>
+        {time}
+      </dd>
     </div>
   );
 }

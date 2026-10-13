@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getDB } from "@/lib/db";
+import { formatEventDate } from "@/lib/dates";
+import { formatFee } from "@/lib/money";
+import Reveal from "@/components/Reveal";
 
 export const dynamic = "force-dynamic";
 
@@ -30,21 +33,15 @@ interface PodiumRow {
   verified: number;
 }
 
-function formatDate(dateStr: string) {
-  const d = new Date(dateStr + "T00:00:00");
-  return d.toLocaleDateString("en-AU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
 function formatDayMonth(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00");
   const day = d.toLocaleDateString("en-AU", { day: "2-digit" });
   const month = d.toLocaleDateString("en-AU", { month: "short" }).toUpperCase();
   return { day, month };
+}
+
+function plural(n: number, one: string, many: string) {
+  return n === 1 ? one : many;
 }
 
 export default async function ResultsPage() {
@@ -125,240 +122,261 @@ export default async function ResultsPage() {
     )
     .first<{ total: number }>();
 
+  const totalFinishers = totalFinishersRes?.count ?? 0;
+  const paidCents = totalPayoutRes?.total ?? 0;
+  const totalPaid = `$${(paidCents / 100).toLocaleString("en-AU", {
+    minimumFractionDigits: paidCents % 100 ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`;
+
+  // The archive reads year by year, most recent first.
+  const years: { year: string; events: EventRow[] }[] = [];
+  for (const event of past.results) {
+    const year = event.date.slice(0, 4);
+    const current = years[years.length - 1];
+    if (current && current.year === year) current.events.push(event);
+    else years.push({ year, events: [event] });
+  }
+
   return (
     <>
-      {/* Header */}
-      <section className="bg-midnight text-white relative overflow-hidden">
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, transparent 0 79px, #F5F2EC 79px 80px)",
-          }}
-        />
-        <div className="mx-auto max-w-6xl px-6 py-14 md:py-20 relative">
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-5">
-            Results
-          </p>
-          <h1 className="text-3xl md:text-5xl font-semibold tracking-tight leading-[1.05] max-w-2xl">
-            Every time, every podium, every dollar paid out.
-          </h1>
-          <p className="mt-4 text-stone/60 max-w-xl">
-            Running TT publishes the full leaderboard for every event. Times
-            stay up forever. Past winners keep their records on the page.
-          </p>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-4 md:gap-6 mt-10 pt-8 border-t border-stone/10">
-            <div>
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums">
-                {totalRaces}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Events
-              </p>
-            </div>
-            <div>
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums">
-                {totalFinishersRes?.count ?? 0}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Finishers
-              </p>
-            </div>
-            <div>
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums text-gold">
-                ${((totalPayoutRes?.total ?? 0) / 100).toLocaleString("en-AU")}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Paid out
-              </p>
-            </div>
+      {/* Opener and the record book */}
+      <section className="bg-midnight text-bone">
+        <div className="mx-auto max-w-6xl px-6 pt-20 pb-24 md:pt-28 md:pb-32">
+          <div className="max-w-5xl motion-safe:animate-fade-up">
+            <h1 className="t-display text-[3rem] sm:text-[4rem] md:text-[4.8rem]">
+              Every time, every podium,{" "}
+              <br className="hidden md:inline" />
+              <em className="text-bone/75">every dollar paid out.</em>
+            </h1>
+            <p className="t-lede mt-8 max-w-2xl text-bone/80">
+              Running TT publishes the full leaderboard for every event. Times
+              stay up forever. Past winners keep their records on the page.
+            </p>
           </div>
-        </div>
-      </section>
 
-      {/* All-time records */}
-      {records.length > 0 && (
-        <section className="bg-stone border-b border-stone/40">
-          <div className="mx-auto max-w-6xl px-6 py-14 md:py-20">
-            <div className="flex items-end justify-between mb-8">
-              <div>
-                <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                  All-time
-                </p>
-                <h2 className="text-2xl font-semibold tracking-tight">
-                  Running TT records
+          {totalRaces > 0 && (
+            <p className="mt-14 md:mt-20 max-w-3xl border-t rule-light pt-6 text-[1.05rem] md:text-[1.15rem] leading-relaxed text-bone/70">
+              So far:{" "}
+              <span className="t-numeral text-[1.35em] text-bone">{totalRaces}</span>{" "}
+              {plural(totalRaces, "race", "races")} run,{" "}
+              <span className="t-numeral text-[1.35em] text-bone">{totalFinishers}</span>{" "}
+              {plural(totalFinishers, "finisher", "finishers")} on the record, and{" "}
+              <span className="t-numeral text-[1.35em] text-gold">{totalPaid}</span>{" "}
+              paid out in prize money.
+            </p>
+          )}
+
+          {records.length > 0 && (
+            <div className="mt-20 md:mt-28 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+              <div className="lg:col-span-4">
+                <h2 className="t-display text-[2.5rem] md:text-[3.3rem]">
+                  Running TT <em className="text-gold">records</em>
                 </h2>
+                <p className="mt-5 max-w-xs text-bone/65 leading-relaxed">
+                  Fastest time ever recorded at a Running TT event, per
+                  distance.
+                </p>
               </div>
-              <p className="hidden sm:block text-sm text-dust max-w-xs text-right">
-                Fastest time ever recorded at a Running TT event, per distance.
-              </p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {records.map((rec) => (
-                <div
-                  key={rec.distance}
-                  className="bg-white border border-stone/40 overflow-hidden"
-                >
-                  <div className="bg-midnight text-white px-4 py-2 flex items-center justify-between">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em]">
-                      {rec.distance}
-                    </p>
-                    {rec.verified === 1 && (
-                      <span
-                        className="inline-flex items-center gap-1 text-[10px] text-trail"
-                        title="Verified"
-                      >
-                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-trail" />
-                        verified
-                      </span>
-                    )}
-                  </div>
-                  <div className="px-4 py-5">
-                    <p className="text-3xl font-mono font-semibold tracking-tight tabular-nums text-gold">
-                      {rec.time_display}
-                    </p>
-                    <Link
-                      href={`/athletes/${rec.user_id}`}
-                      className="block mt-2 font-medium hover:text-terracotta transition-colors"
-                    >
-                      {rec.user_name}
-                    </Link>
-                    <Link
-                      href={`/events/${rec.event_slug}`}
-                      className="block text-xs text-midnight/50 hover:text-terracotta transition-colors mt-1"
-                    >
-                      {rec.event_name}
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      <section className="bg-bone">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
-          {past.results.length === 0 ? (
-            <div className="bg-white border border-stone/40 p-12 text-center max-w-xl mx-auto">
-              <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-2">
-                Awaiting the first start gun
-              </p>
-              <p className="text-midnight/60">
-                Results from completed events will appear here.
-              </p>
-              <Link
-                href="/events"
-                className="inline-block mt-6 bg-midnight text-white text-sm font-medium px-5 py-2.5 hover:bg-midnight/90 transition-colors"
-              >
-                See upcoming events
-              </Link>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {past.results.map((event) => {
-                const { day, month } = formatDayMonth(event.date);
-                const podium = podiumsByEvent.get(event.id) ?? [];
-                return (
-                  <Link
-                    key={event.id}
-                    href={`/events/${event.slug}`}
-                    className="group block bg-white border border-stone/40 hover:border-midnight/30 transition-colors"
-                  >
-                    {/* Top band */}
-                    <div className="flex items-center justify-between bg-midnight text-white px-5 py-3">
-                      <p className="font-mono text-xs tracking-[0.2em] uppercase">
-                        {event.distance} · {event.location}
-                      </p>
-                      <span className="font-mono text-[10px] uppercase tracking-wider text-stone/50">
-                        {formatDate(event.date)}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-0">
-                      {/* Name + date block */}
-                      <div className="p-5 md:p-6 md:border-r border-b md:border-b-0 border-stone/30 flex items-start gap-5">
-                        <div className="shrink-0 text-center border-r border-stone/40 pr-4">
-                          <p className="font-mono text-3xl font-semibold tracking-tight leading-none">
-                            {day}
+              <div className="lg:col-span-8">
+                <table className="w-full text-left">
+                  <caption className="sr-only">
+                    Running TT records: the fastest time recorded at a Running
+                    TT event, per distance
+                  </caption>
+                  <thead>
+                    <tr className="border-b rule-light">
+                      <th scope="col" className="text-left t-eyebrow text-bone/45 pb-3 pr-4">
+                        Distance
+                      </th>
+                      <th scope="col" className="text-left t-eyebrow text-bone/45 pb-3 pr-4">
+                        Time
+                      </th>
+                      <th scope="col" className="text-left t-eyebrow text-bone/45 pb-3">
+                        Athlete
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {records.map((rec) => (
+                      <tr key={rec.distance} className="border-b rule-light">
+                        <th
+                          scope="row"
+                          className="text-left t-headline text-[1.35rem] md:text-[1.9rem] py-6 md:py-7 pr-4 align-baseline"
+                        >
+                          {rec.distance}
+                        </th>
+                        <td className="py-6 md:py-7 pr-4 align-baseline whitespace-nowrap">
+                          <span className="t-numeral text-[1.8rem] md:text-[2.6rem] text-gold">
+                            {rec.time_display}
+                          </span>
+                        </td>
+                        <td className="py-6 md:py-7 align-baseline">
+                          <Link
+                            href={`/athletes/${rec.user_id}`}
+                            className="t-headline text-[1.15rem] md:text-[1.45rem] link-draw hover:text-gold transition-colors"
+                          >
+                            {rec.user_name}
+                          </Link>
+                          <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.88rem] text-bone/55">
+                            <Link
+                              href={`/events/${rec.event_slug}`}
+                              className="link-quiet decoration-bone/30 hover:text-bone transition-colors"
+                            >
+                              {rec.event_name}
+                            </Link>
+                            {rec.verified === 1 && (
+                              <span
+                                className="inline-flex items-center gap-1.5 t-eyebrow text-bone/60"
+                                title="Verified"
+                              >
+                                <span
+                                  aria-hidden
+                                  className="inline-block w-1.5 h-1.5 rounded-full bg-trail ring-1 ring-bone/40"
+                                />
+                                Verified
+                              </span>
+                            )}
                           </p>
-                          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mt-1">
-                            {month}
-                          </p>
-                        </div>
-                        <div className="min-w-0">
-                          <h3 className="font-semibold tracking-tight group-hover:text-terracotta transition-colors">
-                            {event.name}
-                          </h3>
-                          <p className="text-sm text-midnight/60 mt-1">
-                            {event.venue}
-                          </p>
-                          <p className="text-xs text-terracotta mt-3 font-medium">
-                            View full leaderboard →
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Podium */}
-                      <div className="md:col-span-2 p-5 md:p-6">
-                        <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-3">
-                          Podium
-                        </p>
-                        {podium.length > 0 ? (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            {podium.map((p) => {
-                              const rankColor =
-                                p.rank === 1
-                                  ? "border-gold text-gold"
-                                  : p.rank === 2
-                                    ? "border-stone text-midnight"
-                                    : "border-dust text-midnight";
-                              return (
-                                <div
-                                  key={p.rank}
-                                  className={`border-l-2 pl-3 ${rankColor.split(" ")[0]}`}
-                                >
-                                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust">
-                                    {p.rank === 1
-                                      ? "1st"
-                                      : p.rank === 2
-                                        ? "2nd"
-                                        : "3rd"}
-                                  </p>
-                                  <p
-                                    className={`font-medium ${rankColor.split(" ")[1] ?? ""}`}
-                                  >
-                                    {p.user_name}
-                                  </p>
-                                  <p className="font-mono text-sm tabular-nums mt-0.5">
-                                    {p.time_display}
-                                  </p>
-                                  {p.prize_amount_cents > 0 && (
-                                    <p className="font-mono text-xs text-gold mt-0.5 tabular-nums">
-                                      ${p.prize_amount_cents / 100}
-                                    </p>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-midnight/50">
-                            Full results on the event page.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
       </section>
+
+      {/* The archive */}
+      <Reveal>
+        <section className="bg-bone">
+          <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+            {past.results.length === 0 ? (
+              <div className="max-w-2xl">
+                <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
+                  Awaiting the first start gun.
+                </h2>
+                <p className="t-lede mt-6 text-midnight/75">
+                  Results from completed events will appear here. Every
+                  finisher gets a time, a place and a page, and the times stay
+                  up for good.
+                </p>
+                <Link href="/events" className="btn btn-primary mt-9">
+                  See upcoming events
+                </Link>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4 mb-14 md:mb-20">
+                  <h2 className="t-display text-[2.8rem] md:text-[4.2rem]">
+                    Past races
+                  </h2>
+                  <p className="t-caption text-[1rem] text-midnight/55 max-w-xs">
+                    Thank you to everyone who has lined up.
+                  </p>
+                </div>
+
+                <div className="space-y-16 md:space-y-20">
+                  {years.map(({ year, events }) => (
+                    <div
+                      key={year}
+                      className="grid grid-cols-1 lg:grid-cols-12 gap-x-12 gap-y-5"
+                    >
+                      <h3 className="lg:col-span-2 t-numeral text-[2.2rem] md:text-[2.8rem] text-dust lg:pt-8">
+                        {year}
+                      </h3>
+                      <ol className="lg:col-span-10 border-t rule">
+                        {events.map((event) => {
+                          const { day, month } = formatDayMonth(event.date);
+                          const podium = podiumsByEvent.get(event.id) ?? [];
+                          const place = [event.venue, event.location]
+                            .filter((v) => v && !/TBC/i.test(v))
+                            .join(", ");
+                          return (
+                            <li key={event.id} className="border-b rule py-8 md:py-10">
+                              <div className="grid grid-cols-[4.25rem_1fr] md:grid-cols-[5.5rem_1fr] xl:grid-cols-[5.5rem_1fr_21rem] gap-x-5 md:gap-x-8 gap-y-6">
+                                <div className="text-midnight">
+                                  <p className="t-numeral text-[2.6rem] md:text-[3.2rem]">{day}</p>
+                                  <p className="t-eyebrow text-dust mt-1">{month}</p>
+                                </div>
+
+                                <div className="min-w-0">
+                                  <p className="t-eyebrow text-terracotta">{event.distance}</p>
+                                  <h4 className="t-headline text-[1.6rem] md:text-[2.1rem] mt-2">
+                                    <Link
+                                      href={`/events/${event.slug}`}
+                                      className="hover:text-terracotta transition-colors duration-300"
+                                    >
+                                      {event.name}
+                                    </Link>
+                                  </h4>
+                                  <p className="mt-2 text-[0.95rem] text-midnight/60">
+                                    {place ? `${place} · ` : ""}
+                                    {formatEventDate(event.date, "long")}
+                                  </p>
+                                  <Link
+                                    href={`/events/${event.slug}`}
+                                    className="inline-block mt-2 py-2.5 link-quiet text-[0.95rem] text-midnight"
+                                  >
+                                    Full results
+                                  </Link>
+                                </div>
+
+                                <div className="col-start-2 xl:col-start-3">
+                                  {podium.length > 0 ? (
+                                    <ol className="border-t rule" aria-label={`${event.name} podium`}>
+                                      {podium.map((p) => (
+                                        <li
+                                          key={`${p.rank}-${p.user_id}`}
+                                          className="grid grid-cols-[1.75rem_1fr_auto] items-baseline gap-x-3 border-b rule py-3"
+                                        >
+                                          <span
+                                            className={`t-numeral text-[1.25rem] ${
+                                              p.rank === 1 ? "text-gold" : "text-midnight/45"
+                                            }`}
+                                          >
+                                            {p.rank}
+                                          </span>
+                                          <Link
+                                            href={`/athletes/${p.user_id}`}
+                                            className="min-w-0 truncate text-[1rem] text-midnight link-draw hover:text-terracotta transition-colors"
+                                          >
+                                            {p.user_name}
+                                          </Link>
+                                          <span className="text-right">
+                                            <span className="block t-numeral text-[1.25rem] text-midnight">
+                                              {p.time_display}
+                                            </span>
+                                            {p.prize_amount_cents > 0 && (
+                                              <span className="block t-numeral text-[0.9rem] text-dust mt-1">
+                                                {formatFee(p.prize_amount_cents)}
+                                              </span>
+                                            )}
+                                          </span>
+                                        </li>
+                                      ))}
+                                    </ol>
+                                  ) : (
+                                    <p className="t-caption text-[0.98rem] text-midnight/55">
+                                      Full results on the event page.
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ol>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+      </Reveal>
     </>
   );
 }

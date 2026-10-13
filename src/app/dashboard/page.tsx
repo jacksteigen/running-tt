@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 import Link from "next/link";
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import LogoutButton from "@/components/LogoutButton";
 import ProfileForm from "@/components/ProfileForm";
 import PasswordCard from "@/components/PasswordCard";
@@ -21,6 +22,19 @@ import { todayInMelbourne } from "@/lib/events";
 export const metadata: Metadata = {
   title: "Dashboard · Running TT",
 };
+
+/** "a, b and c", keeping each part's markup. */
+function inSentence(parts: ReactNode[]): ReactNode[] {
+  return parts.flatMap((part, i) => {
+    if (i === 0) return [part];
+    return [i === parts.length - 1 ? " and " : ", ", part];
+  });
+}
+
+/** A number set in race-bib figures inside a serif sentence. */
+function Figure({ children, className = "text-bone" }: { children: ReactNode; className?: string }) {
+  return <span className={`t-numeral text-[1.08em] ${className}`}>{children}</span>;
+}
 
 export default async function DashboardPage({
   searchParams,
@@ -125,12 +139,7 @@ export default async function DashboardPage({
     caption: p.caption ?? "",
   }));
 
-  const initials = user.name
-    .split(" ")
-    .map((n: string) => n[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
+  const firstName = user.firstName?.trim() || user.name.split(" ")[0];
 
   // Upcoming means today or later (a TBC date sorts last), soonest first.
   // A confirmed booking takes the spotlight over an unfinished one.
@@ -184,59 +193,73 @@ export default async function DashboardPage({
     return { href: `/events/${entry.slug}`, action: null };
   }
 
-  // Summary stats
+  // Summary stats, told as a sentence rather than a row of boxes.
+  const upcomingConfirmed = upcomingEntries.filter((e) => e.status === "confirmed").length;
   const totalRaces = results.results.length;
   const podiums = results.results.filter((r) => r.rank <= 3).length;
   const earnings = results.results.reduce(
     (sum, r) => sum + (r.prize_amount_cents || 0),
     0
   );
+  const record: ReactNode[] = [];
+  if (upcomingConfirmed > 0) {
+    record.push(
+      <span key="upcoming">
+        <Figure>{upcomingConfirmed}</Figure> {upcomingConfirmed === 1 ? "race" : "races"} coming up
+      </span>
+    );
+  }
+  if (totalRaces > 0) {
+    record.push(
+      <span key="races">
+        <Figure>{totalRaces}</Figure> on the clock
+      </span>
+    );
+  }
+  if (podiums > 0) {
+    record.push(
+      <span key="podiums">
+        <Figure>{podiums}</Figure> {podiums === 1 ? "podium" : "podiums"}
+      </span>
+    );
+  }
+  if (earnings > 0) {
+    record.push(
+      <span key="earned">
+        <Figure className="text-gold">{formatFee(earnings)}</Figure> in prize money
+      </span>
+    );
+  }
 
   return (
     <>
-      {/* Header */}
-      <section className="bg-midnight text-white relative overflow-hidden">
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, transparent 0 79px, #F5F2EC 79px 80px)",
-          }}
-        />
-        <div className="mx-auto max-w-6xl px-6 py-12 md:py-16 relative">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex items-start gap-4 md:gap-5">
-              <div className="w-16 h-16 md:w-20 md:h-20 bg-terracotta/15 border border-terracotta/30 text-terracotta flex items-center justify-center font-mono text-xl md:text-2xl font-semibold tracking-tight shrink-0">
-                {initials}
-              </div>
-              <div className="pt-1">
-                <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-1">
-                  Your dashboard
-                </p>
-                <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">
-                  {user.name}
-                </h1>
-                <p className="text-sm text-stone/60 mt-1">{user.email}</p>
-              </div>
+      {/* Greeting */}
+      <section className="bg-midnight text-bone">
+        <div className="mx-auto max-w-6xl px-6 pt-14 pb-12 md:pt-24 md:pb-16">
+          <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-8">
+            <div className="min-w-0 motion-safe:animate-fade-up">
+              <h1 className="t-display text-[2.9rem] sm:text-[4rem] md:text-[5rem] break-words">
+                Good to see you, <em className="text-bone/75">{firstName}.</em>
+              </h1>
+              <p className="mt-4 text-[0.95rem] text-bone/55 break-all">{user.email}</p>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 shrink-0">
               <Link
                 href={`/athletes/${user.id}`}
-                className="inline-flex items-center min-h-11 text-xs font-medium text-white border border-white/20 px-4 py-2 hover:border-white/50 transition-colors"
+                className="link-draw inline-block py-3 text-[0.95rem] text-bone/80 hover:text-bone transition-colors"
               >
                 Public profile
               </Link>
               <Link
                 href="#profile"
-                className="inline-flex items-center min-h-11 text-xs font-medium text-white border border-white/20 px-4 py-2 hover:border-white/50 transition-colors"
+                className="link-draw inline-block py-3 text-[0.95rem] text-bone/80 hover:text-bone transition-colors"
               >
                 Edit profile
               </Link>
               {user.isAdmin && (
                 <Link
                   href="/admin"
-                  className="inline-flex items-center min-h-11 text-xs font-medium bg-terracotta text-white px-4 py-2 hover:bg-terracotta/90 transition-colors"
+                  className="link-draw inline-block py-3 text-[0.95rem] text-terracotta hover:text-bone transition-colors"
                 >
                   Admin
                 </Link>
@@ -245,49 +268,21 @@ export default async function DashboardPage({
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-4 md:gap-6 mt-10 pt-8 border-t border-stone/10">
-            <div>
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums">
-                {upcomingEntries.filter((e) => e.status === "confirmed").length}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Upcoming
-              </p>
-            </div>
-            <div>
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums">
-                {totalRaces}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Races
-              </p>
-            </div>
-            <div>
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums">
-                {podiums}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Podiums
-              </p>
-            </div>
-            <div className="hidden md:block">
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums text-gold">
-                {formatFee(earnings)}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Earned
-              </p>
-            </div>
-          </div>
+          <p className="mt-12 md:mt-16 border-t rule-light pt-6 t-headline text-[1.35rem] md:text-[1.8rem] text-bone/70 max-w-4xl">
+            {record.length > 0 ? (
+              <>{inSentence(record)}.</>
+            ) : (
+              <>Nothing on the clock yet. Your first race is waiting.</>
+            )}
+          </p>
         </div>
       </section>
 
       {(sp.welcome || sp.entered) && (
-        <section className="bg-trail text-white">
+        <section className="bg-trail text-bone" role="status">
           <div className="mx-auto max-w-6xl px-6 py-4 flex items-center gap-3">
-            <span className="inline-block w-2 h-2 rounded-full bg-white/80" />
-            <p className="text-sm">
+            <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full bg-bone/80 shrink-0" />
+            <p className="text-[0.95rem]">
               {sp.entered
                 ? "You are in. Your entry is confirmed and your spot on the start list is locked."
                 : `Welcome to Running TT, ${user.firstName ?? user.name}. Your profile is live.`}
@@ -296,66 +291,71 @@ export default async function DashboardPage({
         </section>
       )}
 
-      {/* Next race spotlight */}
+      {/* Next race */}
       {soonestUpcoming && spotlight && (
-        <section className="bg-terracotta text-white">
-          <div className="mx-auto max-w-6xl px-6 py-8 md:py-10">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-center">
-              <div className="lg:col-span-3">
-                <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/70 mb-2">
+        <section className="bg-terracotta text-bone">
+          <div className="mx-auto max-w-6xl px-6 py-14 md:py-20">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-end">
+              <div className="lg:col-span-7">
+                <p className="t-eyebrow text-bone/75">
                   {spotlight.pending ? "Finish your booking" : "Your next race"}
+                  {soonestUpcoming.distance ? `, ${soonestUpcoming.distance}` : ""}
                 </p>
-                <h2 className="text-xl md:text-2xl font-semibold tracking-tight">
+                <h2 className="t-display mt-4 text-[2.6rem] md:text-[3.8rem]">
                   {soonestUpcoming.name}
                 </h2>
-                <p className="text-sm text-white/85 mt-1">
-                  {spotlight.tbc
-                    ? "Date to be announced"
-                    : formatEventDate(soonestUpcoming.date, "long")}{" "}
-                  · {soonestUpcoming.venue}
+                <p className="t-lede mt-4 text-bone/90">
+                  <em>
+                    {spotlight.tbc
+                      ? "Date to be announced"
+                      : formatEventDate(soonestUpcoming.date, "long")}
+                  </em>
+                  , {soonestUpcoming.venue}
                 </p>
                 {!spotlight.pending && (
-                  <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 font-mono text-xs uppercase tracking-[0.2em]">
+                  <ul className="mt-6 flex flex-wrap items-baseline gap-x-6 gap-y-2 text-[0.95rem] text-bone/85">
                     {soonestUpcoming.heat_number && (
-                      <span className="bg-white/15 px-2 py-1">
+                      <li className="text-bone">
                         {heatLabel(soonestUpcoming, soonestUpcoming.heat_number)}
-                      </span>
+                      </li>
                     )}
-                    <span className="text-white/70">
-                      Ref {bookingRef(soonestUpcoming.entry_id)}
-                    </span>
-                  </p>
+                    <li>
+                      Ref <span className="t-numeral text-[1.05em]">{bookingRef(soonestUpcoming.entry_id)}</span>
+                    </li>
+                  </ul>
                 )}
                 {spotlight.action && (
-                  <Link
-                    href={spotlight.href}
-                    className="inline-flex items-center gap-2 mt-5 bg-white text-terracotta text-sm font-medium px-5 py-3 min-h-[44px] hover:bg-bone transition-colors"
-                  >
-                    {spotlight.action} <span aria-hidden>→</span>
-                  </Link>
+                  <div className="mt-8">
+                    <Link
+                      href={spotlight.href}
+                      className="btn btn-bone btn-lg"
+                    >
+                      {spotlight.action}
+                    </Link>
+                  </div>
                 )}
               </div>
-              <div className="lg:col-span-2 lg:border-l lg:border-white/20 lg:pl-6">
+              <div className="lg:col-span-5 border-t border-bone/25 pt-8 lg:border-t-0 lg:pt-0 lg:border-l lg:pl-12">
                 {spotlight.tbc ? (
-                  <div className="border-t border-white/20 pt-5 lg:border-t-0 lg:pt-0">
-                    <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60 mb-2">
-                      What happens next
+                  <>
+                    <p className="t-headline text-[1.9rem] md:text-[2.3rem]">
+                      {spotlight.pending ? "Bookings open soon." : "Your spot is held."}
                     </p>
-                    <p className="text-sm md:text-base text-white/90 leading-relaxed max-w-sm">
+                    <p className="mt-3 text-[0.95rem] text-bone/85 leading-relaxed max-w-sm">
                       {spotlight.pending
                         ? "Bookings open once the date is locked in. The date and heat times land here first."
-                        : "Your spot is held. The date and your heat time land here as soon as they are locked in."}
+                        : "The date and your heat time land here as soon as they are locked in."}
                     </p>
-                  </div>
+                  </>
                 ) : (
                   <>
-                    <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-white/60 mb-2">
+                    <p className="t-eyebrow text-bone/70 mb-4">
                       {spotlight.countdown.label}
                     </p>
                     <Countdown
                       target={soonestUpcoming.date}
                       time={spotlight.countdown.time}
-                      className="text-white"
+                      className="text-bone"
                     />
                   </>
                 )}
@@ -365,227 +365,226 @@ export default async function DashboardPage({
         </section>
       )}
 
-      <div className="mx-auto max-w-6xl px-6 py-12 md:py-16">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          {/* Main content */}
-          <div className="lg:col-span-2 space-y-14">
-            {/* Your entries */}
-            <div>
-              <div className="flex items-end justify-between mb-6">
-                <div>
-                  <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                    Your entries
-                  </p>
-                  <h2 className="text-xl font-semibold tracking-tight">
-                    Events
-                  </h2>
-                </div>
-                {entries.results.length > 0 && (
-                  <p className="text-sm text-dust font-mono">
-                    {entries.results.length}
-                  </p>
-                )}
-              </div>
+      {/* Entries */}
+      <section className="bg-bone">
+        <div className="mx-auto max-w-6xl px-6 py-20 md:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+            <div className="lg:col-span-4">
+              <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
+                Your <em>races</em>
+              </h2>
+              {entries.results.length > 0 && (
+                <Link href="/events" className="inline-block mt-5 link-quiet text-midnight">
+                  Find another race
+                </Link>
+              )}
+            </div>
+            <div className="lg:col-span-8">
               {entries.results.length > 0 ? (
-                <div className="space-y-3">
+                <ol className="border-t rule">
                   {entries.results.map((entry) => {
                     const { day, month, weekday, tbc } = dateParts(entry.date);
                     const { href, action } = entryLink(entry);
                     const confirmed = entry.status === "confirmed";
                     const heat = confirmed ? heatLabel(entry, entry.heat_number) : "";
-                    const statusCls = confirmed
-                      ? "bg-trail text-white"
-                      : "bg-gold text-midnight";
                     return (
-                      <Link
-                        key={entry.entry_id}
-                        href={href}
-                        className="group block bg-white border border-stone/40 hover:border-midnight/30 transition-colors"
-                      >
-                        <div className="flex items-stretch">
-                          {/* Date block */}
-                          <div className="shrink-0 w-[4.75rem] bg-bone border-r border-stone/40 px-3 py-4 text-center flex flex-col justify-center">
+                      <li key={entry.entry_id} className="border-b rule">
+                        <Link
+                          href={href}
+                          className="group grid grid-cols-[4rem_1fr] md:grid-cols-[5rem_1fr_auto] items-center gap-x-5 md:gap-x-8 py-6 md:py-7"
+                        >
+                          <div className="text-midnight">
                             <span className="sr-only">
                               {formatEventDate(entry.date, "long")}
                             </span>
                             <div aria-hidden>
-                              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust">
-                                {weekday}
-                              </p>
+                              <p className="t-eyebrow text-dust">{weekday}</p>
                               <p
-                                className={`font-mono text-2xl font-semibold tracking-tight leading-none mt-1 ${
+                                className={`t-numeral text-[2.3rem] md:text-[2.8rem] mt-1 ${
                                   tbc ? "text-midnight/45" : ""
                                 }`}
                               >
                                 {day}
                               </p>
-                              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mt-1">
+                              <p className="t-eyebrow text-dust mt-1">
                                 {month || "\u00A0"}
                               </p>
                             </div>
                           </div>
-                          <div className="flex-1 min-w-0 px-4 sm:px-5 py-4 flex items-center justify-between gap-3">
-                            <div className="min-w-0">
-                              <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mb-1">
-                                {entry.distance}
-                              </p>
-                              <h3 className="font-semibold tracking-tight truncate group-hover:text-terracotta transition-colors">
-                                {entry.name}
-                              </h3>
-                              <p className="text-sm text-midnight/60 mt-0.5 truncate">
-                                {entry.venue}
-                              </p>
-                              {heat && (
-                                <p className="font-mono text-[11px] uppercase tracking-[0.15em] text-midnight mt-1.5">
-                                  {heat}
-                                </p>
-                              )}
-                              {action && (
-                                <p className="text-xs font-medium text-terracotta mt-2">
-                                  {action} <span aria-hidden>→</span>
-                                </p>
-                              )}
-                            </div>
-                            <span
-                              className={`shrink-0 self-start text-[10px] font-medium uppercase tracking-wider px-2 py-1 ${statusCls}`}
-                            >
-                              {confirmed
-                                ? entry.heat_number
-                                  ? "Booked"
-                                  : "Entered"
-                                : "Pending"}
-                            </span>
+                          <div className="min-w-0">
+                            <p className="t-eyebrow text-terracotta">
+                              {entry.distance}
+                              <span className={`ml-3 ${confirmed ? "text-trail" : "text-dust"}`}>
+                                {confirmed
+                                  ? entry.heat_number
+                                    ? "Booked"
+                                    : "Entered"
+                                  : "Pending"}
+                              </span>
+                            </p>
+                            <h3 className="t-headline text-[1.5rem] md:text-[1.9rem] mt-2 group-hover:text-terracotta transition-colors duration-300">
+                              {entry.name}
+                            </h3>
+                            <p className="mt-1.5 text-[0.95rem] text-midnight/60">
+                              {entry.venue}
+                              {heat && <span className="text-midnight"> · {heat}</span>}
+                            </p>
                           </div>
-                        </div>
-                      </Link>
+                          {action && (
+                            <div className="col-start-2 md:col-start-3 mt-3 md:mt-0">
+                              <span
+                                className={`link-draw text-[0.95rem] ${
+                                  confirmed ? "text-midnight" : "text-terracotta"
+                                }`}
+                              >
+                                {action}
+                              </span>
+                            </div>
+                          )}
+                        </Link>
+                      </li>
                     );
                   })}
-                </div>
+                </ol>
               ) : (
-                <div className="bg-white border border-stone/40 p-10 text-center">
-                  <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-3">
-                    Start line empty
+                <div className="border-t rule pt-6">
+                  <p className="max-w-md text-[1.05rem] text-midnight/70 leading-relaxed">
+                    You have not entered a race yet. When you do, it lands here
+                    with your heat and booking reference.
                   </p>
-                  <p className="text-sm text-midnight/60 mb-4">
-                    You haven&apos;t entered any events yet.
-                  </p>
-                  <Link
-                    href="/events"
-                    className="inline-flex items-center min-h-11 bg-midnight text-white text-sm font-medium px-5 py-2.5 hover:bg-midnight/90 transition-colors"
-                  >
-                    Browse events
+                  <Link href="/events" className="btn btn-primary mt-7">
+                    Find a race
                   </Link>
                 </div>
               )}
             </div>
-
-            {/* Race history */}
-            <div>
-              <div className="flex items-end justify-between mb-6">
-                <div>
-                  <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                    History
-                  </p>
-                  <h2 className="text-xl font-semibold tracking-tight">
-                    Race results
-                  </h2>
-                </div>
-                {totalRaces > 0 && (
-                  <p className="text-sm text-dust font-mono">{totalRaces}</p>
-                )}
-              </div>
-              <ResultsTable rows={results.results} />
-            </div>
-
-            {/* Personal bests */}
-            {pbs.results.length > 0 && (
-              <div>
-                <div className="flex items-end justify-between mb-6">
-                  <div>
-                    <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                      Personal bests
-                    </p>
-                    <h2 className="text-xl font-semibold tracking-tight">
-                      Best times
-                    </h2>
-                  </div>
-                  <p className="text-sm text-dust font-mono">
-                    {pbs.results.length}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {pbs.results.map((pb) => (
-                    <PBCard
-                      key={pb.distance}
-                      distance={pb.distance}
-                      time={pb.time_display}
-                      verified={pb.verified === 1}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Album */}
-            <PhotoAlbum initialPhotos={albumPhotos} />
           </div>
+        </div>
+      </section>
 
-          {/* Sidebar */}
-          <div className="space-y-8">
-            <div id="profile" className="scroll-mt-24">
-              <ProfileForm user={user} />
-            </div>
-
-            <PasswordCard hasPassword={user.hasPassword} />
-
-            {/* Connected accounts */}
-            <div className="bg-white border border-stone/40 p-6">
-              <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-3">
-                Integrations
+      {/* Results and personal bests */}
+      <section className="bg-midnight text-bone">
+        <div className="mx-auto max-w-6xl px-6 py-20 md:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+            <div className="lg:col-span-4">
+              <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
+                On the clock
+              </h2>
+              <p className="mt-5 max-w-xs text-bone/65 leading-relaxed">
+                {totalRaces > 0
+                  ? "Every time you have run with us, kept on your public page."
+                  : "Your times and personal bests land here, and on your public page."}
               </p>
-              <h3 className="font-semibold tracking-tight mb-4">
-                Connected accounts
-              </h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-t border-stone/30">
-                  <div>
-                    <p className="text-sm font-medium">Strava</p>
-                    <p className="text-xs text-midnight/50 mt-0.5">
-                      Auto-import activities
-                    </p>
-                  </div>
-                  {user.stravaAthleteId ? (
-                    <span className="text-xs text-trail bg-trail/10 px-2 py-1">
-                      Connected
-                    </span>
-                  ) : (
-                    <button className="text-xs font-medium text-terracotta border border-terracotta/30 px-3 py-1.5 hover:bg-terracotta/5 transition-colors">
-                      Connect
-                    </button>
-                  )}
+            </div>
+            <div className="lg:col-span-8 space-y-16">
+              {pbs.results.length > 0 && (
+                <div>
+                  <h3 className="t-headline text-[1.5rem] md:text-[1.8rem]">Personal bests</h3>
+                  <dl className="mt-6 border-t rule-light">
+                    {pbs.results.map((pb) => (
+                      <PBCard
+                        key={pb.distance}
+                        distance={pb.distance}
+                        time={pb.time_display}
+                        verified={pb.verified === 1}
+                        tone="dark"
+                      />
+                    ))}
+                  </dl>
                 </div>
-                <div className="flex items-center justify-between py-2 border-t border-stone/30">
-                  <div>
-                    <p className="text-sm font-medium">Garmin</p>
-                    <p className="text-xs text-midnight/50 mt-0.5">
-                      Verify times via GPS
-                    </p>
-                  </div>
-                  {user.garminUserId ? (
-                    <span className="text-xs text-trail bg-trail/10 px-2 py-1">
-                      Connected
-                    </span>
-                  ) : (
-                    <button className="text-xs font-medium text-terracotta border border-terracotta/30 px-3 py-1.5 hover:bg-terracotta/5 transition-colors">
-                      Connect
-                    </button>
-                  )}
+              )}
+              <div>
+                <h3 className="t-headline text-[1.5rem] md:text-[1.8rem]">Race results</h3>
+                <div className="mt-6">
+                  <ResultsTable
+                    rows={results.results}
+                    tone="dark"
+                    empty={
+                      <p className="max-w-md text-bone/70 leading-relaxed">
+                        No results yet. Your time lands here as soon as it is
+                        posted after your first race.
+                      </p>
+                    }
+                  />
                 </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
+
+      {/* Profile, album and account */}
+      <section id="profile" className="bg-stone scroll-mt-16">
+        <div className="mx-auto max-w-6xl px-6 py-20 md:py-28">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+            <div className="lg:col-span-4">
+              <div className="lg:sticky lg:top-28">
+                <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
+                  Your page
+                </h2>
+                <p className="mt-5 max-w-xs text-midnight/70 leading-relaxed">
+                  Your photo, your story and your album, as other runners and
+                  sponsors see them.
+                </p>
+                <Link
+                  href={`/athletes/${user.id}`}
+                  className="inline-block mt-5 link-quiet text-midnight"
+                >
+                  See your public profile
+                </Link>
+              </div>
+            </div>
+            <div className="lg:col-span-8 space-y-8">
+              <ProfileForm user={user} />
+
+              <PhotoAlbum initialPhotos={albumPhotos} />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <PasswordCard hasPassword={user.hasPassword} />
+
+                {/* Connected accounts: not live yet, so said plainly rather than a dead button. */}
+                <div>
+                  <h3 className="t-headline text-[1.5rem]">Connected accounts</h3>
+                  <ul className="mt-5 border-t rule">
+                    <li className="flex items-center justify-between gap-4 py-4 border-b rule">
+                      <div>
+                        <p className="text-[0.95rem] text-midnight">Strava</p>
+                        <p className="text-[0.85rem] text-midnight/55 mt-0.5">
+                          Auto-import activities
+                        </p>
+                      </div>
+                      {user.stravaAthleteId ? (
+                        <span className="t-eyebrow text-trail inline-flex items-center gap-2">
+                          <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full bg-trail" />
+                          Connected
+                        </span>
+                      ) : (
+                        <span className="t-caption text-midnight/50">Coming soon</span>
+                      )}
+                    </li>
+                    <li className="flex items-center justify-between gap-4 py-4 border-b rule">
+                      <div>
+                        <p className="text-[0.95rem] text-midnight">Garmin</p>
+                        <p className="text-[0.85rem] text-midnight/55 mt-0.5">
+                          Verify times via GPS
+                        </p>
+                      </div>
+                      {user.garminUserId ? (
+                        <span className="t-eyebrow text-trail inline-flex items-center gap-2">
+                          <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full bg-trail" />
+                          Connected
+                        </span>
+                      ) : (
+                        <span className="t-caption text-midnight/50">Coming soon</span>
+                      )}
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </>
   );
 }

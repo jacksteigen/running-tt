@@ -24,16 +24,15 @@ export default async function NewEventPage() {
 
   return (
     <>
-      <section className="bg-midnight text-white">
-        <div className="mx-auto max-w-6xl px-6 py-10 md:py-14">
-          <Link href="/admin" className="text-xs text-stone/60 hover:text-stone/80 transition-colors mb-4 inline-block">
-            &larr; Admin
+      <section className="bg-midnight text-bone">
+        <div className="mx-auto max-w-6xl px-6 pt-10 pb-10 md:pt-14 md:pb-12">
+          <Link href="/admin" className="link-quiet text-sm text-bone/65 decoration-bone/30 hover:text-bone">
+            Admin
           </Link>
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-2">
-            New event
-          </p>
-          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Create an event</h1>
-          <p className="mt-2 text-stone/70 text-sm max-w-xl leading-relaxed">
+          <h1 className="t-display mt-5 text-[2.6rem] md:text-[3.6rem]">
+            A new <em>race</em>
+          </h1>
+          <p className="mt-4 text-[0.95rem] text-bone/70 max-w-xl leading-relaxed">
             It starts as Coming Soon, so it can sit on the site with the date TBC.
             Open it for bookings once the date and first heat are locked in.
           </p>

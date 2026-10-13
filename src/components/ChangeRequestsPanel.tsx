@@ -136,14 +136,10 @@ export default function ChangeRequestsPanel({
   return (
     <div className="bg-white border border-stone/40 border-t-2 border-t-terracotta">
       <div className="px-4 sm:px-5 py-4 border-b border-stone/30">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-terracotta mb-1">
-          Heat change requests
-        </p>
-        <h2 className="font-semibold tracking-tight">
-          {requests.length} waiting on you
-        </h2>
-        <p className="mt-1 text-xs text-midnight/60">
-          Collect the {fee} before you move anyone. Moving emails the athlete their new heat.
+        <h2 className="t-headline text-[1.6rem] md:text-[1.8rem]">Heat change requests</h2>
+        <p className="mt-1.5 text-sm text-midnight/60 leading-relaxed">
+          <span className="t-numeral text-[1.2rem] text-terracotta">{requests.length}</span> waiting
+          on you. Collect the {fee} before you move anyone. Moving emails the athlete their new heat.
         </p>
       </div>
 
@@ -168,11 +164,11 @@ export default function ChangeRequestsPanel({
               <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                 <Link
                   href={`/admin/athletes/${r.userId}`}
-                  className="font-medium hover:text-terracotta transition-colors"
+                  className="t-headline text-[1.2rem] hover:text-terracotta transition-colors"
                 >
                   {r.name}
                 </Link>
-                <p className="font-mono text-[11px] text-dust" title={r.madeAt}>
+                <p className="text-xs text-dust" title={r.madeAt}>
                   Asked {r.madeAgo}
                 </p>
               </div>
@@ -192,7 +188,7 @@ export default function ChangeRequestsPanel({
               </div>
 
               {r.note && (
-                <blockquote className="mt-3 border-l-2 border-stone pl-3 text-sm text-midnight/70 italic whitespace-pre-line">
+                <blockquote className="mt-3 border-l-2 border-stone pl-3 t-caption text-midnight/70 whitespace-pre-line">
                   {r.note}
                 </blockquote>
               )}
@@ -211,7 +207,7 @@ export default function ChangeRequestsPanel({
                   type="button"
                   onClick={() => move(r)}
                   disabled={working || !target}
-                  className="h-11 px-5 text-sm font-medium bg-terracotta text-white hover:bg-terracotta/90 transition-colors disabled:opacity-50 whitespace-nowrap"
+                  className="btn btn-sm btn-primary whitespace-nowrap"
                 >
                   {working && busy?.action === "move" ? "Moving..." : "Move and close"}
                 </button>
@@ -220,7 +216,7 @@ export default function ChangeRequestsPanel({
                     type="button"
                     onClick={() => close(r, "done")}
                     disabled={working}
-                    className="h-11 flex-1 sm:flex-none px-4 text-xs font-medium border border-midnight/20 text-midnight hover:border-midnight/60 transition-colors disabled:opacity-50"
+                    className="btn btn-sm btn-ghost flex-1 sm:flex-none"
                   >
                     {working && busy?.action === "done" ? "Saving..." : "Mark done"}
                   </button>

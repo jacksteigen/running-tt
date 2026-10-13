@@ -132,10 +132,16 @@ function buildLonPath(lon: number, rotation: number) {
 
 export default function GlobeMap() {
   const [rotation, setRotation] = useState(0);
+  const [still, setStill] = useState(false);
   const rafRef = useRef<number | null>(null);
   const startRef = useRef<number | null>(null);
 
   useEffect(() => {
+    // With reduced motion the globe holds still and the city pulses stop.
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setStill(true);
+      return;
+    }
     const tick = (t: number) => {
       if (startRef.current === null) startRef.current = t;
       const elapsed = (t - startRef.current) / 1000;
@@ -155,26 +161,23 @@ export default function GlobeMap() {
   for (let l = 0; l < 360; l += 15) lons.push(l);
 
   return (
-    <section className="bg-midnight text-white relative overflow-hidden">
-      <div className="mx-auto max-w-6xl px-6 py-16 md:py-24 relative">
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-10 items-center">
+    <section className="bg-midnight text-bone relative overflow-hidden">
+      <div className="mx-auto max-w-6xl px-6 py-24 md:py-32 relative">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           {/* Copy */}
-          <div className="lg:col-span-2">
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-4">
-              Worldwide
-            </p>
-            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight mb-4 leading-tight">
-              Wherever the runners are.
+          <div className="lg:col-span-5">
+            <h2 className="t-display text-[2.6rem] md:text-[3.8rem]">
+              Wherever the <em className="text-bone/75">runners are.</em>
             </h2>
-            <p className="text-stone/70 leading-relaxed">
+            <p className="mt-6 max-w-sm text-bone/70 leading-relaxed">
               Running TT is built to run anywhere there&apos;s a good venue
-              and athletes who want to race. Each event is announced as it
-              gets locked in, so check back often.
+              and athletes who want to race. Each race is announced as soon
+              as it is locked in, so check back often.
             </p>
           </div>
 
           {/* Globe */}
-          <div className="lg:col-span-3 flex justify-center">
+          <div className="lg:col-span-7 flex justify-center">
             <svg
               viewBox={`0 0 ${SIZE} ${SIZE}`}
               className="w-full max-w-[560px] h-auto"
@@ -187,19 +190,7 @@ export default function GlobeMap() {
                   <stop offset="60%" stopColor="#15150f" />
                   <stop offset="100%" stopColor="#08080a" />
                 </radialGradient>
-                <radialGradient id="globe-glow" cx="50%" cy="50%" r="50%">
-                  <stop offset="60%" stopColor="rgba(196, 89, 58, 0)" />
-                  <stop offset="100%" stopColor="rgba(196, 89, 58, 0.2)" />
-                </radialGradient>
               </defs>
-
-              {/* Soft outer glow */}
-              <circle
-                cx={CENTER}
-                cy={CENTER}
-                r={RADIUS + 44}
-                fill="url(#globe-glow)"
-              />
 
               {/* Sphere body */}
               <circle
@@ -254,12 +245,14 @@ export default function GlobeMap() {
                         fill="#D4A84B"
                         opacity="0.18"
                       >
-                        <animate
-                          attributeName="r"
-                          values="5;11;5"
-                          dur="3.6s"
-                          repeatCount="indefinite"
-                        />
+                        {!still && (
+                          <animate
+                            attributeName="r"
+                            values="5;11;5"
+                            dur="3.6s"
+                            repeatCount="indefinite"
+                          />
+                        )}
                       </circle>
                     )}
                     <circle
@@ -274,10 +267,9 @@ export default function GlobeMap() {
                         x={labelRight ? p.x + 8 : p.x - 8}
                         y={p.y + 4}
                         textAnchor={labelRight ? "start" : "end"}
-                        fontFamily="JetBrains Mono, monospace"
-                        fontSize="10.5"
+                        className="t-eyebrow"
                         fill="#F5F2EC"
-                        opacity="0.88"
+                        opacity="0.82"
                       >
                         {c.name}
                       </text>
@@ -285,15 +277,6 @@ export default function GlobeMap() {
                   </g>
                 );
               })}
-
-              {/* Subtle front-left highlight */}
-              <ellipse
-                cx={CENTER - RADIUS * 0.35}
-                cy={CENTER - RADIUS * 0.3}
-                rx={RADIUS * 0.45}
-                ry={RADIUS * 0.25}
-                fill="rgba(255, 255, 255, 0.04)"
-              />
             </svg>
           </div>
         </div>

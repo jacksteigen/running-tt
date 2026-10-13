@@ -100,27 +100,30 @@ export default async function AdminAthletePage({
 
   return (
     <>
-      <section className="bg-midnight text-white">
-        <div className="mx-auto max-w-4xl px-6 py-10 md:py-14">
-          <Link href="/admin/athletes" className="text-xs text-stone/60 hover:text-stone/80 transition-colors mb-4 inline-block">
-            &larr; Athletes
+      <section className="bg-midnight text-bone">
+        <div className="mx-auto max-w-4xl px-6 pt-10 pb-10 md:pt-14 md:pb-12">
+          <Link href="/admin/athletes" className="link-quiet text-sm text-bone/65 decoration-bone/30 hover:text-bone">
+            Athletes
           </Link>
-          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">{athlete.name}</h1>
-          <p className="mt-2 text-stone/70 text-sm">
+          <h1 className="t-display mt-5 text-[2.6rem] md:text-[3.6rem] break-words">{athlete.name}</h1>
+          <p className="mt-3 text-[0.95rem] text-bone/65">
             {athlete.email}
             {placeText ? ` · ${placeText}` : ""} · joined {athlete.created_at.slice(0, 10)}
             {athlete.profile_completed ? "" : " · profile incomplete"}
           </p>
-          <Link href={`/athletes/${athlete.id}`} className="inline-block mt-4 text-xs text-terracotta hover:text-terracotta/80 transition-colors">
-            View public profile →
+          <Link
+            href={`/athletes/${athlete.id}`}
+            className="inline-block mt-5 link-quiet text-sm text-bone decoration-bone/40"
+          >
+            View public profile
           </Link>
         </div>
       </section>
 
       <section className="bg-bone min-h-[60vh]">
-        <div className="mx-auto max-w-4xl px-6 py-10 md:py-14 space-y-10">
+        <div className="mx-auto max-w-4xl px-6 py-10 md:py-14 space-y-12">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight mb-4">Profile</h2>
+            <h2 className="t-headline text-[1.7rem] md:text-[2rem] mb-5">Profile</h2>
             <AthleteEditor
               athleteId={athlete.id}
               isSelf={athlete.id === session.user.id}
@@ -138,35 +141,46 @@ export default async function AdminAthletePage({
           </div>
 
           <div>
-            <h2 className="text-lg font-semibold tracking-tight mb-4">Entries</h2>
-            <div className="bg-white border border-stone/40">
-              {entries.results.length === 0 ? (
-                <p className="px-5 py-8 text-sm text-midnight/50 text-center">No entries.</p>
-              ) : (
-                <div className="divide-y divide-stone/30">
-                  {entries.results.map((e) => (
-                    <div key={e.id} className="px-5 py-3 flex items-center gap-4">
-                      <div className="flex-1 min-w-0">
-                        <Link href={`/admin/events/${e.slug}`} className="text-sm font-medium hover:text-terracotta transition-colors">
-                          {e.name}
-                        </Link>
-                        <p className="text-[11px] text-midnight/50">
-                          {formatEventDate(e.date, "compact")} · {e.distance}
-                          {e.heat_number ? ` · ${heatLabel(e, e.heat_number)}` : ""}
-                          {" · "}
-                          {e.age_group ?? "no age group"}
-                          {e.time_display ? ` · ${e.time_display}` : ""}
-                        </p>
-                      </div>
-                      <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 ${e.status === "confirmed" ? "bg-trail/10 text-trail" : "bg-gold/20 text-midnight"}`}>
-                        {e.status}
-                      </span>
-                      <RemoveEntryButton entryId={e.id} label={athlete.name} disabled={!!e.time_display} />
+            <h2 className="t-headline text-[1.7rem] md:text-[2rem] mb-5">Entries</h2>
+            {entries.results.length === 0 ? (
+              <p className="border-t rule pt-4 text-[0.95rem] text-midnight/55">
+                No entries yet.
+              </p>
+            ) : (
+              <div className="bg-white border border-stone/40 divide-y divide-stone/30">
+                {entries.results.map((e) => (
+                  <div key={e.id} className="px-5 py-3.5 flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <Link
+                        href={`/admin/events/${e.slug}`}
+                        className="t-headline text-[1.1rem] hover:text-terracotta transition-colors"
+                      >
+                        {e.name}
+                      </Link>
+                      <p className="text-xs text-midnight/55 mt-0.5">
+                        {formatEventDate(e.date, "compact")} · {e.distance}
+                        {e.heat_number ? ` · ${heatLabel(e, e.heat_number)}` : ""}
+                        {" · "}
+                        {e.age_group ?? "no age group"}
+                        {e.time_display && (
+                          <span className="sm:hidden">
+                            {" · "}
+                            <span className="font-mono text-midnight">{e.time_display}</span>
+                          </span>
+                        )}
+                      </p>
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
+                    {e.time_display && (
+                      <span className="hidden sm:inline t-numeral text-[1.3rem] shrink-0">{e.time_display}</span>
+                    )}
+                    <span className={`text-[10px] font-medium uppercase tracking-wider px-2 py-1 ${e.status === "confirmed" ? "bg-trail/10 text-trail" : "bg-gold/20 text-midnight"}`}>
+                      {e.status}
+                    </span>
+                    <RemoveEntryButton entryId={e.id} label={athlete.name} disabled={!!e.time_display} />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>

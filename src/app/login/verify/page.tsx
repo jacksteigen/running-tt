@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getDB } from "@/lib/db";
@@ -26,67 +27,76 @@ export default async function VerifyPage({
   const link = await peekMagicLink(db, token);
 
   return (
-    <>
-      <section className="bg-midnight text-white relative overflow-hidden">
+    <section className="bg-bone lg:grid lg:grid-cols-12 lg:min-h-[calc(100svh-4rem)]">
+      {/* The photograph, desktop only. On a phone the button comes first. */}
+      <div className="relative hidden lg:flex lg:col-span-5 bg-midnight text-bone overflow-hidden items-end lg:sticky lg:top-16 lg:self-start lg:h-[calc(100svh-4rem)]">
+        <Image
+          src="/images/athlete-sock-bench.jpg"
+          alt=""
+          fill
+          sizes="42vw"
+          className="object-cover object-center opacity-80 motion-safe:animate-slow-zoom"
+          aria-hidden
+        />
         <div
           aria-hidden
-          className="absolute inset-0 opacity-[0.04]"
-          style={{ backgroundImage: "repeating-linear-gradient(90deg, transparent 0 79px, #F5F2EC 79px 80px)" }}
+          className="absolute inset-0 bg-gradient-to-t from-midnight via-midnight/25 to-midnight/0"
         />
-        <div className="relative mx-auto max-w-6xl px-6 py-16 md:py-20 motion-safe:animate-fade-up">
-          <Link
-            href="/"
-            className="text-xs text-stone/60 hover:text-stone/80 transition-colors mb-4 inline-block"
-          >
-            &larr; Home
-          </Link>
-          <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-            {link ? "One tap to go" : "Link expired"}
+        <p className="relative t-caption px-12 pb-14 max-w-sm text-bone/70">
+          Lacing up. Nearly time.
+        </p>
+      </div>
+
+      <div className="lg:col-span-7 lg:flex lg:items-center">
+        <div className="w-full max-w-md mx-auto px-6 py-16 md:py-24 motion-safe:animate-fade-up">
+          <h1 className="t-display text-[2.8rem] md:text-[3.4rem]">
+            {link ? (
+              <>
+                One tap <em>to go.</em>
+              </>
+            ) : (
+              <>
+                Link <em>expired.</em>
+              </>
+            )}
           </h1>
-          <p className="mt-3 text-stone/70 max-w-md">
+          <p className="t-lede mt-5 text-midnight/80 text-pretty">
             {link
               ? "Press the button below to finish signing in."
               : "Sign-in links work once and expire after 15 minutes."}
           </p>
-        </div>
-      </section>
 
-      <section className="bg-bone">
-        <div className="mx-auto max-w-md px-6 py-16 md:py-24">
           {link ? (
-            <form
-              action="/api/auth/verify"
-              method="POST"
-              className="bg-white border border-stone/40 p-8 text-center"
-            >
+            <form action="/api/auth/verify" method="POST" className="mt-10 border-t rule pt-8">
               <input type="hidden" name="token" value={token} />
-              <p className="text-sm text-midnight/70 leading-relaxed mb-6">
-                You are signing in as{" "}
-                <span className="font-medium text-midnight">{link.email}</span>.
+              <p className="t-eyebrow text-dust">Signing in as</p>
+              <p className="t-headline mt-2 text-[1.5rem] md:text-[1.7rem] break-all">
+                {link.email}
               </p>
-              <button
-                type="submit"
-                className="w-full bg-terracotta text-white text-sm font-medium py-3.5 hover:bg-terracotta/90 transition-colors"
-              >
+              <button type="submit" className="btn btn-primary btn-lg w-full mt-8">
                 Complete sign in
               </button>
             </form>
           ) : (
-            <div className="bg-white border border-stone/40 p-8 text-center">
-              <p className="text-sm text-midnight/70 leading-relaxed mb-6">
+            <div className="mt-10 border-t rule pt-8">
+              <p className="text-[0.98rem] text-midnight/70 leading-relaxed">
                 This sign-in link has already been used or has expired.
                 Request a fresh one and try again.
               </p>
-              <Link
-                href="/login"
-                className="inline-block w-full bg-terracotta text-white text-sm font-medium py-3.5 hover:bg-terracotta/90 transition-colors"
-              >
+              <Link href="/login" className="btn btn-primary btn-lg w-full mt-7">
                 Request a new link
               </Link>
             </div>
           )}
+
+          <Link
+            href="/"
+            className="mt-10 inline-flex items-center min-h-11 link-quiet text-[0.92rem] text-midnight/60"
+          >
+            Back to the home page
+          </Link>
         </div>
-      </section>
-    </>
+      </div>
+    </section>
   );
 }

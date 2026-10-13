@@ -1,14 +1,17 @@
 import { getDB } from "@/lib/db";
 import type { Metadata } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import PBCard from "@/components/PBCard";
 import ResultsTable from "@/components/ResultsTable";
+import { formatFee } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
 interface UserRow {
   id: string;
   name: string;
+  first_name: string | null;
   email: string;
   location: string | null;
   created_at: string;
@@ -27,6 +30,19 @@ interface UserRow {
 interface SponsorRef {
   name: string;
   url: string;
+}
+
+/** "a, b and c", keeping each part's markup. */
+function inSentence(parts: ReactNode[]): ReactNode[] {
+  return parts.flatMap((part, i) => {
+    if (i === 0) return [part];
+    return [i === parts.length - 1 ? " and " : ", ", part];
+  });
+}
+
+/** A number set in race-bib figures inside a serif sentence. */
+function Figure({ children }: { children: ReactNode }) {
+  return <span className="t-numeral text-[1.08em] text-midnight">{children}</span>;
 }
 
 export async function generateMetadata({
@@ -61,15 +77,24 @@ export default async function AthletePage({
 
   if (!user) {
     return (
-      <div className="mx-auto max-w-6xl px-6 py-24 text-center">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-3">
-          DNF
-        </p>
-        <h1 className="text-2xl font-semibold">Athlete not found</h1>
-        <Link href="/" className="text-terracotta text-sm mt-4 inline-block">
-          Back home
-        </Link>
-      </div>
+      <section className="bg-bone">
+        <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+          <h1 className="t-display text-[2.8rem] md:text-[4.2rem] max-w-3xl">
+            Athlete <em>not found.</em>
+          </h1>
+          <p className="t-lede mt-5 max-w-lg text-midnight/70">
+            This page may have moved, or the athlete may no longer be listed.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-x-7 gap-y-2">
+            <Link href="/" className="link-quiet inline-block py-3 text-midnight">
+              Back home
+            </Link>
+            <Link href="/results" className="link-quiet inline-block py-3 text-midnight">
+              See the results
+            </Link>
+          </div>
+        </div>
+      </section>
     );
   }
 
@@ -165,7 +190,15 @@ export default async function AthletePage({
     });
   }
 
-  // Summary stats
+  const firstName = user.first_name?.trim() || user.name.split(" ")[0];
+  const story = (user.story ?? "")
+    .split(/\n{2,}/)
+    .map((para) => para.trim())
+    .filter(Boolean);
+  const place = user.location?.trim();
+  const openToSponsors = user.open_to_sponsorship === 1;
+
+  // Summary stats, told as a sentence rather than a row of boxes.
   const totalRaces = results.results.length;
   const podiums = results.results.filter((r) => r.rank <= 3).length;
   const wins = results.results.filter((r) => r.rank === 1).length;
@@ -173,312 +206,305 @@ export default async function AthletePage({
     (sum, r) => sum + (r.prize_amount_cents || 0),
     0
   );
+  const record: ReactNode[] = [];
+  if (totalRaces > 0) {
+    record.push(
+      <span key="races">
+        <Figure>{totalRaces}</Figure> {totalRaces === 1 ? "race" : "races"} on the clock
+      </span>
+    );
+  }
+  if (wins > 0) {
+    record.push(
+      <span key="wins">
+        <Figure>{wins}</Figure> {wins === 1 ? "win" : "wins"}
+      </span>
+    );
+  }
+  if (podiums > 0) {
+    record.push(
+      <span key="podiums">
+        <Figure>{podiums}</Figure> {podiums === 1 ? "podium" : "podiums"}
+      </span>
+    );
+  }
+  if (earnings > 0) {
+    record.push(
+      <span key="earned">
+        <Figure>{formatFee(earnings)}</Figure> in prize money
+      </span>
+    );
+  }
 
   return (
     <>
-      {/* Identity header */}
-      <section className="bg-midnight text-white relative overflow-hidden">
-        <div
-          aria-hidden
-          className="absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "repeating-linear-gradient(90deg, transparent 0 79px, #F5F2EC 79px 80px)",
-          }}
-        />
-        <div className="mx-auto max-w-6xl px-6 py-14 md:py-20 relative">
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-5">
-            Athlete
-          </p>
-          <div className="flex flex-col sm:flex-row items-start gap-6">
-            {/* Photo or initials */}
+      {/* The profile: a name, a face, and a line about them. */}
+      <section className="bg-bone">
+        <div className="mx-auto max-w-6xl px-6 pt-12 pb-16 md:pt-20 md:pb-24">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-x-12 gap-y-10">
+            <div className="lg:col-span-7 lg:row-start-1 lg:self-end motion-safe:animate-fade-up">
+              {place && <p className="t-eyebrow text-dust">{place}</p>}
+              <h1
+                className={`t-display text-[3rem] sm:text-[4.2rem] md:text-[5.2rem] lg:text-[clamp(4.2rem,6vw,5.8rem)] break-words text-balance ${
+                  place ? "mt-5" : ""
+                }`}
+              >
+                {user.name}
+              </h1>
+              <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <p className="t-caption text-midnight/60">
+                  With Running TT since {memberSince}
+                </p>
+                {openToSponsors && (
+                  <p className="t-eyebrow text-trail inline-flex items-center gap-2">
+                    <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full bg-trail" />
+                    Open to sponsors
+                  </p>
+                )}
+              </div>
+            </div>
+
             {user.photo_url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={user.photo_url}
-                alt={user.name}
-                className="w-28 h-28 md:w-36 md:h-36 object-cover border border-terracotta/30 shrink-0"
-              />
+              <div className="lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:row-span-2 motion-safe:animate-fade-up [animation-delay:120ms]">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={user.photo_url}
+                  alt={user.name}
+                  className="w-full aspect-[4/5] object-cover bg-stone"
+                />
+              </div>
             ) : (
-              <div className="w-24 h-24 md:w-28 md:h-28 bg-terracotta/15 border border-terracotta/30 text-terracotta flex items-center justify-center font-mono text-2xl md:text-3xl font-semibold tracking-tight shrink-0">
-                {initials}
+              // No photo yet: a monogram holds the space on wide screens.
+              <div
+                aria-hidden
+                className="hidden lg:flex lg:col-span-5 lg:col-start-8 lg:row-start-1 lg:row-span-2 aspect-[4/5] bg-stone items-center justify-center"
+              >
+                <span className="t-display italic text-[9rem] text-dust/60">{initials}</span>
               </div>
             )}
 
-            <div className="pt-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl md:text-4xl font-semibold tracking-tight">
-                  {user.name}
-                </h1>
-                {user.open_to_sponsorship === 1 && (
-                  <span className="text-[10px] font-medium uppercase tracking-wider px-2 py-1 bg-trail text-white">
-                    Open to sponsors
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap items-center gap-3 text-sm text-stone/60 mt-2">
-                {user.location && <span>{user.location}</span>}
-                {user.location && <span className="text-stone/30">·</span>}
-                <span className="font-mono">Member since {memberSince}</span>
-              </div>
-
+            <div className="lg:col-span-7 lg:row-start-2">
               {user.bio && (
-                <p className="mt-4 text-stone/70 leading-relaxed max-w-2xl">
-                  {user.bio}
-                </p>
+                <p className="t-lede max-w-xl text-midnight/80">{user.bio}</p>
               )}
 
               {socials.length > 0 && (
-                <div className="flex flex-wrap items-center gap-4 mt-5">
+                <ul className={`flex flex-wrap gap-x-7 ${user.bio ? "mt-6" : ""}`}>
                   {socials.map((s) => (
-                    <a
-                      key={s.label}
-                      href={s.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-xs uppercase tracking-[0.15em] text-stone/60 hover:text-terracotta transition-colors"
-                    >
-                      {s.label === "Instagram" || s.label === "TikTok"
-                        ? `${s.label} ${s.value}`
-                        : s.label}
-                    </a>
+                    <li key={s.label}>
+                      <a
+                        href={s.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="link-quiet inline-block py-3 text-[0.95rem] text-midnight"
+                      >
+                        {s.label === "Instagram" || s.label === "TikTok"
+                          ? `${s.label} ${s.value}`
+                          : s.label === "Website"
+                            ? s.value
+                            : s.label}
+                      </a>
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mt-10 pt-8 border-t border-stone/10">
-            <div>
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums">
-                {totalRaces}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Races
+          {/* The record, as a sentence */}
+          <div className="mt-14 md:mt-20 border-t rule pt-7">
+            <p className="t-headline text-[1.45rem] md:text-[2rem] text-midnight/75 max-w-4xl">
+              {record.length > 0 ? (
+                <>{inSentence(record)}.</>
+              ) : (
+                <>No Running TT races on the record yet.</>
+              )}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Personal bests */}
+      {pbs.results.length > 0 && (
+        <section className="bg-bone">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="border-t rule py-20 md:py-28 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+              <h2 className="lg:col-span-4 t-display text-[2.6rem] md:text-[3.6rem]">
+                Personal <em>bests</em>
+              </h2>
+              <dl className="lg:col-span-8 border-t rule">
+                {pbs.results.map((pb) => (
+                  <PBCard
+                    key={pb.distance}
+                    distance={pb.distance}
+                    time={pb.time_display}
+                    verified={pb.verified === 1}
+                  />
+                ))}
+              </dl>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Story */}
+      {story.length > 0 && (
+        <section className="bg-bone">
+          <div className="mx-auto max-w-6xl px-6">
+            <div className="border-t rule py-20 md:py-28 grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+              <h2 className="lg:col-span-4 t-display text-[2.6rem] md:text-[3.6rem]">
+                In their words
+              </h2>
+              <div className="lg:col-span-8 max-w-[38rem] space-y-6">
+                {story.map((para, i) => (
+                  <p
+                    key={i}
+                    className={`font-serif text-[1.15rem] md:text-[1.3rem] leading-[1.7] text-midnight/85 whitespace-pre-line ${
+                      i === 0 && para.length > 120
+                        ? "first-letter:float-left first-letter:font-serif first-letter:text-[4.6rem] first-letter:leading-[0.8] first-letter:mr-3 first-letter:mt-[0.08em] first-letter:text-terracotta"
+                        : ""
+                    }`}
+                  >
+                    {para}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Race history */}
+      <section className="bg-midnight text-bone">
+        <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <div className="lg:col-span-4">
+              <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
+                On the clock
+              </h2>
+              <p className="mt-5 max-w-sm text-bone/65 leading-relaxed">
+                {totalRaces > 0
+                  ? `Every race ${firstName} has run with Running TT, newest first.`
+                  : `When ${firstName} lines up at a Running TT race, the time lands here.`}
               </p>
             </div>
-            <div>
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums">
-                {wins}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Wins
-              </p>
-            </div>
-            <div>
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums">
-                {podiums}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Podiums
-              </p>
-            </div>
-            <div>
-              <p className="font-mono text-2xl md:text-3xl font-semibold tabular-nums text-gold">
-                ${(earnings / 100).toFixed(0)}
-              </p>
-              <p className="text-xs uppercase tracking-[0.2em] text-stone/50 mt-1">
-                Earned
+            <div className="lg:col-span-8">
+              <ResultsTable
+                rows={results.results}
+                tone="dark"
+                empty={
+                  <p className="max-w-md text-bone/65 leading-relaxed">
+                    No Running TT results yet.
+                  </p>
+                }
+              />
+              <p className="t-caption mt-8 max-w-md text-bone/50">
+                Coming soon: results from races outside Running TT, so the
+                whole racing record lives in one place.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-          {/* Main column */}
-          <div className="lg:col-span-2 space-y-14">
-            {/* Personal bests */}
-            {pbs.results.length > 0 && (
-              <div>
-                <div className="flex items-end justify-between mb-6">
-                  <div>
-                    <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                      Personal bests
-                    </p>
-                    <h2 className="text-xl font-semibold tracking-tight">
-                      Best times
-                    </h2>
-                  </div>
-                  <p className="text-sm text-dust font-mono">
-                    {pbs.results.length} distance
-                    {pbs.results.length === 1 ? "" : "s"}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  {pbs.results.map((pb) => (
-                    <PBCard
-                      key={pb.distance}
-                      distance={pb.distance}
-                      time={pb.time_display}
-                      verified={pb.verified === 1}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Story */}
-            {user.story && (
-              <div>
-                <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                  In their words
-                </p>
-                <h2 className="text-xl font-semibold tracking-tight mb-6">
-                  My story
-                </h2>
-                <div className="bg-white border border-stone/40 p-6 md:p-8">
-                  {user.story
-                    .split(/\n{2,}/)
-                    .filter((para) => para.trim())
-                    .map((para, i) => (
-                      <p
-                        key={i}
-                        className="text-sm text-midnight/75 leading-relaxed whitespace-pre-line mb-4 last:mb-0"
-                      >
-                        {para.trim()}
-                      </p>
-                    ))}
-                </div>
-              </div>
-            )}
-
-            {/* Album */}
-            {albumRows.results.length > 0 && (
-              <div>
-                <div className="flex items-end justify-between mb-6">
-                  <div>
-                    <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                      The album
-                    </p>
-                    <h2 className="text-xl font-semibold tracking-tight">
-                      Photos
-                    </h2>
-                  </div>
-                  <p className="text-sm text-dust font-mono">
-                    {albumRows.results.length}
-                  </p>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {albumRows.results.map((photo) => (
-                    <figure key={photo.id}>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`/api/photos/${photo.r2_key}`}
-                        alt={photo.caption || `Photo of ${user.name}`}
-                        className="w-full aspect-square object-cover border border-stone/40 bg-stone/20"
-                      />
-                      {photo.caption && (
-                        <figcaption className="mt-1.5 text-xs text-midnight/60 leading-snug">
-                          {photo.caption}
-                        </figcaption>
-                      )}
-                    </figure>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Running TT results */}
-            <div>
-              <div className="flex items-end justify-between mb-6">
-                <div>
-                  <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                    On the clock
-                  </p>
-                  <h2 className="text-xl font-semibold tracking-tight">
-                    Running TT results
-                  </h2>
-                </div>
-                {totalRaces > 0 && (
-                  <p className="text-sm text-dust font-mono">
-                    {totalRaces} race{totalRaces === 1 ? "" : "s"}
-                  </p>
-                )}
-              </div>
-              <ResultsTable rows={results.results} />
-            </div>
-
-            {/* Other results */}
-            <div>
-              <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                Beyond Running TT
-              </p>
-              <h2 className="text-xl font-semibold tracking-tight mb-6">
-                Other results
-              </h2>
-              <div className="bg-white border border-stone/40 p-10 text-center">
-                <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-2">
-                  Coming soon
-                </p>
-                <p className="text-sm text-midnight/60 max-w-sm mx-auto">
-                  Athletes will be able to add results from races outside
-                  Running TT, so the whole racing record lives in one place.
-                </p>
-              </div>
+      {/* Album */}
+      {albumRows.results.length > 0 && (
+        <section className="bg-bone">
+          <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+            <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
+              The album
+            </h2>
+            <div className="mt-10 md:mt-14 grid grid-cols-2 lg:grid-cols-3 gap-x-4 md:gap-x-6 gap-y-10 md:gap-y-14">
+              {albumRows.results.map((photo) => (
+                <figure key={photo.id}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/photos/${photo.r2_key}`}
+                    alt={photo.caption || `Photo of ${user.name}`}
+                    loading="lazy"
+                    decoding="async"
+                    className="w-full aspect-[4/5] object-cover bg-stone"
+                  />
+                  {photo.caption && (
+                    <figcaption className="t-caption mt-3 text-midnight/60">
+                      {photo.caption}
+                    </figcaption>
+                  )}
+                </figure>
+              ))}
             </div>
           </div>
+        </section>
+      )}
 
-          {/* Sponsorship sidebar */}
-          <div className="space-y-8">
-            <div className="bg-white border border-stone/40 p-6">
-              <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-3">
-                Backing
-              </p>
-              <h3 className="font-semibold tracking-tight mb-4">
-                Sponsored by
-              </h3>
-              {sponsorList.length > 0 ? (
-                <div className="space-y-2">
-                  {sponsorList.map((s) => (
-                    <a
-                      key={s.name}
-                      href={s.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block border border-stone/40 hover:border-terracotta px-4 py-3 transition-colors group"
-                    >
-                      <span className="text-sm font-semibold tracking-[0.12em] uppercase group-hover:text-terracotta transition-colors">
-                        {s.name}
-                      </span>
-                    </a>
-                  ))}
-                </div>
+      {/* Backing */}
+      <section className="bg-stone">
+        <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            <h2 className="lg:col-span-4 t-display text-[2.6rem] md:text-[3.6rem]">
+              {openToSponsors ? (
+                <>
+                  Back {firstName}
+                </>
               ) : (
-                <p className="text-sm text-midnight/50">
-                  No sponsors listed yet.
-                </p>
+                <>
+                  In their corner
+                </>
+              )}
+            </h2>
+            <div className="lg:col-span-8 max-w-2xl">
+              <p className="t-eyebrow text-dust">Sponsored by</p>
+              {sponsorList.length > 0 ? (
+                <ul className="mt-4 flex flex-wrap gap-x-8 gap-y-1">
+                  {sponsorList.map((s) => (
+                    <li key={s.name}>
+                      <a
+                        href={s.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="link-quiet inline-block py-2 t-headline text-[1.5rem] md:text-[1.8rem] text-midnight hover:text-terracotta transition-colors"
+                      >
+                        {s.name}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-4 text-midnight/60">No sponsors listed yet.</p>
               )}
 
-              {user.open_to_sponsorship === 1 && (
-                <div className="mt-5 pt-5 border-t border-stone/30">
-                  <p className="text-xs font-medium text-trail mb-2">
+              {openToSponsors && (
+                <div className="mt-10 border-t border-midnight/15 pt-6">
+                  <p className="t-eyebrow text-trail inline-flex items-center gap-2">
+                    <span aria-hidden className="inline-block w-1.5 h-1.5 rounded-full bg-trail" />
                     Open to sponsorship
                   </p>
                   {user.sponsor_interests && (
-                    <p className="text-sm text-midnight/60 leading-relaxed">
-                      Looking for: {user.sponsor_interests}
+                    <p className="t-lede mt-3 text-midnight/80">
+                      Looking for {user.sponsor_interests}
                     </p>
                   )}
                 </div>
               )}
-            </div>
 
-            <div className="bg-stone/60 border border-stone/40 p-6">
-              <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-3">
-                Scouts and sponsors
-              </p>
-              <p className="text-sm text-midnight/70 leading-relaxed">
-                Every athlete profile shows real, recorded results. If you
-                want to back a runner you see here, reach out through their
-                socials or contact Running TT.
-              </p>
+              <div className="mt-10 border-t border-midnight/15 pt-6">
+                <p className="max-w-lg text-midnight/70 leading-relaxed">
+                  Every athlete profile shows real, recorded results. If you
+                  want to back a runner you see here, reach out through their
+                  socials or{" "}
+                  <a
+                    href="mailto:partners@runningtt.com?subject=Backing%20a%20Running%20TT%20athlete"
+                    className="link-quiet text-midnight"
+                  >
+                    contact Running TT
+                  </a>
+                  .
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
     </>
   );
 }

@@ -96,10 +96,8 @@ export default function AddAthleteForm() {
         className="w-full flex items-center justify-between gap-4 px-5 py-4 min-h-[56px] text-left hover:bg-bone/60 transition-colors"
       >
         <span>
-          <span className="block font-mono text-xs uppercase tracking-[0.2em] text-dust mb-1">
-            Walk-ups and phone bookings
-          </span>
-          <span className="block font-semibold tracking-tight">Add an athlete</span>
+          <span className="block t-headline text-[1.4rem] md:text-[1.6rem]">Add an athlete</span>
+          <span className="block mt-1 text-sm text-midnight/55">For walk-ups and phone bookings</span>
         </span>
         <span
           aria-hidden
@@ -119,9 +117,9 @@ export default function AddAthleteForm() {
             </p>
             <Link
               href={`/admin/athletes/${created.id}`}
-              className="text-xs font-medium text-trail underline underline-offset-4 hover:text-trail/80"
+              className="link-quiet text-sm text-trail"
             >
-              Open their profile →
+              Open their profile
             </Link>
           </div>
         )}
@@ -222,9 +220,9 @@ export default function AddAthleteForm() {
             {existingId && (
               <Link
                 href={`/admin/athletes/${existingId}`}
-                className="text-xs font-medium text-midnight underline underline-offset-4 hover:text-terracotta transition-colors"
+                className="link-quiet text-sm text-midnight hover:text-terracotta transition-colors"
               >
-                Go to their profile →
+                Go to their profile
               </Link>
             )}
           </div>
@@ -234,7 +232,7 @@ export default function AddAthleteForm() {
           <button
             type="submit"
             disabled={busy}
-            className="bg-midnight text-white text-sm font-medium px-6 py-2.5 min-h-[44px] hover:bg-midnight/90 transition-colors disabled:opacity-50"
+            className="btn btn-ink"
           >
             {busy ? "Adding..." : "Add athlete"}
           </button>
@@ -245,7 +243,7 @@ export default function AddAthleteForm() {
               setError("");
               setExistingId(null);
             }}
-            className="text-sm text-dust hover:text-midnight px-3 py-2.5 min-h-[44px] transition-colors"
+            className="link-quiet text-sm text-midnight/60 hover:text-midnight px-3 py-2.5 min-h-[44px] transition-colors"
           >
             Cancel
           </button>

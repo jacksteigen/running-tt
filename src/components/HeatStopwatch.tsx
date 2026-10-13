@@ -139,7 +139,7 @@ function RunningClock({ startedAt }: { startedAt: number }) {
     <p
       role="timer"
       aria-label="Elapsed time"
-      className="font-mono font-semibold tabular-nums tracking-tight leading-none text-[3.75rem] sm:text-7xl md:text-8xl"
+      className="t-numeral leading-none text-[4.25rem] sm:text-[5.75rem] md:text-[7rem]"
     >
       {formatTenths(tenths)}
     </p>
@@ -266,7 +266,7 @@ export default function HeatStopwatch({
   }
 
   const note = (
-    <p className="text-xs text-stone/50 leading-relaxed">
+    <p className="t-caption text-stone/55">
       Hand timed on this device. Tap the moment the runner crosses the line.
     </p>
   );
@@ -276,11 +276,9 @@ export default function HeatStopwatch({
       <div className="bg-midnight text-white px-4 sm:px-6 py-5 sm:py-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-terracotta mb-1.5">
+            <p className="t-headline text-[1.5rem]">Heat {heatNumber}</p>
+            <p className="mt-1 text-sm text-stone/75">
               Hand timing
-            </p>
-            <p className="text-sm text-stone/80">
-              Heat {heatNumber}
               {heatTime ? ` · ${heatTime}` : ""}
               <span className="text-stone/40"> · </span>
               {untimed === 0 ? "everyone timed" : `${untimed} to finish`}
@@ -295,7 +293,7 @@ export default function HeatStopwatch({
           <button
             type="button"
             onClick={onStart}
-            className="w-full sm:w-auto min-h-14 px-8 bg-terracotta text-white text-base font-semibold tracking-tight hover:bg-terracotta/90 active:bg-terracotta/80 transition-colors"
+            className="btn btn-primary btn-lg w-full sm:w-auto min-h-14"
           >
             Start Heat {heatNumber}
           </button>
@@ -308,26 +306,22 @@ export default function HeatStopwatch({
   return (
     <div className="bg-midnight text-white px-4 sm:px-6 py-5 sm:py-6">
       <div className="flex items-center justify-between gap-3">
-        <p className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.25em] text-terracotta">
+        <p className="inline-flex items-center gap-2 t-eyebrow text-terracotta">
           <span className="relative flex h-2 w-2" aria-hidden>
             <span className="absolute inline-flex h-full w-full rounded-full bg-terracotta opacity-75 motion-safe:animate-ping" />
             <span className="relative inline-flex h-2 w-2 rounded-full bg-terracotta" />
           </span>
           Heat {heatNumber} running
         </p>
-        <button
-          type="button"
-          onClick={stop}
-          className="min-h-11 px-4 text-xs font-medium text-stone/80 border border-white/20 hover:border-white/50 hover:text-white transition-colors"
-        >
+        <button type="button" onClick={stop} className="btn btn-sm btn-light">
           Stop clock
         </button>
       </div>
 
       <div className="mt-5">
         <RunningClock startedAt={startedAt} />
-        <p className="mt-2 font-mono text-xs text-stone/50">
-          Started {wallClock(startedAt)}
+        <p className="mt-3 text-sm text-stone/55">
+          Started <span className="font-mono">{wallClock(startedAt)}</span>
         </p>
       </div>
 
@@ -415,7 +409,7 @@ export default function HeatStopwatch({
                   onClick={() => markDnf(a)}
                   disabled={saving}
                   aria-label={`Mark ${a.name} as did not finish`}
-                  className="shrink-0 min-h-14 w-16 font-mono text-xs font-semibold uppercase tracking-[0.15em] text-stone/80 border border-white/20 hover:border-terracotta hover:text-white active:bg-terracotta transition-colors disabled:opacity-40"
+                  className="btn btn-light shrink-0 min-h-14 w-16 px-0 active:bg-terracotta active:border-terracotta"
                 >
                   DNF
                 </button>
@@ -433,7 +427,7 @@ export default function HeatStopwatch({
                     type="button"
                     onClick={() => record(a, capture.time)}
                     disabled={saving}
-                    className="min-h-11 px-3 font-medium text-white border border-white/30 hover:border-white/60 transition-colors disabled:opacity-40"
+                    className="btn btn-sm btn-light"
                   >
                     Retry <span className="font-mono">{capture.time}</span>
                   </button>

@@ -147,7 +147,7 @@ export default async function BookHeatPage({
   return (
     <>
       {/* Header */}
-      <section className="relative bg-midnight text-white overflow-hidden">
+      <section className="relative bg-midnight text-bone overflow-hidden">
         <Image
           src="/images/athlete-track-lane.jpg"
           alt=""
@@ -161,40 +161,40 @@ export default async function BookHeatPage({
           aria-hidden
           className="absolute inset-0 bg-gradient-to-b from-midnight/50 via-midnight/75 to-midnight"
         />
-        <div className="relative mx-auto max-w-6xl px-6 pt-10 pb-10 md:pt-14 md:pb-12">
+        <div className="relative mx-auto max-w-6xl px-6 pt-8 pb-10 md:pt-12 md:pb-14">
           <Link
             href={`/events/${slug}`}
-            className="text-xs text-stone/60 hover:text-white transition-colors mb-8 inline-flex items-center min-h-11 font-mono uppercase tracking-[0.2em]"
+            className="inline-flex min-h-11 items-center text-[0.9rem] text-bone/60 hover:text-bone transition-colors"
           >
-            &larr; Event details
+            <span className="link-draw">Event details</span>
           </Link>
-          <div className="motion-safe:animate-fade-up">
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-4">
+          <div className="mt-8 md:mt-12 motion-safe:animate-fade-up">
+            <p className="t-eyebrow text-bone/60">
               {event.distance} · {event.location}
             </p>
-            <h1 className="text-4xl md:text-6xl font-semibold tracking-tight leading-[1.02]">
+            <h1 className="t-display mt-4 max-w-4xl text-[2.8rem] sm:text-[3.6rem] md:text-[4.6rem]">
               {event.name}
             </h1>
-            <div className="mt-5 flex flex-wrap items-center gap-x-3 gap-y-1 text-base text-stone/80">
-              <span>{formatEventDate(event.date, "long")}</span>
-              <span className="text-stone/30" aria-hidden>·</span>
-              <span>{event.venue}</span>
-              <span className="text-stone/30" aria-hidden>·</span>
-              <span className="font-mono">{price}</span>
-            </div>
+            <p className="t-lede mt-5 text-bone/85">
+              <em>{formatEventDate(event.date, "long")}</em>, {event.venue}
+            </p>
+            <p className="mt-4 flex items-baseline gap-2.5 text-[0.95rem] text-bone/60">
+              <span className="t-numeral text-[1.35rem] text-bone">{price}</span>
+              entry
+            </p>
             {event.description && (
-              <p className="hidden md:block mt-5 max-w-2xl text-sm text-stone/60 leading-relaxed line-clamp-2">
+              <p className="hidden md:block mt-6 max-w-2xl text-[0.95rem] text-bone/55 leading-relaxed line-clamp-2">
                 {event.description}
               </p>
             )}
           </div>
-          <div className="mt-10 md:mt-12 max-w-2xl">
+          <div className="mt-10 md:mt-14 max-w-2xl">
             <BookingSteps current={1} free={free} />
           </div>
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 pt-10 md:pt-14 pb-0 lg:pb-20">
+      <section className="mx-auto max-w-6xl px-6 pt-12 md:pt-16 pb-0 lg:pb-24">
         <HeatPicker
           eventId={event.id}
           eventSlug={slug}

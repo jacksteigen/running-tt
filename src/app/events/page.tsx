@@ -3,7 +3,8 @@ import Link from "next/link";
 import { getDB } from "@/lib/db";
 import EventCard from "@/components/EventCard";
 import GlobeMap from "@/components/GlobeMap";
-import { displayStatus } from "@/lib/events";
+import RaceList from "@/components/RaceList";
+import { displayStatus, todayInMelbourne } from "@/lib/events";
 
 export const dynamic = "force-dynamic";
 
@@ -35,7 +36,8 @@ export default async function EventsPage() {
 
   // Upcoming/past split by date, not status, so events flip automatically once
   // their date has passed. Past events are reversed so the most recent shows first.
-  const todayISO = new Date().toISOString().slice(0, 10);
+  // Event dates are Melbourne calendar days, as everywhere else.
+  const todayISO = todayInMelbourne();
   const upcoming = allEvents.results.filter((e) => e.date >= todayISO);
   const past = allEvents.results
     .filter((e) => e.date < todayISO)
@@ -54,119 +56,111 @@ export default async function EventsPage() {
 
   return (
     <>
-      <section className="bg-midnight text-white">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-20">
-          <p className="font-mono text-xs text-stone/50 uppercase tracking-[0.25em] mb-3">
-            Running TT
-          </p>
-          <h1 className="text-3xl md:text-5xl font-semibold tracking-tight">
-            Events
-          </h1>
-          <p className="mt-4 text-stone/60 max-w-lg">
-            Time trial events held around the world. Rolling heats and prize
-            money at every race.
-          </p>
-        </div>
-      </section>
-
       <section className="bg-bone">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          {upcoming.length === 0 && past.length === 0 && (
-            <div className="bg-white border border-stone/40 p-10 md:p-16 text-center mb-20">
-              <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-3">
-                On the start line
-              </p>
-              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight mb-4">
-                The first event is being locked in.
-              </h2>
-              <p className="text-sm text-midnight/60 max-w-md mx-auto mb-8">
-                Events are announced as venues are confirmed, anywhere in the
-                world. Create your athlete profile now and you&apos;ll be
-                ready the moment entries open.
-              </p>
-              <Link
-                href="/login"
-                className="inline-block bg-terracotta text-white text-sm font-medium px-7 py-3 hover:bg-terracotta/90 transition-colors"
-              >
-                Create your profile
-              </Link>
-            </div>
-          )}
+        <div className="mx-auto max-w-6xl px-6 pt-16 pb-24 md:pt-24 md:pb-32">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 lg:gap-12 items-end motion-safe:animate-fade-up">
+            <h1 className="lg:col-span-7 t-display text-[3.4rem] sm:text-[4.4rem] md:text-[5.6rem]">
+              Find your <em>race.</em>
+            </h1>
+            <p className="lg:col-span-5 t-lede max-w-md text-midnight/75 lg:pb-2">
+              Time trials held around the world, wherever there is a good
+              venue and runners who want to race. Small heats, an honest
+              clock, and prize money at every one.
+            </p>
+          </div>
 
-          {upcoming.length > 0 && (
-            <div className="mb-20">
-              <div className="flex items-end justify-between mb-8">
-                <div>
-                  <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                    Upcoming
+          <div className="mt-16 md:mt-24">
+            {upcoming.length > 0 ? (
+              <>
+                <div className="flex items-baseline justify-between gap-4 mb-5">
+                  <h2 className="t-headline text-[1.7rem] md:text-[2.1rem]">Coming up</h2>
+                  <p className="t-eyebrow text-dust">
+                    {upcoming.length} {upcoming.length === 1 ? "race" : "races"}
                   </p>
-                  <h2 className="text-2xl font-semibold tracking-tight">
-                    Open for entry
-                  </h2>
                 </div>
-                <p className="text-sm text-dust font-mono">
-                  {upcoming.length} event{upcoming.length === 1 ? "" : "s"}
-                </p>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {upcoming.map((event) => (
-                  <EventCard
-                    key={event.id}
-                    slug={event.slug}
-                    name={event.name}
-                    distance={event.distance}
-                    date={event.date}
-                    location={event.location}
-                    venue={event.venue}
-                    status={displayStatus(event.status, event.date)}
-                    entryCount={countMap.get(event.id) ?? 0}
-                    entryFeeCents={event.entry_fee_cents}
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {past.length > 0 ? (
-            <div>
-              <div className="flex items-end justify-between mb-8">
-                <div>
-                  <p className="text-xs text-dust uppercase tracking-[0.2em] mb-2">
-                    Completed
+                <RaceList
+                  races={upcoming.map((event) => ({
+                    slug: event.slug,
+                    name: event.name,
+                    distance: event.distance,
+                    date: event.date,
+                    venue: event.venue,
+                    location: event.location,
+                    status: displayStatus(event.status, event.date),
+                    entryFeeCents: event.entry_fee_cents,
+                    entered: countMap.get(event.id) ?? 0,
+                  }))}
+                />
+                {past.length === 0 && (
+                  <p className="mt-8 t-caption text-midnight/55">
+                    No past races yet. The first one is coming.
                   </p>
-                  <h2 className="text-2xl font-semibold tracking-tight">
-                    Past events
-                  </h2>
-                </div>
-                <p className="text-sm text-dust font-mono">
-                  {past.length} event{past.length === 1 ? "" : "s"}
+                )}
+              </>
+            ) : past.length === 0 ? (
+              <div className="border-y rule py-14">
+                <h2 className="t-headline text-[1.8rem] md:text-[2.2rem]">
+                  The first race is being locked in.
+                </h2>
+                <p className="mt-3 max-w-md text-midnight/65 leading-relaxed">
+                  Races are announced as venues are confirmed, anywhere in the
+                  world. Create your athlete profile now and you&apos;ll be
+                  ready the moment entries open.
                 </p>
+                <Link href="/login" className="btn btn-primary mt-7">
+                  Create your profile
+                </Link>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                {past.map((event) => (
-                  <EventCard
-                    key={event.id}
-                    slug={event.slug}
-                    name={event.name}
-                    distance={event.distance}
-                    date={event.date}
-                    location={event.location}
-                    venue={event.venue}
-                    status={displayStatus(event.status, event.date)}
-                    entryCount={countMap.get(event.id) ?? 0}
-                  />
-                ))}
+            ) : (
+              <div className="border-y rule py-10">
+                <h2 className="t-headline text-[1.6rem] md:text-[2rem]">
+                  The next race is being locked in.
+                </h2>
+                <p className="mt-3 max-w-md text-midnight/65 leading-relaxed">
+                  Races are announced as venues are confirmed. Set up your
+                  athlete profile and you will be ready the moment bookings
+                  open.
+                </p>
+                <Link href="/login" className="inline-block mt-5 link-quiet text-midnight">
+                  Set up your profile
+                </Link>
               </div>
-            </div>
-          ) : upcoming.length > 0 ? (
-            <div className="border border-stone/40 bg-white p-12 text-center">
-              <p className="text-dust text-sm">
-                No past events yet. The first one is coming.
-              </p>
-            </div>
-          ) : null}
+            )}
+          </div>
         </div>
       </section>
+
+      {past.length > 0 && (
+        <section className="bg-stone">
+          <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+            <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-4 mb-10 md:mb-14">
+              <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
+                Past <em>races</em>
+              </h2>
+              <p className="t-caption text-midnight/60 max-w-xs">
+                {past.length} {past.length === 1 ? "race" : "races"} run so far.
+                Thank you to everyone who lined up.
+              </p>
+            </div>
+            <ol className="border-t rule">
+              {past.map((event) => (
+                <li key={event.id} className="border-b rule">
+                  <EventCard
+                    slug={event.slug}
+                    name={event.name}
+                    distance={event.distance}
+                    date={event.date}
+                    location={event.location}
+                    venue={event.venue}
+                    status={displayStatus(event.status, event.date)}
+                    entryCount={countMap.get(event.id) ?? 0}
+                  />
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+      )}
 
       <GlobeMap />
     </>

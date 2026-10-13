@@ -104,44 +104,46 @@ export default function PhotoAlbum({
   }
 
   return (
-    <div className="bg-white border border-stone/40 p-6">
-      <div className="flex items-end justify-between mb-4">
-        <div>
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-2">
-            Your album
-          </p>
-          <h3 className="text-lg font-semibold tracking-tight">Photos</h3>
-        </div>
-        <p className="font-mono text-xs text-dust">
+    <div className="bg-white border rule p-6 md:p-10">
+      <div className="flex items-baseline justify-between gap-4">
+        <h3 className="t-headline text-[1.6rem] md:text-[1.9rem]">Your album</h3>
+        <p className="t-numeral text-[1.1rem] text-dust">
           {photos.length} / {MAX_PHOTOS}
         </p>
       </div>
 
-      <p className="text-sm text-midnight/60 leading-relaxed mb-5">
+      <p className="mt-2 text-[0.95rem] text-midnight/60 leading-relaxed max-w-md">
         Race day, training, the people you run with. These sit on your public
         athlete profile.
       </p>
 
       {photos.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
+        <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-6">
           {photos.map((photo) => (
             <div key={photo.id}>
-              <div className="relative group">
+              <div className="relative">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={photo.url}
                   alt={photo.caption || "Album photo"}
-                  className="w-full aspect-square object-cover border border-stone/40"
+                  className="w-full aspect-[4/5] object-cover bg-stone"
                 />
                 <button
                   type="button"
                   onClick={() => removePhoto(photo.id)}
                   aria-label="Remove photo"
-                  className="absolute top-1.5 right-1.5 w-6 h-6 flex items-center justify-center bg-midnight/80 text-white text-sm hover:bg-terracotta transition-colors"
+                  className="group/remove absolute top-0 right-0 w-11 h-11 flex items-start justify-end"
                 >
-                  ×
+                  {/* A small mark, with the full 44px corner to tap. */}
+                  <span
+                    aria-hidden
+                    className="w-8 h-8 flex items-center justify-center bg-midnight/75 text-bone group-hover/remove:bg-terracotta transition-colors"
+                  >
+                    ×
+                  </span>
                 </button>
               </div>
+              {/* Set like the caption it becomes on the public page. */}
               <input
                 type="text"
                 defaultValue={photo.caption}
@@ -149,27 +151,25 @@ export default function PhotoAlbum({
                 placeholder="Add a caption"
                 maxLength={140}
                 aria-label="Photo caption"
-                className="w-full mt-1.5 border border-stone/40 px-2 py-1.5 text-xs bg-bone/50 focus:outline-none focus:border-terracotta transition-colors"
+                className="w-full mt-1 min-h-11 bg-transparent border-0 border-b border-midnight/15 px-0 py-2 font-serif italic text-base text-midnight/80 placeholder:text-midnight/35 focus:outline-none focus:border-terracotta transition-colors"
               />
             </div>
           ))}
         </div>
       )}
 
-      <div aria-live="polite">
-        {status && <p className="text-xs text-trail mb-2">{status}</p>}
+      <div aria-live="polite" className="mt-6">
+        {status && <p className="text-[0.9rem] text-trail mb-3">{status}</p>}
         {error && (
-          <p role="alert" className="text-xs text-terracotta mb-2">
+          <p role="alert" className="text-[0.9rem] text-terracotta mb-3">
             {error}
           </p>
         )}
       </div>
 
       <label
-        className={`inline-block text-xs font-medium border px-4 py-2 transition-colors ${
-          full || uploading
-            ? "border-stone/40 text-dust cursor-not-allowed"
-            : "border-terracotta/30 text-terracotta hover:bg-terracotta/5 cursor-pointer"
+        className={`btn btn-sm btn-ghost has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-terracotta ${
+          full || uploading ? "opacity-45 cursor-not-allowed" : "cursor-pointer"
         }`}
       >
         {uploading
@@ -185,11 +185,11 @@ export default function PhotoAlbum({
           accept="image/jpeg,image/png,image/webp"
           multiple
           onChange={handleFiles}
-          className="hidden"
+          className="sr-only"
           disabled={full || uploading}
         />
       </label>
-      <p className="text-[11px] text-midnight/40 mt-2">
+      <p className="text-[0.8rem] text-midnight/50 mt-2.5">
         JPG, PNG or WebP, up to 5 MB each. Pick several at once.
       </p>
     </div>

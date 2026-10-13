@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import CountrySelect from "@/components/CountrySelect";
 import { formatEventDate } from "@/lib/dates";
 import { formatFee } from "@/lib/money";
+import { fieldInputCls, fieldLabelCls, fieldSelectCls, fieldTextareaCls } from "@/components/fieldStyles";
 
 interface Initial {
   firstName: string;
@@ -29,12 +30,13 @@ interface OpenEvent {
   heatSummary: string | null;
 }
 
-const inputCls =
-  "w-full bg-white/5 border border-white/15 px-4 py-3.5 text-base text-white placeholder:text-white/30 focus:outline-none focus:border-terracotta focus:bg-white/10 transition-colors";
-const selectCls =
-  "w-full appearance-none bg-white/5 border border-white/15 pl-4 pr-10 py-3.5 text-base cursor-pointer focus:outline-none focus:border-terracotta focus:bg-white/10 transition-colors [color-scheme:dark] [&_optgroup]:bg-midnight [&_option]:bg-midnight [&_option]:text-white";
-const labelCls =
-  "block font-mono text-[10px] uppercase tracking-[0.25em] text-stone/60 mb-2";
+/* Paper fields on bone, matching sign in. The focus frame tightens the
+   global focus outline onto the border: one clear 2px terracotta edge. */
+const inputCls = fieldInputCls;
+const textareaCls = fieldTextareaCls;
+const selectCls = fieldSelectCls;
+const labelCls = fieldLabelCls;
+const helpCls = "text-[0.98rem] text-midnight/65 leading-relaxed";
 
 /**
  * First-run profile, in three short steps, then an invitation to the next
@@ -150,31 +152,57 @@ export default function Onboarding({
     }
   }
 
-  const headings = [
-    { kicker: "Step 1 of " + totalSteps, title: "What do we call you?" },
-    { kicker: "Step 2 of " + totalSteps, title: "A couple of details" },
-    { kicker: "Step 3 of " + totalSteps, title: "In your words" },
-    { kicker: "One more thing", title: "There is a race open" },
+  const headings: { kicker: string; title: ReactNode }[] = [
+    {
+      kicker: "Step 1 of " + totalSteps,
+      title: (
+        <>
+          What do we <em>call you?</em>
+        </>
+      ),
+    },
+    {
+      kicker: "Step 2 of " + totalSteps,
+      title: (
+        <>
+          A couple of <em>details.</em>
+        </>
+      ),
+    },
+    {
+      kicker: "Step 3 of " + totalSteps,
+      title: (
+        <>
+          In your <em>own words.</em>
+        </>
+      ),
+    },
+    {
+      kicker: "One more thing",
+      title: (
+        <>
+          There is a race <em>open.</em>
+        </>
+      ),
+    },
   ];
 
   return (
-    <div className="bg-midnight/80 backdrop-blur-md border border-white/10 p-7 md:p-10 shadow-2xl shadow-black/40 motion-safe:animate-fade-up">
-      {/* Progress */}
-      <div className="flex gap-1.5 mb-8" aria-hidden>
+    <div className="motion-safe:animate-fade-up">
+      {/* Progress, a run of hairline splits */}
+      <div className="flex gap-1.5 mb-9" aria-hidden>
         {Array.from({ length: totalSteps }).map((_, i) => (
           <div
             key={i}
             className={`h-0.5 flex-1 transition-colors duration-500 ${
-              i <= step ? "bg-terracotta" : "bg-white/15"
+              i <= step ? "bg-terracotta" : "bg-midnight/12"
             }`}
           />
         ))}
       </div>
 
-      <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-3">
-        {headings[step].kicker}
-      </p>
-      <h1 className="text-3xl md:text-4xl font-semibold tracking-tight mb-2">
+      <p className="t-eyebrow text-terracotta">{headings[step].kicker}</p>
+      <h1 className="t-display mt-4 text-[2.5rem] md:text-[3.1rem]">
         {headings[step].title}
       </h1>
 
@@ -184,9 +212,9 @@ export default function Onboarding({
             e.preventDefault();
             goNext();
           }}
-          className="mt-6 space-y-5"
+          className="mt-6 space-y-6"
         >
-          <p className="text-sm text-stone/60 leading-relaxed">
+          <p className={helpCls}>
             This is how your name appears on results and your athlete page.
             {toBooking && " Three quick steps, then you pick your heat."}
             {toBooked && " Three quick steps, then straight to your booking."}
@@ -206,7 +234,10 @@ export default function Onboarding({
           </div>
           <div>
             <label htmlFor="middleName" className={labelCls}>
-              Middle name <span className="text-stone/40">(if you have one)</span>
+              Middle name{" "}
+              <span className="t-caption normal-case tracking-normal font-normal text-midnight/45">
+                if you have one
+              </span>
             </label>
             <input
               id="middleName"
@@ -228,8 +259,8 @@ export default function Onboarding({
               className={inputCls}
             />
           </div>
-          {error && <p role="alert" className="text-sm text-terracotta">{error}</p>}
-          <button type="submit" className="w-full bg-terracotta text-white font-medium py-4 hover:bg-terracotta/90 transition-colors">
+          {error && <p role="alert" className="text-[0.95rem] text-terracotta">{error}</p>}
+          <button type="submit" className="btn btn-primary btn-lg w-full">
             Continue
           </button>
         </form>
@@ -241,9 +272,9 @@ export default function Onboarding({
             e.preventDefault();
             goNext();
           }}
-          className="mt-6 space-y-5"
+          className="mt-6 space-y-6"
         >
-          <p className="text-sm text-stone/60 leading-relaxed">
+          <p className={helpCls}>
             Your date of birth places you in an age group at every event.
             Only your age group is ever shown, never the date.
           </p>
@@ -259,7 +290,7 @@ export default function Onboarding({
               max={new Date().toISOString().slice(0, 10)}
               value={form.dateOfBirth}
               onChange={(e) => set("dateOfBirth", e.target.value)}
-              className={`${inputCls} [color-scheme:dark]`}
+              className={inputCls}
             />
           </div>
           <div>
@@ -287,7 +318,7 @@ export default function Onboarding({
                     id="country"
                     value={form.country}
                     onChange={(value) => set("country", value)}
-                    className={`${selectCls} ${form.country ? "text-white" : "text-white/40"}`}
+                    className={`${selectCls} ${form.country ? "text-midnight" : "text-midnight/40"}`}
                   />
                   <svg
                     aria-hidden
@@ -297,23 +328,27 @@ export default function Onboarding({
                     fill="none"
                     stroke="currentColor"
                     strokeWidth="1.5"
-                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-stone/60"
+                    className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-midnight/50"
                   >
                     <path d="M2.5 4.5L6 8l3.5-3.5" />
                   </svg>
                 </div>
               </div>
             </div>
-            <p className="mt-2 text-[11px] text-stone/40">
+            <p className="t-caption mt-2.5 text-midnight/50">
               Shown on your athlete page as your home base.
             </p>
           </div>
-          {error && <p role="alert" className="text-sm text-terracotta">{error}</p>}
-          <div className="flex gap-3">
-            <button type="button" onClick={() => setStep(0)} className="px-5 py-4 text-sm text-stone/60 hover:text-white transition-colors">
+          {error && <p role="alert" className="text-[0.95rem] text-terracotta">{error}</p>}
+          <div className="flex items-center gap-6">
+            <button
+              type="button"
+              onClick={() => setStep(0)}
+              className="inline-flex items-center min-h-14 link-quiet text-[0.95rem] text-midnight/65 hover:text-midnight transition-colors"
+            >
               Back
             </button>
-            <button type="submit" className="flex-1 bg-terracotta text-white font-medium py-4 hover:bg-terracotta/90 transition-colors">
+            <button type="submit" className="btn btn-primary btn-lg flex-1">
               Continue
             </button>
           </div>
@@ -326,9 +361,9 @@ export default function Onboarding({
             e.preventDefault();
             submitProfile();
           }}
-          className="mt-6 space-y-5"
+          className="mt-6 space-y-6"
         >
-          <p className="text-sm text-stone/60 leading-relaxed">
+          <p className={helpCls}>
             Who you are, what you are chasing. This sits under your name on
             your public athlete page. You can add a longer story later.
           </p>
@@ -344,18 +379,22 @@ export default function Onboarding({
               value={form.bio}
               onChange={(e) => set("bio", e.target.value)}
               placeholder="Chasing a sub 5 mile. Train with the Geelong crew on Tuesdays."
-              className={inputCls}
+              className={textareaCls}
             />
-            <p className="mt-1.5 text-[11px] text-stone/40 text-right">
+            <p className="t-numeral mt-2 text-[0.85rem] text-midnight/40 text-right">
               {form.bio.length} / 600
             </p>
           </div>
-          {error && <p role="alert" className="text-sm text-terracotta">{error}</p>}
-          <div className="flex gap-3">
-            <button type="button" onClick={() => setStep(1)} className="px-5 py-4 text-sm text-stone/60 hover:text-white transition-colors">
+          {error && <p role="alert" className="text-[0.95rem] text-terracotta">{error}</p>}
+          <div className="flex items-center gap-6">
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              className="inline-flex items-center min-h-14 link-quiet text-[0.95rem] text-midnight/65 hover:text-midnight transition-colors"
+            >
               Back
             </button>
-            <button type="submit" disabled={busy} className="flex-1 bg-terracotta text-white font-medium py-4 hover:bg-terracotta/90 transition-colors disabled:opacity-50">
+            <button type="submit" disabled={busy} className="btn btn-primary btn-lg flex-1">
               {busy
                 ? "Saving..."
                 : toBooking
@@ -372,49 +411,50 @@ export default function Onboarding({
 
       {step === 3 && offer && (
         <div className="mt-6">
-          <p className="text-sm text-stone/60 leading-relaxed mb-6">
+          <p className={`${helpCls} mb-8`}>
             {offer.hasHeats
               ? "Your profile is set. Heats are open for booking right now."
               : "Your profile is set. Entries are open right now for this one."}
           </p>
-          <div className="border border-terracotta/40 bg-terracotta/10 p-6 mb-6">
-            <p className="font-mono text-[10px] uppercase tracking-[0.25em] text-terracotta mb-2">
+          {/* The race, set like a ticket */}
+          <div className="bg-midnight text-bone px-6 py-7 md:px-8 mb-6">
+            <p className="t-eyebrow text-terracotta">
               {offer.distance} · {offer.venue}
             </p>
-            <p className="text-2xl font-semibold tracking-tight">{offer.name}</p>
-            <p className="text-sm text-stone/70 mt-1">
+            <p className="t-headline mt-3 text-[1.9rem] md:text-[2.3rem]">{offer.name}</p>
+            <p className="mt-3 text-[0.95rem] text-bone/70 leading-relaxed">
               {formatEventDate(offer.date, "medium")} ·{" "}
               {offer.heatSummary ?? offer.time}
             </p>
-            <p className="font-mono text-xs text-stone/60 mt-4">
-              {offer.entryFeeCents > 0
-                ? `${formatFee(offer.entryFeeCents)} entry`
-                : "Free entry"}
+            <p className="mt-6 pt-5 border-t rule-light flex items-baseline gap-2">
+              {offer.entryFeeCents > 0 ? (
+                <>
+                  <span className="t-numeral text-[1.7rem]">{formatFee(offer.entryFeeCents)}</span>
+                  <span className="text-[0.95rem] text-bone/65">entry</span>
+                </>
+              ) : (
+                <span className="t-headline text-[1.4rem]">Free entry</span>
+              )}
             </p>
           </div>
-          {error && <p role="alert" className="text-sm text-terracotta mb-4">{error}</p>}
+          {error && <p role="alert" className="text-[0.95rem] text-terracotta mb-4">{error}</p>}
           {offer.hasHeats ? (
-            <a
-              href={`/events/${offer.slug}/book`}
-              className="block w-full text-center bg-terracotta text-white text-lg font-medium py-4 hover:bg-terracotta/90 transition-colors"
-            >
+            <a href={`/events/${offer.slug}/book`} className="btn btn-primary btn-lg w-full">
               Choose your heat
             </a>
           ) : (
-            <button
-              onClick={enterEvent}
-              disabled={busy}
-              className="w-full bg-terracotta text-white text-lg font-medium py-4 hover:bg-terracotta/90 transition-colors disabled:opacity-50"
-            >
+            <button onClick={enterEvent} disabled={busy} className="btn btn-primary btn-lg w-full">
               {busy ? "Entering..." : "Count me in"}
             </button>
           )}
-          <a
-            href="/dashboard?welcome=1"
-            className="mt-4 w-full min-h-11 inline-flex items-center justify-center py-2 text-sm text-stone/50 hover:text-white transition-colors"
-          >
-            Not this time
-          </a>
+          <div className="mt-3 text-center">
+            <a
+              href="/dashboard?welcome=1"
+              className="inline-flex items-center min-h-11 px-2 link-quiet text-[0.95rem] text-midnight/60"
+            >
+              Not this time
+            </a>
+          </div>
         </div>
       )}
     </div>
