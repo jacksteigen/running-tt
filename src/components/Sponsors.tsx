@@ -19,57 +19,47 @@ const sponsors: Sponsor[] = [
 
 export default function Sponsors() {
   return (
-    <section className="bg-bone border-t border-stone/40">
-      <div className="mx-auto max-w-6xl px-6 py-14 md:py-20">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 items-center">
-          <div>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-dust mb-3">
-              Sponsors
-            </p>
-            <h2 className="text-2xl font-semibold tracking-tight mb-3">
-              The purse is backed.
+    <section className="bg-bone">
+      <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-end">
+          <div className="lg:col-span-5">
+            <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
+              The purse is <em>backed.</em>
             </h2>
-            <p className="text-sm text-midnight/60 leading-relaxed">
-              Prize money at every event comes from entry fees plus cash from
-              our sponsors. They back the runners, you see who they are.
+            <p className="mt-5 max-w-sm text-midnight/70 leading-relaxed">
+              Prize money comes from entry fees and from the people who back
+              the runners. You will always see who they are.
             </p>
           </div>
 
-          <div className="lg:col-span-2">
-            <div className="flex flex-wrap items-center gap-4">
-              {sponsors.map((s) => (
+          <ul className="lg:col-span-7 border-t rule">
+            {sponsors.map((s) => (
+              <li key={s.name} className="border-b rule">
                 <a
-                  key={s.name}
                   href={s.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group bg-white border border-stone/40 hover:border-midnight/30 transition-colors px-8 py-6"
+                  className="group flex items-baseline justify-between gap-6 py-6"
                 >
-                  <p className="text-xl font-semibold tracking-[0.18em] group-hover:text-terracotta transition-colors">
+                  <span className="t-eyebrow text-[1.5rem] md:text-[1.9rem] tracking-[0.2em] text-midnight group-hover:text-terracotta transition-colors duration-300">
                     {s.name}
-                  </p>
-                  {s.tag && (
-                    <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mt-1.5">
-                      {s.tag}
-                    </p>
-                  )}
+                  </span>
+                  {s.tag && <span className="t-caption text-midnight/55">{s.tag}</span>}
                 </a>
-              ))}
-
-              {/* Become a sponsor */}
+              </li>
+            ))}
+            <li className="border-b rule">
               <a
                 href="mailto:partners@runningtt.com?subject=Sponsoring%20Running%20TT"
-                className="border border-dashed border-dust/50 hover:border-terracotta px-8 py-6 transition-colors group"
+                className="group flex items-baseline justify-between gap-6 py-6"
               >
-                <p className="text-sm font-medium text-midnight/70 group-hover:text-terracotta transition-colors">
-                  Become a sponsor →
-                </p>
-                <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-dust mt-1.5">
-                  Back the purse
-                </p>
+                <span className="t-headline text-[1.3rem] md:text-[1.5rem] text-midnight/60 group-hover:text-terracotta transition-colors duration-300">
+                  Your name here
+                </span>
+                <span className="link-draw text-[0.95rem] text-midnight">Back the purse</span>
               </a>
-            </div>
-          </div>
+            </li>
+          </ul>
         </div>
       </div>
     </section>

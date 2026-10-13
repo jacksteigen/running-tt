@@ -21,7 +21,8 @@ export async function getStripe(): Promise<Stripe> {
 /** True while the account is on test keys, when no real money can move. */
 export async function isStripeTestMode(): Promise<boolean> {
   try {
-    return (await getKey()).startsWith("sk_test_");
+    // Secret (sk_) and restricted (rk_) keys both carry _test_ in test mode.
+    return /^(sk|rk)_test_/.test(await getKey());
   } catch {
     return true;
   }
@@ -73,9 +74,23 @@ export async function createCheckoutSession({
     success_url: successUrl,
     cancel_url: cancelUrl,
     customer_email: userEmail,
+    // Payments run through Steigen's Stripe account. The suffix makes card
+    // statements read "STEIGEN* RUNNING TT" so athletes recognise the
+    // charge, and the brand tag lets Steigen's books filter Running TT.
+    payment_intent_data: {
+      description: `Running TT · ${eventName}${heatText ? ` · ${heatText}` : ""}`,
+      statement_descriptor_suffix: "RUNNING TT",
+      metadata: {
+        brand: "running-tt",
+        entry_id: entryId,
+        event_id: eventId,
+        user_id: userId,
+      },
+    },
     // The heat spot is held for HOLD_MINUTES; the session closes before that.
     expires_at: Math.floor(Date.now() / 1000) + 31 * 60,
     metadata: {
+      brand: "running-tt",
       entry_id: entryId,
       event_id: eventId,
       user_id: userId,

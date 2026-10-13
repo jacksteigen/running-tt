@@ -3,7 +3,7 @@ import Image from "next/image";
 import { getDB } from "@/lib/db";
 import LiveClock from "@/components/LiveClock";
 import Countdown from "@/components/Countdown";
-import EventCard from "@/components/EventCard";
+import RaceList from "@/components/RaceList";
 import Sponsors from "@/components/Sponsors";
 import Reveal from "@/components/Reveal";
 import { displayStatus, todayInMelbourne } from "@/lib/events";
@@ -19,36 +19,22 @@ import { formatFee } from "@/lib/money";
 
 export const dynamic = "force-dynamic";
 
-const stats = [
-  { value: "$15", label: "standard entry fee" },
-  { value: "Cash", label: "prize money at every event" },
-  { value: "1", label: "distance per event, announced with the race" },
-];
-
 const steps = [
   {
-    number: "01",
-    title: "Book a race",
-    description:
-      "Races are announced when they're locked in. Tracks, road courses, anywhere a good race can be held.",
+    title: "Book a heat",
+    body: "Races are announced once they are locked in, on a track, a road, or anywhere a good race can be held. Pick your heat and you are on the start list.",
   },
   {
-    number: "02",
-    title: "Rolling heats",
-    description:
-      "Runners go off in small heats across the event window. Show up, warm up, race when your number is called.",
+    title: "Run your race",
+    body: "Small heats go off through the event window. Warm up, toe the line when your heat is called, and run against the clock.",
   },
   {
-    number: "03",
-    title: "Times posted",
-    description:
-      "Every time gets recorded at the finish and posted to the event page. Your run lives there afterwards.",
+    title: "Your time, on the record",
+    body: "Every finisher gets a time, a place, and their age group, posted to the event page and kept on their athlete profile.",
   },
   {
-    number: "04",
-    title: "Prize money",
-    description:
-      "Every event pays out prize money. The purse and how it splits is announced with the race.",
+    title: "Paid on the day",
+    body: "Every race pays prize money, handed out at the finish once the last runner is home. The purse is listed before you enter.",
   },
 ];
 
@@ -135,142 +121,146 @@ export default async function Home() {
     ? describeSpotlight(nextOpen, countMap.get(nextOpen.id) ?? 0, spotlightHeats)
     : null;
 
+  // The most recent race with times, so the home page celebrates real
+  // finishers rather than describing them.
+  const lastRace = await db
+    .prepare(
+      `SELECT ev.id, ev.slug, ev.name, ev.distance, ev.date, ev.venue
+       FROM events ev
+       WHERE ev.date < ? AND EXISTS (SELECT 1 FROM results r WHERE r.event_id = ev.id)
+       ORDER BY ev.date DESC LIMIT 1`
+    )
+    .bind(todayInMelbourne())
+    .first<{ id: string; slug: string; name: string; distance: string; date: string; venue: string }>();
+
+  const finishers = lastRace
+    ? ((await db
+        .prepare(
+          `SELECT r.rank, r.time_display, u.id as user_id, u.name
+           FROM results r JOIN users u ON u.id = r.user_id
+           WHERE r.event_id = ? ORDER BY r.rank ASC LIMIT 5`
+        )
+        .bind(lastRace.id)
+        .all()) as unknown as {
+        results: { rank: number; time_display: string; user_id: string; name: string }[];
+      }).results
+    : [];
+
   return (
     <>
       {/* Hero */}
-      <section className="relative bg-midnight text-white overflow-hidden min-h-[86vh] md:min-h-[92vh] flex items-end">
-        <Image
-          src="/images/athlete-track-lane.jpg"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-center opacity-55 motion-safe:animate-slow-zoom"
-          aria-hidden
-        />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-midnight via-midnight/60 to-midnight/10" />
-        <div aria-hidden className="absolute inset-0 bg-gradient-to-r from-midnight/80 via-midnight/20 to-transparent" />
-        <div className="relative mx-auto max-w-6xl px-6 w-full pb-14 pt-36 md:pb-24 md:pt-48">
-          <div className="grid grid-cols-1 lg:grid-cols-5 gap-12 lg:gap-8 items-end">
-            <div className="lg:col-span-3 motion-safe:animate-fade-up">
-              <div className="mb-7">
-                <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta">
-                  Running TT
-                </p>
-                <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/60 mt-1.5">
-                  Worldwide time trials
-                </p>
-              </div>
-              <h1 className="text-5xl md:text-7xl lg:text-[5.5rem] font-semibold tracking-[-0.03em] leading-[0.98]">
-                You. The clock.
-                <br />
-                <span className="text-stone/60">Nothing else.</span>
-              </h1>
-              <p className="mt-7 text-lg md:text-xl text-stone/80 max-w-lg leading-relaxed">
-                Time trial events held around the world. Rolling heats and
-                real prize money at every race.
-              </p>
-              <div className="mt-9 flex flex-wrap items-center gap-3">
-                <Link
-                  href="/events"
-                  className="inline-block bg-terracotta text-white font-medium px-8 py-4 text-sm hover:bg-terracotta/90 transition-colors"
-                >
-                  Find an event
-                </Link>
-                <Link
-                  href="/format"
-                  className="inline-block border border-white/25 text-white px-8 py-4 text-sm hover:border-white/60 hover:bg-white/5 transition-colors"
-                >
-                  How it works
-                </Link>
-              </div>
+      <section className="relative bg-midnight text-bone overflow-hidden min-h-[88svh] md:min-h-[94vh] flex items-end">
+        {/* Phones: the photo fills the hero. Desktop: it takes the right
+            side, like a magazine cover, so the type never sits on the runner. */}
+        <div aria-hidden className="absolute inset-0 lg:left-[52%] overflow-hidden">
+          <Image
+            src="/images/athlete-track-lane.jpg"
+            alt=""
+            fill
+            priority
+            sizes="(min-width: 1024px) 48vw, 100vw"
+            className="object-cover object-[42%_30%] opacity-75 lg:opacity-95 motion-safe:animate-slow-zoom"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-midnight via-midnight/40 to-midnight/0" />
+          <div className="absolute inset-0 hidden lg:block bg-gradient-to-r from-midnight via-midnight/10 to-transparent w-1/3" />
+        </div>
+        <div aria-hidden className="absolute inset-0 lg:hidden bg-gradient-to-r from-midnight/70 via-midnight/20 to-transparent" />
+        <div className="relative mx-auto max-w-6xl px-6 w-full pb-12 pt-40 md:pb-20">
+          <div className="max-w-3xl lg:max-w-[48%] motion-safe:animate-fade-up">
+            <p className="t-eyebrow text-bone/70">Worldwide time trials</p>
+            <h1 className="t-display mt-5 text-[3.4rem] sm:text-[4.8rem] md:text-[6.2rem] lg:text-[clamp(4.4rem,5.6vw,6rem)]">
+              You.
+              <br />
+              The clock.
+              <br />
+              <em className="text-bone/75">Nothing else.</em>
+            </h1>
+            <p className="t-lede mt-7 max-w-md text-bone/85">
+              Time trials for people who love to run. Small heats, an honest
+              clock, and real prize money at every race.
+            </p>
+            <div className="mt-9 flex flex-wrap items-center gap-3">
+              <Link href="/events" className="btn btn-primary btn-lg">
+                Find a race
+              </Link>
+              <Link href="/format" className="btn btn-light btn-lg">
+                How it works
+              </Link>
             </div>
+          </div>
 
-            {/* Live clock */}
-            <div className="lg:col-span-2 lg:justify-self-end motion-safe:animate-fade-up [animation-delay:180ms]">
-              <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/50 mb-4">
-                Race clock
-              </p>
-              <LiveClock />
-            </div>
+          <div className="mt-14 md:mt-20 flex flex-col md:flex-row md:items-end md:justify-between gap-8 border-t rule-light pt-6 motion-safe:animate-fade-up [animation-delay:200ms]">
+            <p className="t-caption text-bone/60 max-w-xs">
+              Every race starts the same way. A line, a gun, and a clock that
+              does not care who you are.
+            </p>
+            <LiveClock />
           </div>
         </div>
       </section>
 
-      {/* Next Event Spotlight */}
+      {/* Next race */}
       {nextOpen && spotlight && (
-        <section className="bg-terracotta text-white">
-          <div className="mx-auto max-w-6xl px-6 py-10 md:py-14">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 items-center">
-              <div className="lg:col-span-3">
-                <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/70 mb-3">
-                  Next event{nextOpen.distance ? ` · ${nextOpen.distance}` : ""}
+        <section className="bg-terracotta text-bone">
+          <div className="mx-auto max-w-6xl px-6 py-14 md:py-20">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12 items-end">
+              <div className="lg:col-span-7">
+                <p className="t-eyebrow text-bone/75">
+                  Next race{nextOpen.distance ? `, ${nextOpen.distance}` : ""}
                 </p>
-                <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">
+                <h2 className="t-display mt-4 text-[2.8rem] md:text-[4.2rem]">
                   {nextOpen.name}
                 </h2>
-                <p className="mt-2 text-white/85 text-sm md:text-base">
-                  {spotlight.tbc
-                    ? "Date to be announced"
-                    : formatEventDate(nextOpen.date, "long")}{" "}
-                  · {nextOpen.venue}
+                <p className="t-lede mt-4 text-bone/90">
+                  <em>
+                    {spotlight.tbc ? "Date to be announced" : formatEventDate(nextOpen.date, "long")}
+                  </em>
+                  {!/TBC/i.test(nextOpen.venue) && <>, {nextOpen.venue}</>}
                 </p>
-                {spotlight.heatTimes && !spotlight.tbc && (
-                  <p className="mt-1 font-mono text-xs uppercase tracking-[0.2em] text-white/70">
-                    Heats {spotlight.heatTimes}
-                  </p>
-                )}
-                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/80">
-                  {spotlight.facts.map((fact, i) => (
-                    <span key={fact} className="flex items-center gap-4">
-                      {i > 0 && <span aria-hidden className="text-white/40">·</span>}
-                      <span className="font-mono">{fact}</span>
-                    </span>
+                <ul className="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-[0.95rem] text-bone/85">
+                  {spotlight.heatTimes && !spotlight.tbc && <li>Heats {spotlight.heatTimes}</li>}
+                  {spotlight.facts.map((fact) => (
+                    <li key={fact}>{fact}</li>
                   ))}
-                </div>
+                </ul>
                 {spotlight.fullNote && (
-                  <p className="mt-5 flex items-start gap-2.5 max-w-md text-sm text-white/90 leading-relaxed">
-                    <span
-                      aria-hidden
-                      className="mt-[7px] inline-block w-1.5 h-1.5 rounded-full bg-white/70 shrink-0"
-                    />
+                  <p className="mt-5 max-w-md text-[0.95rem] text-bone/90 leading-relaxed">
                     {spotlight.fullNote}
                   </p>
                 )}
-                <Link
-                  href={spotlight.cta.href}
-                  className="inline-flex items-center gap-2 mt-6 bg-white text-terracotta font-medium px-6 py-3 min-h-[44px] text-sm hover:bg-bone transition-colors"
-                >
-                  {spotlight.cta.label} <span aria-hidden>→</span>
-                </Link>
+                <div className="mt-8">
+                  <Link
+                    href={spotlight.cta.href}
+                    className="btn btn-lg bg-bone text-midnight hover:bg-midnight hover:text-bone"
+                  >
+                    {spotlight.cta.label}
+                  </Link>
+                </div>
               </div>
 
-              <div className="lg:col-span-2 lg:border-l lg:border-white/20 lg:pl-8">
+              <div className="lg:col-span-5 border-t border-bone/25 pt-8 lg:border-t-0 lg:pt-0 lg:border-l lg:pl-12">
                 {spotlight.tbc ? (
-                  <div className="border-t border-white/20 pt-6 lg:border-t-0 lg:pt-0">
-                    <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/60 mb-3">
-                      Bookings
-                    </p>
-                    <p className="text-2xl md:text-3xl font-semibold tracking-tight">
-                      Opening soon
-                    </p>
-                    <p className="mt-3 text-sm text-white/80 leading-relaxed max-w-sm">
+                  <>
+                    <p className="t-eyebrow text-bone/70">Bookings</p>
+                    <p className="t-headline mt-3 text-[2rem] md:text-[2.4rem]">Opening soon.</p>
+                    <p className="mt-3 text-[0.95rem] text-bone/85 leading-relaxed max-w-sm">
                       {spotlight.withHeats
-                        ? "The date and heat times are being locked in. Set up your profile now and you are one tap from booking a heat when they land."
-                        : "The date is being locked in. Set up your profile now and you are one tap from entering when it lands."}
+                        ? "The date and heat times are being locked in. Set up your profile now and you will be one tap from booking a heat."
+                        : "The date is being locked in. Set up your profile now and you will be one tap from entering."}
                     </p>
-                  </div>
+                    <Link href="/login" className="inline-block mt-5 link-quiet text-bone decoration-bone/40">
+                      Set up your profile
+                    </Link>
+                  </>
                 ) : (
                   <>
-                    <p className="font-mono text-xs uppercase tracking-[0.25em] text-white/60 mb-4">
-                      {spotlight.withHeats && nextOpen.first_heat_time
-                        ? "First heat in"
-                        : "Start gun in"}
+                    <p className="t-eyebrow text-bone/70 mb-4">
+                      {spotlight.withHeats && nextOpen.first_heat_time ? "First heat in" : "Start gun in"}
                     </p>
                     <Countdown
                       target={nextOpen.date}
                       time={spotlight.withHeats ? nextOpen.first_heat_time : null}
-                      className="text-white"
+                      className="text-bone"
                     />
                   </>
                 )}
@@ -280,185 +270,196 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Full-bleed photo band */}
-      <section className="bg-midnight">
-        <div className="relative w-full h-[320px] md:h-[460px] lg:h-[540px] overflow-hidden">
-          <Image
-            src="/images/athlete-sock-bench.jpg"
-            alt="Athlete lacing up before a Running TT heat"
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover object-center"
-          />
-          <div
-            aria-hidden
-            className="absolute inset-0 bg-gradient-to-t from-midnight/80 via-midnight/10 to-transparent"
-          />
-        </div>
-      </section>
-
+      {/* Why it exists */}
       <Reveal>
-      {/* Stats */}
-      <section className="bg-bone border-y border-stone/40">
-        <div className="mx-auto max-w-6xl px-6 py-10">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {stats.map((stat) => (
-              <div key={stat.label}>
-                <p className="text-2xl md:text-3xl font-semibold tracking-tight font-mono">
-                  {stat.value}
-                </p>
-                <p className="text-sm text-dust mt-1">{stat.label}</p>
-              </div>
-            ))}
+        <section className="bg-bone">
+          <div className="mx-auto max-w-6xl px-6 py-24 md:py-36">
+            <div className="max-w-4xl">
+              <p className="t-eyebrow text-dust">Why we race</p>
+              <p className="t-headline mt-6 text-[1.9rem] sm:text-[2.4rem] md:text-[3.1rem] text-midnight">
+                For the runner up before sunrise. The one chasing a time
+                nobody else knows about. The one who simply loves how a hard
+                effort feels. <em className="text-terracotta">Running TT is for you.</em>
+              </p>
+              <p className="mt-8 max-w-xl text-[1.05rem] leading-relaxed text-midnight/70">
+                Every heat is small, so every runner is seen. Every time is
+                recorded, every finisher gets a place, and every race pays
+                prize money. It is racing built around the athlete, not the
+                spectacle.
+              </p>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
       </Reveal>
 
-      <Reveal>
-      {/* Upcoming Events */}
+      {/* Photograph */}
       <section className="bg-bone">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          <div className="flex items-end justify-between mb-10">
-            <div>
-              <p className="text-xs text-dust uppercase tracking-wide mb-2">
-                Upcoming
-              </p>
-              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">
-                Events
-              </h2>
-            </div>
-            <Link
-              href="/events"
-              className="inline-flex items-center min-h-11 -mb-3 text-sm text-terracotta hover:text-terracotta/80 transition-colors"
-            >
-              View all →
-            </Link>
+        <figure className="mx-auto max-w-6xl px-6">
+          <div className="relative w-full aspect-[4/5] sm:aspect-[16/10] md:aspect-[21/9] overflow-hidden">
+            <Image
+              src="/images/athlete-sock-bench.jpg"
+              alt="An athlete lacing up before a heat"
+              fill
+              sizes="(min-width: 1152px) 1104px, 100vw"
+              className="object-cover object-center"
+            />
           </div>
-          {upcomingEvents.results.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-              {upcomingEvents.results.map((event) => (
-                <EventCard
-                  key={event.id}
-                  slug={event.slug}
-                  name={event.name}
-                  distance={event.distance}
-                  date={event.date}
-                  location={event.location}
-                  venue={event.venue}
-                  status={displayStatus(event.status, event.date)}
-                  entryCount={countMap.get(event.id) ?? 0}
-                  entryFeeCents={event.entry_fee_cents}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white border border-stone/40 p-10 md:p-14 text-center">
-              <p className="font-mono text-xs uppercase tracking-[0.25em] text-terracotta mb-3">
-                On the start line
-              </p>
-              <h3 className="text-xl md:text-2xl font-semibold tracking-tight mb-3">
-                The first event is being locked in.
-              </h3>
-              <p className="text-sm text-midnight/60 max-w-md mx-auto mb-6">
-                Events are announced as venues are confirmed. Create your
-                athlete profile now and you&apos;ll be ready the moment
-                entries open.
-              </p>
-              <Link
-                href="/login"
-                className="inline-block bg-terracotta text-white text-sm font-medium px-7 py-3 hover:bg-terracotta/90 transition-colors"
-              >
-                Create your profile
+          <figcaption className="t-caption text-midnight/55 mt-4">
+            Lacing up. The quiet minute before the gun.
+          </figcaption>
+        </figure>
+      </section>
+
+      {/* Races */}
+      <Reveal>
+        <section className="bg-bone">
+          <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+            <div className="flex flex-wrap items-end justify-between gap-4 mb-10 md:mb-14">
+              <h2 className="t-display text-[2.8rem] md:text-[4.2rem]">Upcoming races</h2>
+              <Link href="/events" className="link-quiet text-midnight text-[0.95rem]">
+                All races
               </Link>
             </div>
-          )}
-        </div>
-      </section>
+            {upcomingEvents.results.length > 0 ? (
+              <RaceList
+                races={upcomingEvents.results.map((event) => ({
+                  slug: event.slug,
+                  name: event.name,
+                  distance: event.distance,
+                  date: event.date,
+                  venue: event.venue,
+                  location: event.location,
+                  status: displayStatus(event.status, event.date),
+                  entryFeeCents: event.entry_fee_cents,
+                  entered: countMap.get(event.id) ?? 0,
+                }))}
+              />
+            ) : (
+              <div className="border-y rule py-14">
+                <h3 className="t-headline text-[1.8rem] md:text-[2.2rem]">The next race is being locked in.</h3>
+                <p className="mt-3 max-w-md text-midnight/65 leading-relaxed">
+                  Races are announced as venues are confirmed. Set up your
+                  athlete profile now and you will be ready the moment
+                  bookings open.
+                </p>
+                <Link href="/login" className="btn btn-primary mt-7">
+                  Set up your profile
+                </Link>
+              </div>
+            )}
+          </div>
+        </section>
       </Reveal>
 
-      <Reveal>
-      {/* How it works */}
-      <section className="bg-stone">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          <div className="flex items-end justify-between mb-12">
-            <div>
-              <p className="text-xs text-dust uppercase tracking-wide mb-2">
-                The format
-              </p>
-              <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">
-                How it works
-              </h2>
+      {/* Recent finishers */}
+      {lastRace && finishers.length > 0 && (
+        <Reveal>
+          <section className="bg-midnight text-bone">
+            <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+                <div className="lg:col-span-5">
+                  <p className="t-eyebrow text-bone/60">On the clock</p>
+                  <h2 className="t-display mt-5 text-[2.6rem] md:text-[3.8rem]">
+                    {lastRace.name}
+                  </h2>
+                  <p className="t-lede mt-4 text-bone/75">
+                    <em>{formatEventDate(lastRace.date, "long")}</em>
+                    {!/TBC/i.test(lastRace.venue) && <>, {lastRace.venue}</>}
+                  </p>
+                  <p className="mt-6 max-w-sm text-bone/70 leading-relaxed">
+                    Thank you to everyone who lined up. These are the runners
+                    who led the way home.
+                  </p>
+                  <Link
+                    href={`/events/${lastRace.slug}`}
+                    className="inline-block mt-6 link-quiet text-bone decoration-bone/40"
+                  >
+                    Full results
+                  </Link>
+                </div>
+                <ol className="lg:col-span-7 border-t rule-light">
+                  {finishers.map((f) => (
+                    <li key={f.user_id} className="border-b rule-light">
+                      <Link
+                        href={`/athletes/${f.user_id}`}
+                        className="group grid grid-cols-[3rem_1fr_auto] items-baseline gap-4 py-5"
+                      >
+                        <span className={`t-numeral text-2xl ${f.rank === 1 ? "text-gold" : "text-bone/45"}`}>
+                          {f.rank}
+                        </span>
+                        <span className="t-headline text-[1.4rem] md:text-[1.7rem] truncate group-hover:text-terracotta transition-colors duration-300">
+                          {f.name}
+                        </span>
+                        <span className="t-numeral text-[1.8rem] md:text-[2.2rem]">{f.time_display}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             </div>
-            <Link
-              href="/format"
-              className="inline-flex items-center min-h-11 -mb-3 text-sm text-terracotta hover:text-terracotta/80 transition-colors"
-            >
-              Full breakdown →
-            </Link>
+          </section>
+        </Reveal>
+      )}
+
+      {/* How it works */}
+      <Reveal>
+        <section className="bg-stone">
+          <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+              <div className="lg:col-span-4">
+                <h2 className="t-display text-[2.8rem] md:text-[3.8rem]">
+                  How a race <em>works</em>
+                </h2>
+                <Link href="/format" className="inline-block mt-6 link-quiet text-midnight">
+                  The full format
+                </Link>
+              </div>
+              <ol className="lg:col-span-8 border-t border-midnight/15">
+                {steps.map((step, i) => (
+                  <li
+                    key={step.title}
+                    className="grid grid-cols-[2.5rem_1fr] md:grid-cols-[4rem_1fr] gap-4 border-b border-midnight/15 py-7"
+                  >
+                    <span className="t-numeral text-[1.6rem] text-terracotta">{i + 1}</span>
+                    <div>
+                      <h3 className="text-[1.45rem] md:text-[1.6rem] leading-tight">{step.title}</h3>
+                      <p className="mt-2 max-w-xl text-midnight/70 leading-relaxed">{step.body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {steps.map((step) => (
-              <div
-                key={step.number}
-                className="border-t-2 border-midnight/10 pt-5"
-              >
-                <p className="text-sm font-mono text-terracotta mb-3">
-                  {step.number}
+        </section>
+      </Reveal>
+
+      {/* Prize money */}
+      <Reveal>
+        <section className="bg-midnight text-bone">
+          <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-end">
+              <div className="lg:col-span-7">
+                <h2 className="t-display text-[3rem] md:text-[4.8rem]">
+                  Prize money.
+                  <br />
+                  <em className="text-gold">Always.</em>
+                </h2>
+              </div>
+              <div className="lg:col-span-5 space-y-4 text-bone/75 leading-relaxed">
+                <p>
+                  Every Running TT race pays out. No qualifying standards and
+                  no fine print: you show up, you race, and fast running gets
+                  rewarded.
                 </p>
-                <h3 className="font-semibold tracking-tight mb-2">
-                  {step.title}
-                </h3>
-                <p className="text-sm text-midnight/60 leading-relaxed">
-                  {step.description}
+                <p>
+                  The purse and how it splits is listed on each race before
+                  you enter, and it is handed out at the finish. It comes from
+                  entry fees and from sponsors who back the runners.
                 </p>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      </Reveal>
-
-      <Reveal>
-      {/* Prize Money */}
-      <section className="bg-midnight text-white">
-        <div className="mx-auto max-w-6xl px-6 py-16 md:py-24">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <p className="text-xs text-gold uppercase tracking-[0.2em] mb-3">
-                Every event
-              </p>
-              <h2 className="text-3xl md:text-4xl font-semibold tracking-tight mb-5">
-                Prize money. Always.
-              </h2>
-              <p className="text-stone/70 leading-relaxed">
-                Every Running TT event pays out prize money. No qualifying
-                standards, no conditions. You show up, you race, and the
-                running gets paid for.
-              </p>
-              <p className="text-stone/70 leading-relaxed mt-4">
-                What the purse is and how it gets split is announced with each
-                race, because no two events are the same. The money comes from
-                entry fees plus cash from our sponsors.
-              </p>
-            </div>
-            <div className="border border-white/10 p-8 md:p-10">
-              <p className="font-mono text-xs uppercase tracking-[0.25em] text-stone/60 mb-4">
-                On the day
-              </p>
-              <p className="text-xl md:text-2xl font-semibold tracking-tight text-gold leading-snug">
-                Run fast, get paid.
-              </p>
-              <p className="mt-4 text-sm text-stone/70 leading-relaxed">
-                Prize money is handed out at the finish, in person, once the
-                last runner is home. Every event page lists exactly what is on
-                offer before you enter.
-              </p>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
       </Reveal>
 
       <Sponsors />

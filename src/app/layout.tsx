@@ -1,19 +1,24 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Archivo, Newsreader } from "next/font/google";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import MobileTabBar from "@/components/MobileTabBar";
 import { SessionProvider } from "@/components/SessionProvider";
 import "./globals.css";
 
-const inter = Inter({
+// Editorial serif for headlines; a grotesk with a width axis for everything
+// else, used narrow for times, clocks and labels like a race bib.
+const display = Newsreader({
   subsets: ["latin"],
-  variable: "--font-sans",
+  style: ["normal", "italic"],
+  axes: ["opsz"],
+  variable: "--font-display",
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const sans = Archivo({
   subsets: ["latin"],
-  variable: "--font-mono",
+  axes: ["wdth"],
+  variable: "--font-archivo",
 });
 
 const SITE_URL = "https://runningtt.com";
@@ -51,7 +56,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
+    <html lang="en" className={`${display.variable} ${sans.variable}`}>
       <body className="min-h-screen flex flex-col font-sans antialiased has-tab-bar">
         <SessionProvider>
           <Nav />

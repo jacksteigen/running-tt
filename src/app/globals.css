@@ -9,8 +9,12 @@
   --color-dust: #7A644A;
   --color-gold: #D4A84B;
 
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* Archivo for reading and UI. "mono" is no longer a code face: it is
+     Archivo drawn narrow (see .font-mono below), for times, clocks and
+     labels, so every existing font-mono becomes race-bib type. */
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-display), Georgia, "Times New Roman", serif;
 
   --animate-fade-up: fade-up 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-page-in: page-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -101,5 +105,226 @@ body {
 @media (max-width: 767px) {
   .has-tab-bar {
     padding-bottom: calc(4.25rem + env(safe-area-inset-bottom));
+  }
+}
+
+
+/* ======================================================================
+   Running TT type and component system.
+
+   These rules sit OUTSIDE any @layer on purpose. Tailwind v4 puts its
+   utilities in a layer, and unlayered CSS always wins over layered CSS, so
+   these define the house style even where older markup still carries
+   utilities like font-semibold or tracking-[0.25em].
+   ====================================================================== */
+
+/* Headlines: editorial serif, regular weight, set close. */
+h1,
+h2 {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-optical-sizing: auto;
+  letter-spacing: -0.018em;
+  line-height: 1.04;
+}
+h3 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-optical-sizing: auto;
+  letter-spacing: -0.008em;
+}
+h1 em,
+h2 em,
+.t-display em {
+  font-style: italic;
+  font-weight: 300;
+}
+
+/* Narrow Archivo for numbers and labels. */
+.font-mono {
+  font-stretch: 78%;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "zero" 0;
+}
+/* Labels were spaced out like a tech template; a race bib is tighter. */
+.font-mono.uppercase,
+.uppercase.tracking-\[0\.2em\],
+.uppercase.tracking-\[0\.25em\],
+.uppercase.tracking-\[0\.3em\],
+.uppercase.tracking-wide,
+.uppercase.tracking-wider {
+  letter-spacing: 0.085em;
+}
+.font-mono.uppercase {
+  font-weight: 600;
+}
+
+/* Type roles for new and reworked markup. */
+.t-display {
+  font-family: var(--font-serif);
+  font-weight: 350;
+  font-optical-sizing: auto;
+  letter-spacing: -0.028em;
+  line-height: 0.96;
+}
+.t-headline {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.018em;
+  line-height: 1.06;
+}
+.t-eyebrow {
+  font-family: var(--font-archivo), sans-serif;
+  font-stretch: 82%;
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.t-numeral {
+  font-family: var(--font-archivo), sans-serif;
+  font-stretch: 72%;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 0.9;
+}
+.t-caption {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.t-lede {
+  font-family: var(--font-serif);
+  font-weight: 350;
+  font-size: clamp(1.2rem, 1rem + 0.8vw, 1.55rem);
+  line-height: 1.38;
+  letter-spacing: -0.006em;
+}
+
+/* Buttons. Square, considered, one family. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  min-height: 3rem;
+  padding: 0 1.6rem;
+  font-family: var(--font-archivo), sans-serif;
+  font-stretch: 88%;
+  font-weight: 600;
+  font-size: 0.8rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  line-height: 1;
+  border: 1px solid transparent;
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease,
+    border-color 0.25s ease,
+    transform 0.25s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn:disabled,
+.btn[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-lg {
+  min-height: 3.5rem;
+  padding: 0 2.1rem;
+  font-size: 0.85rem;
+}
+.btn-sm {
+  min-height: 2.75rem;
+  padding: 0 1.1rem;
+  font-size: 0.72rem;
+}
+.btn-primary {
+  background: var(--color-terracotta);
+  color: var(--color-bone);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #ad4c30;
+}
+/* Outline on light backgrounds. */
+.btn-ghost {
+  border-color: rgb(26 26 24 / 0.22);
+  color: var(--color-midnight);
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--color-midnight);
+  background: var(--color-midnight);
+  color: var(--color-bone);
+}
+/* Outline on dark backgrounds. */
+.btn-light {
+  border-color: rgb(245 242 236 / 0.32);
+  color: var(--color-bone);
+}
+.btn-light:hover:not(:disabled) {
+  border-color: var(--color-bone);
+  background: var(--color-bone);
+  color: var(--color-midnight);
+}
+.btn-ink {
+  background: var(--color-midnight);
+  color: var(--color-bone);
+}
+.btn-ink:hover:not(:disabled) {
+  background: #000;
+}
+
+/* A text link with an underline that draws in. */
+.link-draw {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size 0.35s ease;
+  padding-bottom: 2px;
+}
+.link-draw:hover,
+.link-draw:focus-visible {
+  background-size: 100% 1px;
+}
+.link-quiet {
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.28em;
+  text-decoration-color: rgb(26 26 24 / 0.3);
+  transition: text-decoration-color 0.25s ease;
+}
+.link-quiet:hover {
+  text-decoration-color: currentColor;
+}
+
+/* Hairline rules instead of boxes. */
+.rule {
+  border-color: rgb(26 26 24 / 0.14);
+}
+.rule-light {
+  border-color: rgb(245 242 236 / 0.14);
+}
+
+/* Paper grain over the whole page: printed, not rendered. */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+  opacity: 0.055;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0.9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@media print {
+  body::after {
+    display: none;
   }
 }

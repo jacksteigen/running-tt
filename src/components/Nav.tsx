@@ -23,7 +23,7 @@ export default function Nav() {
   }, [pathname]);
 
   return (
-    <nav className="sticky top-0 z-50 bg-midnight/85 backdrop-blur-md text-white border-b border-white/5">
+    <nav className="sticky top-0 z-50 bg-midnight/90 backdrop-blur-md text-bone border-b border-bone/10">
       <div className="mx-auto max-w-6xl px-6 h-16 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
           <Image
@@ -34,7 +34,7 @@ export default function Nav() {
             className="invert brightness-200"
             aria-hidden
           />
-          <span className="text-lg font-semibold tracking-tight">RUNNING TT</span>
+          <span className="t-eyebrow text-[0.95rem] tracking-[0.14em] text-bone">Running TT</span>
         </Link>
 
         {/* Desktop nav */}
@@ -43,30 +43,26 @@ export default function Nav() {
             <Link
               key={l.href}
               href={l.href}
-              className={`text-sm transition-colors ${
-                pathname.startsWith(l.href) ? "text-white" : "text-stone/70 hover:text-white"
+              className={`text-[0.92rem] transition-colors ${
+                pathname.startsWith(l.href)
+                  ? "text-bone underline decoration-terracotta decoration-2 underline-offset-[10px]"
+                  : "text-bone/65 hover:text-bone"
               }`}
             >
               {l.label}
             </Link>
           ))}
           {user?.isAdmin && (
-            <Link href="/admin" className="text-sm text-terracotta hover:text-terracotta/80 transition-colors">
+            <Link href="/admin" className="text-[0.92rem] text-terracotta hover:text-bone transition-colors">
               Admin
             </Link>
           )}
           {user ? (
-            <Link
-              href="/dashboard"
-              className="ml-2 bg-terracotta text-white text-sm font-medium px-5 py-2 hover:bg-terracotta/90 transition-colors"
-            >
-              Dashboard
+            <Link href="/dashboard" className="btn btn-sm btn-light ml-2">
+              Your page
             </Link>
           ) : (
-            <Link
-              href="/login"
-              className="ml-2 bg-terracotta text-white text-sm font-medium px-5 py-2 hover:bg-terracotta/90 transition-colors"
-            >
+            <Link href="/login" className="btn btn-sm btn-primary ml-2">
               Sign in
             </Link>
           )}
@@ -90,7 +86,7 @@ export default function Nav() {
       {menuOpen && (
         <div id="mobile-menu" className="md:hidden border-t border-white/10 px-6 py-5 flex flex-col gap-4 bg-midnight/95">
           {links.map((l) => (
-            <Link key={l.href} href={l.href} className="text-base text-stone/80 hover:text-white">
+            <Link key={l.href} href={l.href} className="t-headline text-[1.6rem] text-bone/85 hover:text-bone">
               {l.label}
             </Link>
           ))}
@@ -99,11 +95,8 @@ export default function Nav() {
               Admin
             </Link>
           )}
-          <Link
-            href={user ? "/dashboard" : "/login"}
-            className="bg-terracotta text-white text-sm font-medium px-5 py-3 text-center hover:bg-terracotta/90"
-          >
-            {user ? "Dashboard" : "Sign in"}
+          <Link href={user ? "/dashboard" : "/login"} className="btn btn-primary mt-2">
+            {user ? "Your page" : "Sign in"}
           </Link>
         </div>
       )}

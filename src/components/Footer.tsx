@@ -1,80 +1,75 @@
 import Link from "next/link";
 
+const columns = [
+  {
+    title: "Racing",
+    links: [
+      { href: "/events", label: "Upcoming races" },
+      { href: "/results", label: "Results" },
+      { href: "/format", label: "The format" },
+    ],
+  },
+  {
+    title: "Athletes",
+    links: [
+      { href: "/login", label: "Create your profile" },
+      { href: "/dashboard", label: "Your page" },
+      { href: "/about", label: "Why we built it" },
+    ],
+  },
+  {
+    title: "Partners",
+    links: [{ href: "mailto:partners@runningtt.com", label: "Back the purse" }],
+  },
+];
+
 export default function Footer() {
   return (
-    <footer className="bg-midnight text-stone/60 mt-auto">
-      <div className="mx-auto max-w-6xl px-6 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
-          <div>
-            <p className="text-white font-semibold tracking-tight mb-3">
-              RUNNING TT
-            </p>
-            <p className="text-sm leading-relaxed">
-              You. The clock. Nothing else.
-            </p>
-          </div>
+    <footer className="bg-midnight text-bone/65 mt-auto">
+      <div className="mx-auto max-w-6xl px-6 pt-20 pb-10 md:pt-28">
+        <p className="t-display text-bone text-[2.8rem] sm:text-[3.8rem] md:text-[5rem] max-w-3xl">
+          See you on <em className="text-terracotta">the start line.</em>
+        </p>
 
-          <div>
-            <p className="text-white text-sm font-medium mb-3">Racing</p>
-            <div className="flex flex-col gap-2">
-              <Link href="/events" className="text-sm hover:text-white transition-colors">
-                Upcoming events
-              </Link>
-              <Link href="/results" className="text-sm hover:text-white transition-colors">
-                Past results
-              </Link>
-              <Link href="/format" className="text-sm hover:text-white transition-colors">
-                The format
-              </Link>
-            </div>
+        <div className="mt-16 md:mt-20 grid grid-cols-2 md:grid-cols-4 gap-10 border-t rule-light pt-10">
+          <div className="col-span-2 md:col-span-1">
+            <p className="t-eyebrow text-bone tracking-[0.14em]">Running TT</p>
+            <p className="t-caption mt-3 text-bone/55">You. The clock. Nothing else.</p>
           </div>
-
-          <div>
-            <p className="text-white text-sm font-medium mb-3">About</p>
-            <div className="flex flex-col gap-2">
-              <Link href="/about" className="text-sm hover:text-white transition-colors">
-                Why we built it
-              </Link>
-              <Link href="/login" className="text-sm hover:text-white transition-colors">
-                Sign in
-              </Link>
+          {columns.map((c) => (
+            <div key={c.title}>
+              <p className="t-eyebrow text-bone/45">{c.title}</p>
+              <ul className="mt-4 space-y-2.5">
+                {c.links.map((l) => (
+                  <li key={l.href}>
+                    <Link href={l.href} className="link-draw text-[0.95rem] hover:text-bone transition-colors">
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             </div>
-          </div>
-
-          <div>
-            <p className="text-white text-sm font-medium mb-3">Athletes</p>
-            <div className="flex flex-col gap-2">
-              <Link href="/login" className="text-sm hover:text-white transition-colors">
-                Create your profile
-              </Link>
-              <Link href="/dashboard" className="text-sm hover:text-white transition-colors">
-                Your dashboard
-              </Link>
-              <a href="mailto:partners@runningtt.com" className="text-sm hover:text-white transition-colors">
-                Partner with us
-              </a>
-            </div>
-          </div>
+          ))}
         </div>
 
-        <div className="border-t border-white/10 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-xs">
+        <div className="mt-16 border-t rule-light pt-6 flex flex-col md:flex-row justify-between gap-4 text-[0.85rem]">
+          <p>
             A{" "}
             <a
               href="https://www.steigen.com.au"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-stone/80 hover:text-white underline underline-offset-4 decoration-stone/30 hover:decoration-white transition-colors"
+              className="link-quiet text-bone/80 decoration-bone/30"
             >
               Steigen
             </a>{" "}
             initiative
           </p>
-          <div className="flex items-center gap-4 text-xs">
-            <Link href="/terms" className="hover:text-white transition-colors">
+          <div className="flex items-center gap-5">
+            <Link href="/terms" className="hover:text-bone transition-colors">
               Terms of entry
             </Link>
-            <Link href="/privacy" className="hover:text-white transition-colors">
+            <Link href="/privacy" className="hover:text-bone transition-colors">
               Privacy
             </Link>
             <span>&copy; {new Date().getFullYear()} Running TT</span>
