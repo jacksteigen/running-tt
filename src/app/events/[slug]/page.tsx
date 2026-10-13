@@ -5,6 +5,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import EnterEventButton from "@/components/EnterEventButton";
+import CategoryPrompt from "@/components/CategoryPrompt";
 import Countdown from "@/components/Countdown";
 import LiveRefresh from "@/components/LiveRefresh";
 import HeatSchedule from "@/components/HeatSchedule";
@@ -15,6 +16,16 @@ import { formatEventDate, isDateTbc } from "@/lib/dates";
 import { getHeatAvailability, hasHeats, heatLabel, heatWindow, isValidClock } from "@/lib/heats";
 import { bookingClosedReason, changeFeeText } from "@/lib/bookings";
 import { formatFee } from "@/lib/money";
+import { eventShareMetadata, type ShareableEvent } from "@/lib/site";
+import {
+  CATEGORY_LABEL,
+  RACE_CATEGORIES,
+  ordinal,
+  purseCents,
+  toPrizeSplit,
+  toRaceCategory,
+  type RaceCategory,
+} from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +53,8 @@ interface EventRow {
   heat_interval_minutes: number | null;
   heat_count: number | null;
   heat_capacity: number | null;
+  prize_split: string | null;
+  age_group_prize: string | null;
 }
 
 interface LeaderboardRow {
@@ -54,6 +67,18 @@ interface LeaderboardRow {
   prize_amount_cents: number;
   age_group: string | null;
   age_group_rank: number | null;
+  race_category: string | null;
+  category_rank: number | null;
+  age_group_award: number;
+}
+
+interface NonFinisherRow {
+  user_id: string;
+  name: string;
+  age_group: string | null;
+  heat_number: number | null;
+  outcome: Outcome;
+  race_category: string | null;
 }
 
 export async function generateMetadata({
@@ -64,19 +89,28 @@ export async function generateMetadata({
   const { slug } = await params;
   const db = await getDB();
   const event = await db
-    .prepare("SELECT name, distance, date, venue, description FROM events WHERE slug = ?")
+    .prepare(
+      `SELECT slug, name, distance, date, venue, location, description, status, prizes, prize_split,
+              heat_count
+       FROM events WHERE slug = ?`
+    )
     .bind(slug)
-    .first<{ name: string; distance: string; date: string; venue: string; description: string | null }>();
+    .first<ShareableEvent & { description: string | null }>();
 
   if (!event) return { title: "Event · Running TT" };
 
+  const description =
+    event.description ??
+    `${event.distance} time trial at ${event.venue}${
+      isDateTbc(event.date) ? "" : ` on ${formatEventDate(event.date, "long")}`
+    }. Enter on Running TT.`;
+
+  // A shared race link leads with the race and its purse, then where and
+  // when, under the same share card as the rest of the site.
   return {
     title: `${event.name} · Running TT`,
-    description:
-      event.description ??
-      `${event.distance} time trial at ${event.venue}${
-        isDateTbc(event.date) ? "" : ` on ${formatEventDate(event.date, "long")}`
-      }. Enter on Running TT.`,
+    description,
+    ...eventShareMetadata(event),
   };
 }
 
@@ -96,6 +130,12 @@ export default async function EventPage({
   if (!event) notFound();
 
   const eventPrizes = parsePrizes(event.prizes);
+  // Prize places are paid down the overall order, or once in each category.
+  const prizeSplit = toPrizeSplit(event.prize_split);
+  const byCategory = prizeSplit === "category";
+  const ageGroupPrize = event.age_group_prize?.trim() || null;
+  const purse = purseCents(eventPrizes, prizeSplit);
+  const hasPrizes = eventPrizes.length > 0 || !!ageGroupPrize;
 
   const entryCount = await db
     .prepare(
@@ -107,7 +147,8 @@ export default async function EventPage({
   const leaderboard = await db
     .prepare(
       `SELECT r.rank, r.time_display, r.heat_number, r.verified, r.prize_amount_cents,
-              r.age_group, r.age_group_rank, u.name, u.id as user_id
+              r.age_group, r.age_group_rank, r.race_category, r.category_rank,
+              r.age_group_award, u.name, u.id as user_id
        FROM results r
        JOIN users u ON r.user_id = u.id
        WHERE r.event_id = ?
@@ -119,22 +160,14 @@ export default async function EventPage({
   // DNF and DQ are listed under the finishers; DNS stays private.
   const nonFinishers = (await db
     .prepare(
-      `SELECT u.id as user_id, u.name, e.age_group, e.heat_number, e.outcome
+      `SELECT u.id as user_id, u.name, e.age_group, e.heat_number, e.outcome, u.race_category
        FROM entries e JOIN users u ON u.id = e.user_id
        WHERE e.event_id = ? AND e.status = 'confirmed'
          AND e.outcome IN (${PUBLIC_OUTCOMES.map(() => "?").join(", ")})
        ORDER BY e.outcome, u.name COLLATE NOCASE`
     )
     .bind(event.id, ...PUBLIC_OUTCOMES)
-    .all()) as unknown as {
-    results: {
-      user_id: string;
-      name: string;
-      age_group: string | null;
-      heat_number: number | null;
-      outcome: Outcome;
-    }[];
-  };
+    .all()) as unknown as { results: NonFinisherRow[] };
 
   const avgTime = await db
     .prepare("SELECT AVG(time_seconds) as avg FROM results WHERE event_id = ?")
@@ -220,11 +253,27 @@ export default async function EventPage({
   const canBook = bookingOpen && !allFull;
 
   // Age group standings, in band order, only for groups with a finisher.
-  const groups = AGE_GROUPS.map((group) => ({
-    group,
-    rows: leaderboard.results.filter((r) => r.age_group === group),
-  })).filter((g) => g.rows.length > 0);
-  const ungrouped = leaderboard.results.filter((r) => !r.age_group);
+  // Events paid per category split each band by category, women first.
+  const bandGroups = (category: RaceCategory | null) =>
+    AGE_GROUPS.map((band) => ({
+      key: category ? `${category}-${band}` : band,
+      title: category ? `${CATEGORY_LABEL[category]} ${band}` : band,
+      rows: leaderboard.results.filter(
+        (r) => r.age_group === band && (!category || toRaceCategory(r.race_category) === category)
+      ),
+    })).filter((g) => g.rows.length > 0);
+  const groupBlocks = (
+    byCategory ? RACE_CATEGORIES.map((c) => bandGroups(c)) : [bandGroups(null)]
+  ).filter((block) => block.length > 0);
+  const ungrouped = leaderboard.results.filter(
+    (r) => !r.age_group || (byCategory && !toRaceCategory(r.race_category))
+  );
+  const ungroupedFor = [
+    ungrouped.some((r) => !r.age_group) && "a date of birth",
+    byCategory && ungrouped.some((r) => !toRaceCategory(r.race_category)) && "a race category",
+  ]
+    .filter(Boolean)
+    .join(" or ");
 
   // The facts under the name, read across one line like a race programme.
   const entered = entryCount?.count ?? 0;
@@ -243,6 +292,7 @@ export default async function EventPage({
     place,
     when,
     freeEntry ? "Free entry" : `${feeLabel} entry`,
+    purse > 0 ? `${formatFee(purse)} prize purse` : null,
     entered > 0 ? `${entered} ${withHeats ? "booked" : "entered"}` : null,
   ].filter((f): f is string => !!f);
 
@@ -322,6 +372,15 @@ export default async function EventPage({
       </div>
     ) : null;
 
+  // A race paid by category asks a signed-in athlete with no category first,
+  // the same as the heat booking page does.
+  const needsCategory =
+    byCategory &&
+    eventStatus === "Open" &&
+    !alreadyEntered &&
+    !!session?.user.profileCompleted &&
+    !session.user.raceCategory;
+
   // Events without heats enter in one tap, on paper below the cover.
   const entryPanel =
     isUpcoming && !withHeats ? (
@@ -335,15 +394,22 @@ export default async function EventPage({
             : "Entries will open soon."}
         </p>
         <div className="mt-6 max-w-sm">
-          <EnterEventButton
-            eventId={event.id}
-            eventSlug={event.slug}
-            eventStatus={eventStatus}
-            entryFeeCents={event.entry_fee_cents}
-            isLoggedIn={!!session}
-            profileCompleted={!!session?.user.profileCompleted}
-            alreadyEntered={alreadyEntered}
-          />
+          {needsCategory ? (
+            <CategoryPrompt
+              stacked
+              body="One thing before you enter. Prize money for this race is paid in women's and men's categories. Which do you race in?"
+            />
+          ) : (
+            <EnterEventButton
+              eventId={event.id}
+              eventSlug={event.slug}
+              eventStatus={eventStatus}
+              entryFeeCents={event.entry_fee_cents}
+              isLoggedIn={!!session}
+              profileCompleted={!!session?.user.profileCompleted}
+              alreadyEntered={alreadyEntered}
+            />
+          )}
         </div>
         <div className="mt-5 max-w-sm">{smallPrint(false)}</div>
       </div>
@@ -392,7 +458,7 @@ export default async function EventPage({
   // Sections alternate bone, stone and midnight; a hairline separates two
   // bone sections that meet.
   const introAtEnd = !heatsFirst;
-  const introRuled = introAtEnd && !withHeats && eventPrizes.length === 0;
+  const introRuled = introAtEnd && !withHeats && !hasPrizes;
   const introSection =
     event.description || entryPanel ? (
       <section className="bg-bone">
@@ -466,48 +532,313 @@ export default async function EventPage({
     </section>
   ) : null;
 
-  const prizeSection =
-    eventPrizes.length > 0 ? (
-      <section className="bg-midnight text-bone">
-        <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
-            <div className="lg:col-span-4">
-              <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
-                Prize money
-              </h2>
-              <p className="mt-5 max-w-xs text-bone/70 leading-relaxed">
-                Handed out on the day, at the finish.
-              </p>
-            </div>
-            <dl className="lg:col-span-8 border-t rule-light">
-              {eventPrizes.map((prize, i) => (
-                <div
-                  key={prize.label}
-                  className="flex items-baseline justify-between gap-6 border-b rule-light py-5 md:py-6"
-                >
-                  <dt className="t-headline text-[1.3rem] md:text-[1.6rem] text-bone/85">
-                    {prize.label}
-                  </dt>
-                  <dd
-                    className={`t-numeral text-[2.2rem] md:text-[3rem] ${
-                      i === 0 ? "text-gold" : "text-bone"
-                    }`}
-                  >
-                    {prize.amount}
-                  </dd>
-                </div>
+  // The places, then any age group prize. Events paid per category show the
+  // purse and each place once for women and once for men.
+  const prizeRow = "py-5 md:py-6 align-baseline";
+  const ageGroupPrizeLine = ageGroupPrize ? (
+    <div className={`border-b rule-light py-6 md:py-7 ${eventPrizes.length === 0 ? "border-t" : ""}`}>
+      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-8">
+        <p className="t-headline text-[1.3rem] md:text-[1.6rem] text-bone/60 sm:text-bone/85">
+          Age group prize
+        </p>
+        <p className="t-headline text-[1.3rem] md:text-[1.6rem] text-bone sm:text-right">
+          {ageGroupPrize}
+        </p>
+      </div>
+      <p className="mt-3 max-w-md text-[0.95rem] text-bone/65 leading-relaxed">
+        {byCategory
+          ? "The fastest woman and the fastest man in each age group who has not already won a prize place."
+          : "The fastest runner in each age group who has not already won a prize place."}
+      </p>
+    </div>
+  ) : null;
+
+  const prizeSection = hasPrizes ? (
+    <section className="bg-midnight text-bone">
+      <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-12">
+          <div className="lg:col-span-4">
+            <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
+              {purse > 0 || !ageGroupPrize ? "Prize money" : "Prizes"}
+            </h2>
+            {byCategory && purse > 0 && (
+              <div className="mt-8">
+                <p className="t-numeral text-[2.8rem] md:text-[3.4rem]">{formatFee(purse)}</p>
+                <p className="mt-2.5 t-eyebrow text-bone/55">Total purse</p>
+              </div>
+            )}
+            <p className="mt-5 max-w-xs text-bone/70 leading-relaxed">
+              {byCategory && eventPrizes.length > 0 && "Women and men race for the same money. "}
+              Handed out on the day, at the finish.
+            </p>
+          </div>
+          <div className="lg:col-span-8">
+            {eventPrizes.length > 0 &&
+              (byCategory ? (
+                <table className="w-full border-t rule-light">
+                  <caption className="sr-only">Prize money for each place, women and men</caption>
+                  <thead>
+                    <tr className="border-b rule-light">
+                      <th scope="col" className="t-eyebrow text-bone/50 py-3 pr-4 text-left">
+                        Place
+                      </th>
+                      {RACE_CATEGORIES.map((category) => (
+                        <th
+                          key={category}
+                          scope="col"
+                          className="t-eyebrow text-bone/50 py-3 pl-4 text-right w-[34%] sm:w-[30%]"
+                        >
+                          {CATEGORY_LABEL[category]}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {eventPrizes.map((prize, i) => (
+                      <tr key={`${i}-${prize.label}`} className="border-b rule-light">
+                        <th
+                          scope="row"
+                          className={`${prizeRow} pr-4 text-left t-headline text-[1.3rem] md:text-[1.6rem] text-bone/85`}
+                        >
+                          {prize.label}
+                        </th>
+                        {RACE_CATEGORIES.map((category) => (
+                          <td
+                            key={category}
+                            className={`${prizeRow} pl-4 text-right t-numeral text-[1.9rem] sm:text-[2.3rem] md:text-[3rem] ${
+                              i === 0 ? "text-gold" : "text-bone"
+                            }`}
+                          >
+                            {prize.amount}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <dl className="border-t rule-light">
+                  {eventPrizes.map((prize, i) => (
+                    <div
+                      key={prize.label}
+                      className="flex items-baseline justify-between gap-6 border-b rule-light py-5 md:py-6"
+                    >
+                      <dt className="t-headline text-[1.3rem] md:text-[1.6rem] text-bone/85">
+                        {prize.label}
+                      </dt>
+                      <dd
+                        className={`t-numeral text-[2.2rem] md:text-[3rem] ${
+                          i === 0 ? "text-gold" : "text-bone"
+                        }`}
+                      >
+                        {prize.amount}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
               ))}
-            </dl>
+            {ageGroupPrizeLine}
           </div>
         </div>
-      </section>
-    ) : null;
+      </div>
+    </section>
+  ) : null;
 
   // The results board. A hairline sits on top when it follows another bone
   // section directly.
-  const resultsRuled = heatsFirst && !withHeats && eventPrizes.length === 0 && !!introSection;
+  const resultsRuled = heatsFirst && !withHeats && !hasPrizes && !!introSection;
   const fastest = leaderboard.results[0]?.time_display;
   const cell = "py-4 md:py-5 align-baseline";
+
+  // One results table. "overall" is the classic board, place by place.
+  // "category" places each runner within their category and notes the
+  // overall place quietly; "other" holds runners with no category, who
+  // have no category place.
+  type BoardMode = "overall" | "category" | "other";
+  const resultsTable = (
+    mode: BoardMode,
+    caption: string,
+    rows: LeaderboardRow[],
+    dnfs: NonFinisherRow[]
+  ) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-t rule">
+        <caption className="sr-only">{caption}</caption>
+        <thead>
+          <tr className="border-b rule">
+            <th scope="col" className="t-eyebrow text-dust py-3 pr-4 w-12 md:w-20">
+              Pos
+            </th>
+            <th scope="col" className="t-eyebrow text-dust py-3 pr-4">
+              Athlete
+            </th>
+            <th scope="col" className="t-eyebrow text-dust py-3 pr-4 hidden sm:table-cell">
+              Age group
+            </th>
+            <th scope="col" className="t-eyebrow text-dust py-3 pr-4 hidden md:table-cell w-20">
+              Heat
+            </th>
+            <th scope="col" className="t-eyebrow text-dust py-3 text-right">
+              Time
+            </th>
+            <th scope="col" className="t-eyebrow text-dust py-3 pl-6 hidden sm:table-cell w-28 text-right">
+              Prize
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((entry) => {
+            const pos =
+              mode === "overall" ? entry.rank : mode === "category" ? (entry.category_rank ?? entry.rank) : null;
+            const rankColor =
+              pos === 1
+                ? "text-gold"
+                : pos !== null && pos <= 3
+                  ? "text-midnight"
+                  : "text-midnight/40";
+            const prize =
+              entry.prize_amount_cents > 0 ? formatFee(entry.prize_amount_cents) : null;
+            const award = !prize && entry.age_group_award && ageGroupPrize ? ageGroupPrize : null;
+            const overall = mode === "overall" ? null : `${ordinal(entry.rank)} overall`;
+            const mobileLine = [entry.age_group, overall, prize ?? award].filter(Boolean).join(" · ");
+            return (
+              <tr key={entry.user_id} className="border-b rule">
+                <td className={`${cell} pr-4`}>
+                  {pos !== null ? (
+                    <span className={`t-numeral text-[1.6rem] md:text-[2rem] ${rankColor}`}>{pos}</span>
+                  ) : (
+                    <span className="text-midnight/30">-</span>
+                  )}
+                </td>
+                <td className={`${cell} pr-4`}>
+                  <Link
+                    href={`/athletes/${entry.user_id}`}
+                    className="t-headline text-[1.2rem] md:text-[1.5rem] hover:text-terracotta transition-colors duration-300"
+                  >
+                    {entry.name}
+                  </Link>
+                  {mobileLine && (
+                    <span className="sm:hidden block mt-1 text-[0.8rem] text-midnight/55">{mobileLine}</span>
+                  )}
+                  {overall && (
+                    <span className="hidden sm:block mt-1 text-[0.8rem] text-midnight/55">{overall}</span>
+                  )}
+                </td>
+                <td className={`${cell} pr-4 hidden sm:table-cell text-[0.95rem] text-midnight/65`}>
+                  {entry.age_group ?? "-"}
+                  {entry.age_group_rank === 1 && (
+                    <span className="t-eyebrow ml-2.5 inline-flex items-center gap-1.5 text-midnight/70">
+                      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold" />
+                      1st
+                    </span>
+                  )}
+                </td>
+                <td className={`${cell} pr-4 hidden md:table-cell`}>
+                  <span className="t-numeral text-[1.05rem] text-dust">H{entry.heat_number}</span>
+                </td>
+                <td className={`${cell} text-right`}>
+                  <span className="t-numeral text-[1.4rem] md:text-[1.8rem]">{entry.time_display}</span>
+                </td>
+                <td className={`${cell} pl-6 text-right hidden sm:table-cell`}>
+                  {prize ? (
+                    <span className="t-numeral text-[1.15rem] md:text-[1.3rem]">{prize}</span>
+                  ) : award ? (
+                    <span className="t-eyebrow inline-block leading-snug text-midnight/70">{award}</span>
+                  ) : (
+                    <span className="text-midnight/30">-</span>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+          {dnfs.map((nf) => (
+            <tr key={nf.user_id} className="border-b rule">
+              <td className={`${cell} pr-4 text-midnight/30`}>-</td>
+              <td className={`${cell} pr-4`}>
+                <Link
+                  href={`/athletes/${nf.user_id}`}
+                  className="t-headline text-[1.2rem] md:text-[1.5rem] text-midnight/60 hover:text-terracotta transition-colors duration-300"
+                >
+                  {nf.name}
+                </Link>
+                {nf.age_group && (
+                  <span className="sm:hidden block mt-1 text-[0.8rem] text-midnight/50">{nf.age_group}</span>
+                )}
+              </td>
+              <td className={`${cell} pr-4 hidden sm:table-cell text-[0.95rem] text-midnight/50`}>
+                {nf.age_group ?? "-"}
+              </td>
+              <td className={`${cell} pr-4 hidden md:table-cell`}>
+                <span className="t-numeral text-[1.05rem] text-dust">
+                  {nf.heat_number ? `H${nf.heat_number}` : "-"}
+                </span>
+              </td>
+              <td className={`${cell} text-right`} title={OUTCOMES[nf.outcome].name}>
+                <span className="t-eyebrow text-[0.8rem] text-midnight/55">{OUTCOMES[nf.outcome].label}</span>
+              </td>
+              <td className={`${cell} pl-6 text-right hidden sm:table-cell text-midnight/30`}>-</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  // Events paid per category get a board for women, then men, then anyone
+  // without a category, who still has an overall place but no category one.
+  const categoryBoards = byCategory
+    ? [
+        ...RACE_CATEGORIES.map((category) => ({
+          key: category,
+          mode: "category" as const,
+          title: CATEGORY_LABEL[category],
+          rows: leaderboard.results
+            .filter((r) => toRaceCategory(r.race_category) === category)
+            .sort((a, b) => (a.category_rank ?? a.rank) - (b.category_rank ?? b.rank) || a.rank - b.rank),
+          dnfs: nonFinishers.results.filter((n) => toRaceCategory(n.race_category) === category),
+        })),
+        {
+          key: "other",
+          mode: "other" as const,
+          title: "Other finishers",
+          rows: leaderboard.results.filter((r) => !toRaceCategory(r.race_category)),
+          dnfs: nonFinishers.results.filter((n) => !toRaceCategory(n.race_category)),
+        },
+      ].filter((b) => b.rows.length + b.dnfs.length > 0)
+    : [];
+  // A category race where nobody finished with a category reads as a plain
+  // overall board, the same as its podium on the results page.
+  const showCategoryBoards =
+    byCategory && categoryBoards.some((b) => b.mode === "category" && b.rows.length > 0);
+  const boards = showCategoryBoards ? (
+    categoryBoards.map((b, i) => (
+      <div key={b.key} className={i > 0 ? "mt-16 md:mt-20" : ""}>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 pb-4">
+          <h3
+            className={`t-headline ${
+              b.mode === "other" ? "text-[1.5rem] md:text-[1.8rem]" : "text-[2rem] md:text-[2.6rem]"
+            }`}
+          >
+            {b.title}
+          </h3>
+          {b.rows.length > 0 && (
+            <p className="t-eyebrow text-dust">
+              {b.rows.length} {b.rows.length === 1 ? "finisher" : "finishers"}
+            </p>
+          )}
+        </div>
+        {b.mode === "other" && (
+          <p className="-mt-1 mb-4 t-caption text-midnight/55">
+            No race category on file, so placed overall only.
+          </p>
+        )}
+        {resultsTable(b.mode, `${b.title} results for ${event.name}`, b.rows, b.dnfs)}
+      </div>
+    ))
+  ) : (
+    resultsTable("overall", `Overall results for ${event.name}`, leaderboard.results, nonFinishers.results)
+  );
+
   const resultsSection = (
     <section className="bg-bone">
       <div className="mx-auto max-w-6xl px-6">
@@ -549,123 +880,7 @@ export default async function EventPage({
 
           {leaderboard.results.length > 0 ? (
             <>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-t rule">
-                  <caption className="sr-only">Overall results for {event.name}</caption>
-                  <thead>
-                    <tr className="border-b rule">
-                      <th scope="col" className="t-eyebrow text-dust py-3 pr-4 w-12 md:w-20">
-                        Pos
-                      </th>
-                      <th scope="col" className="t-eyebrow text-dust py-3 pr-4">
-                        Athlete
-                      </th>
-                      <th scope="col" className="t-eyebrow text-dust py-3 pr-4 hidden sm:table-cell">
-                        Age group
-                      </th>
-                      <th scope="col" className="t-eyebrow text-dust py-3 pr-4 hidden md:table-cell w-20">
-                        Heat
-                      </th>
-                      <th scope="col" className="t-eyebrow text-dust py-3 text-right">
-                        Time
-                      </th>
-                      <th scope="col" className="t-eyebrow text-dust py-3 pl-6 hidden sm:table-cell w-28 text-right">
-                        Prize
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {leaderboard.results.map((entry) => {
-                      const rankColor =
-                        entry.rank === 1
-                          ? "text-gold"
-                          : entry.rank <= 3
-                            ? "text-midnight"
-                            : "text-midnight/40";
-                      const prize =
-                        entry.prize_amount_cents > 0 ? formatFee(entry.prize_amount_cents) : null;
-                      return (
-                        <tr key={entry.user_id} className="border-b rule">
-                          <td className={`${cell} pr-4`}>
-                            <span className={`t-numeral text-[1.6rem] md:text-[2rem] ${rankColor}`}>
-                              {entry.rank}
-                            </span>
-                          </td>
-                          <td className={`${cell} pr-4`}>
-                            <Link
-                              href={`/athletes/${entry.user_id}`}
-                              className="t-headline text-[1.2rem] md:text-[1.5rem] hover:text-terracotta transition-colors duration-300"
-                            >
-                              {entry.name}
-                            </Link>
-                            {(entry.age_group || prize) && (
-                              <span className="sm:hidden block mt-1 text-[0.8rem] text-midnight/55">
-                                {[entry.age_group, prize].filter(Boolean).join(" · ")}
-                              </span>
-                            )}
-                          </td>
-                          <td className={`${cell} pr-4 hidden sm:table-cell text-[0.95rem] text-midnight/65`}>
-                            {entry.age_group ?? "-"}
-                            {entry.age_group_rank === 1 && (
-                              <span className="t-eyebrow ml-2.5 inline-flex items-center gap-1.5 text-midnight/70">
-                                <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-gold" />
-                                1st
-                              </span>
-                            )}
-                          </td>
-                          <td className={`${cell} pr-4 hidden md:table-cell`}>
-                            <span className="t-numeral text-[1.05rem] text-dust">H{entry.heat_number}</span>
-                          </td>
-                          <td className={`${cell} text-right`}>
-                            <span className="t-numeral text-[1.4rem] md:text-[1.8rem]">
-                              {entry.time_display}
-                            </span>
-                          </td>
-                          <td className={`${cell} pl-6 text-right hidden sm:table-cell`}>
-                            {prize ? (
-                              <span className="t-numeral text-[1.15rem] md:text-[1.3rem]">{prize}</span>
-                            ) : (
-                              <span className="text-midnight/30">-</span>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                    {nonFinishers.results.map((nf) => (
-                      <tr key={nf.user_id} className="border-b rule">
-                        <td className={`${cell} pr-4 text-midnight/30`}>-</td>
-                        <td className={`${cell} pr-4`}>
-                          <Link
-                            href={`/athletes/${nf.user_id}`}
-                            className="t-headline text-[1.2rem] md:text-[1.5rem] text-midnight/60 hover:text-terracotta transition-colors duration-300"
-                          >
-                            {nf.name}
-                          </Link>
-                          {nf.age_group && (
-                            <span className="sm:hidden block mt-1 text-[0.8rem] text-midnight/50">
-                              {nf.age_group}
-                            </span>
-                          )}
-                        </td>
-                        <td className={`${cell} pr-4 hidden sm:table-cell text-[0.95rem] text-midnight/50`}>
-                          {nf.age_group ?? "-"}
-                        </td>
-                        <td className={`${cell} pr-4 hidden md:table-cell`}>
-                          <span className="t-numeral text-[1.05rem] text-dust">
-                            {nf.heat_number ? `H${nf.heat_number}` : "-"}
-                          </span>
-                        </td>
-                        <td className={`${cell} text-right`} title={OUTCOMES[nf.outcome].name}>
-                          <span className="t-eyebrow text-[0.8rem] text-midnight/55">
-                            {OUTCOMES[nf.outcome].label}
-                          </span>
-                        </td>
-                        <td className={`${cell} pl-6 text-right hidden sm:table-cell text-midnight/30`}>-</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {boards}
               {nonFinishers.results.length > 0 && (
                 <p className="mt-4 t-caption text-midnight/55">
                   {PUBLIC_OUTCOMES.filter((o) => nonFinishers.results.some((n) => n.outcome === o))
@@ -698,52 +913,71 @@ export default async function EventPage({
   );
 
   const ageGroupSection =
-    groups.length > 0 ? (
+    groupBlocks.length > 0 ? (
       <section className="bg-bone">
         <div className="mx-auto max-w-6xl px-6">
           <div className="border-t rule py-24 md:py-32">
             <h2 className="t-display text-[2.4rem] md:text-[3.4rem]">
               Age groups
             </h2>
-            <div className="mt-10 md:mt-14 grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-14">
-              {groups.map(({ group, rows }) => (
-                <div key={group}>
-                  <div className="flex items-baseline justify-between gap-4 pb-3">
-                    <h3 className="t-headline text-[1.45rem] md:text-[1.7rem]">{group}</h3>
-                    <p className="t-eyebrow text-dust">
-                      {rows.length} {rows.length === 1 ? "finisher" : "finishers"}
-                    </p>
+            {groupBlocks.map((block, i) => (
+              <div
+                key={block[0].key}
+                className={`grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-14 ${
+                  i === 0 ? "mt-10 md:mt-14" : "mt-14 md:mt-20"
+                }`}
+              >
+                {block.map(({ key, title, rows }) => (
+                  <div key={key}>
+                    <div className="flex items-baseline justify-between gap-4 pb-3">
+                      <h3 className="t-headline text-[1.45rem] md:text-[1.7rem]">{title}</h3>
+                      <p className="t-eyebrow text-dust">
+                        {rows.length} {rows.length === 1 ? "finisher" : "finishers"}
+                      </p>
+                    </div>
+                    <ol className="border-t rule">
+                      {rows.map((r) => {
+                        const award = r.age_group_award && ageGroupPrize ? ageGroupPrize : null;
+                        return (
+                          <li key={r.user_id} className="border-b rule">
+                            <Link
+                              href={`/athletes/${r.user_id}`}
+                              className="group grid grid-cols-[2.25rem_1fr_auto] items-baseline gap-4 py-3.5 min-h-12"
+                            >
+                              <span
+                                className={`t-numeral text-[1.25rem] ${
+                                  r.age_group_rank === 1 ? "text-gold" : "text-midnight/40"
+                                }`}
+                              >
+                                {r.age_group_rank}
+                              </span>
+                              <span className="min-w-0">
+                                <span className="block t-headline text-[1.15rem] md:text-[1.25rem] truncate group-hover:text-terracotta transition-colors duration-300">
+                                  {r.name}
+                                </span>
+                                {award && (
+                                  <span className="t-eyebrow mt-1.5 flex items-center gap-1.5 text-midnight/70">
+                                    <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold" />
+                                    <span className="sr-only">Age group award: </span>
+                                    {award}
+                                  </span>
+                                )}
+                              </span>
+                              <span className="t-numeral text-[1.25rem]">{r.time_display}</span>
+                            </Link>
+                          </li>
+                        );
+                      })}
+                    </ol>
                   </div>
-                  <ol className="border-t rule">
-                    {rows.map((r) => (
-                      <li key={r.user_id} className="border-b rule">
-                        <Link
-                          href={`/athletes/${r.user_id}`}
-                          className="group grid grid-cols-[2.25rem_1fr_auto] items-baseline gap-4 py-3.5 min-h-12"
-                        >
-                          <span
-                            className={`t-numeral text-[1.25rem] ${
-                              r.age_group_rank === 1 ? "text-gold" : "text-midnight/40"
-                            }`}
-                          >
-                            {r.age_group_rank}
-                          </span>
-                          <span className="t-headline text-[1.15rem] md:text-[1.25rem] truncate group-hover:text-terracotta transition-colors duration-300">
-                            {r.name}
-                          </span>
-                          <span className="t-numeral text-[1.25rem]">{r.time_display}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ol>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ))}
             {ungrouped.length > 0 && (
               <p className="mt-10 t-caption text-midnight/55">
-                {ungrouped.length} finisher{ungrouped.length === 1 ? "" : "s"} without a
-                date of birth on file {ungrouped.length === 1 ? "is" : "are"} shown in the
-                overall results only.
+                {ungrouped.length} finisher{ungrouped.length === 1 ? "" : "s"} without{" "}
+                {ungroupedFor} on file {ungrouped.length === 1 ? "is" : "are"} shown in the{" "}
+                {showCategoryBoards ? "results above" : "overall results"} only.
               </p>
             )}
           </div>

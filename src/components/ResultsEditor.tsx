@@ -18,6 +18,14 @@ import HeatStopwatch, {
 import type { HeatOption } from "@/components/WalkUpForm";
 import { OUTCOMES, type Outcome } from "@/lib/outcomes";
 import { formatFee } from "@/lib/money";
+import {
+  CATEGORY_LABEL,
+  CATEGORY_NOUN,
+  RACE_CATEGORIES,
+  ordinal,
+  type PrizeSplit,
+  type RaceCategory,
+} from "@/lib/categories";
 
 export interface OutcomeMark {
   userId: string;
@@ -31,6 +39,8 @@ interface Entrant {
   ageGroup: string | null;
   /** The heat they booked, or null when the event has no heat booking. */
   heat: number | null;
+  /** The category on their profile now. */
+  raceCategory: RaceCategory | null;
 }
 
 export interface Standing {
@@ -41,6 +51,12 @@ export interface Standing {
   timeDisplay: string;
   heat: number;
   prizeCents: number;
+  /** The category they were placed in when the event was last re-ranked. */
+  raceCategory: RaceCategory | null;
+  /** Place among their category, or null without one. */
+  categoryRank: number | null;
+  /** Fastest in their age group without a prize place. */
+  ageGroupAward: boolean;
 }
 
 type Tab = "all" | number;
@@ -138,6 +154,8 @@ export default function ResultsEditor({
   initialStandings,
   initialOutcomes,
   prizes,
+  prizeSplit,
+  ageGroupPrize,
 }: {
   eventId: string;
   eventSlug: string;
@@ -148,9 +166,14 @@ export default function ResultsEditor({
   /** Athletes marked DNF, DNS or DQ. They never have a time. */
   initialOutcomes: OutcomeMark[];
   prizes: PrizeSlot[];
+  /** "category" pays every prize place once to the women and once to the men. */
+  prizeSplit: PrizeSplit;
+  /** What each age group winner without a prize place gets, or null for none. */
+  ageGroupPrize: string | null;
 }) {
   const router = useRouter();
   const withHeats = heats.length > 0;
+  const byCategory = prizeSplit === "category";
   const [rows, setRows] = useState<Record<string, RowState>>({});
   const [standings, setStandings] = useState<Standing[]>(initialStandings);
   const [filter, setFilter] = useState("");
@@ -624,6 +647,41 @@ export default function ResultsEditor({
   const failedElsewhere = failedIds.filter((id) => !shownIds.has(id));
   const elsewhereTabs = [...new Set(failedElsewhere.map(tabFor))];
 
+  // The top three, or the top three women and the top three men when the
+  // event pays each of them.
+  const leaderBoards: {
+    key: string;
+    category: RaceCategory | null;
+    rows: { s: Standing; place: number }[];
+  }[] = byCategory
+    ? RACE_CATEGORIES.map((c) => ({
+        key: c,
+        category: c,
+        rows: standings
+          .filter((s) => s.raceCategory === c && s.categoryRank)
+          .sort((a, b) => (a.categoryRank as number) - (b.categoryRank as number))
+          .slice(0, 3)
+          .map((s) => ({ s, place: s.categoryRank as number })),
+      }))
+    : [
+        {
+          key: "overall",
+          category: null,
+          rows: standings.slice(0, 3).map((s) => ({ s, place: s.rank })),
+        },
+      ];
+
+  // Paid to women and men, nobody without a category can win a prize place.
+  // Anyone marked DNF, DNS or DQ is out of it anyway.
+  const uncategorised = byCategory
+    ? entrants.filter((e) => {
+        if (outcomeByUser.has(e.userId)) return false;
+        return !e.raceCategory || standingByUser.get(e.userId)?.raceCategory === null;
+      })
+    : [];
+  const uncategorisedFinished = uncategorised.filter((e) => standingByUser.has(e.userId));
+  const uncategorisedToRace = uncategorised.filter((e) => !standingByUser.has(e.userId));
+
   function tabButton(key: Tab, title: string, sub: string, timed: number, total: number) {
     const selected = activeTab === key;
     const running = key !== "all" && !!clocks[key];
@@ -711,20 +769,50 @@ export default function ResultsEditor({
         </div>
       </div>
 
-      {standings.length > 0 && (
-        <ol aria-label="Leaders" className="grid grid-cols-3 border-b border-stone/30 divide-x divide-stone/30">
-          {standings.slice(0, 3).map((s) => (
-            <li key={s.userId} className="px-3 sm:px-5 py-3 min-w-0">
-              <p className={`t-eyebrow ${s.rank === 1 ? "text-gold" : "text-dust"}`}>
-                {ordinal(s.rank)}
-              </p>
-              <p className="t-headline text-[1.05rem] truncate mt-1">
-                {entrantById.get(s.userId)?.name ?? "Athlete"}
-              </p>
-              <p className="t-numeral text-[1.35rem] mt-1">{s.timeDisplay}</p>
-            </li>
-          ))}
-        </ol>
+      {uncategorised.length > 0 && (
+        <div className="px-4 sm:px-5 py-3 border-b border-gold/50 bg-gold/10">
+          <p className="text-sm text-midnight leading-relaxed">
+            <span className="font-semibold">
+              {uncategorised.length} {uncategorised.length === 1 ? "athlete has" : "athletes have"} no
+              category.
+            </span>{" "}
+            <span className="text-midnight/75">
+              This race pays women and men separately, so{" "}
+              {uncategorised.length === 1
+                ? "they cannot be placed for prize money until it is set on their profile."
+                : "none of them can be placed for prize money until it is set on each profile."}
+            </span>
+          </p>
+          {uncategorisedFinished.length > 0 && (
+            <NameLinks label="Finished" people={uncategorisedFinished} />
+          )}
+          {uncategorisedToRace.length > 0 && (
+            <NameLinks label="Still to race" people={uncategorisedToRace} />
+          )}
+        </div>
+      )}
+
+      {leaderBoards.map((board) =>
+        board.rows.length > 0 ? (
+          <ol
+            key={board.key}
+            aria-label={board.category ? `${CATEGORY_LABEL[board.category]} leaders` : "Leaders"}
+            className="grid grid-cols-3 border-b border-stone/30 divide-x divide-stone/30"
+          >
+            {board.rows.map(({ s, place }) => (
+              <li key={s.userId} className="px-3 sm:px-5 py-3 min-w-0">
+                <p className={`t-eyebrow truncate ${place === 1 ? "text-gold" : "text-dust"}`}>
+                  {ordinal(place)}
+                  {board.category ? ` ${CATEGORY_NOUN[board.category]}` : ""}
+                </p>
+                <p className="t-headline text-[1.05rem] truncate mt-1">
+                  {entrantById.get(s.userId)?.name ?? "Athlete"}
+                </p>
+                <p className="t-numeral text-[1.35rem] mt-1">{s.timeDisplay}</p>
+              </li>
+            ))}
+          </ol>
+        ) : null
       )}
 
       {withHeats && (
@@ -795,6 +883,7 @@ export default function ResultsEditor({
                 userId: e.userId,
                 name: e.name,
                 ageGroup: e.ageGroup,
+                raceCategory: byCategory ? e.raceCategory : null,
                 timeDisplay: s?.timeDisplay ?? null,
                 rank: s?.rank ?? null,
                 outcome: outcomeByUser.get(e.userId) ?? null,
@@ -835,11 +924,17 @@ export default function ResultsEditor({
                     ? `H${entrant.heat}`
                     : "No heat"
                   : null,
+                byCategory && standing?.categoryRank && standing.raceCategory
+                  ? `${ordinal(standing.categoryRank)} ${CATEGORY_NOUN[standing.raceCategory]}`
+                  : null,
                 standing?.ageGroupRank ? `${ordinal(standing.ageGroupRank)} in group` : null,
                 standing && standing.prizeCents > 0 ? formatFee(standing.prizeCents) : null,
+                standing?.ageGroupAward ? ageGroupPrize || "Age group prize" : null,
               ]
                 .filter(Boolean)
                 .join(" · ");
+              // Gold for a winner: 1st overall, or 1st woman or man.
+              const winner = byCategory ? standing?.categoryRank === 1 : standing?.rank === 1;
 
               return (
                 <div key={entrant.userId} className="px-4 sm:px-5 py-3">
@@ -848,7 +943,7 @@ export default function ResultsEditor({
                       className={`font-mono text-sm w-8 shrink-0 tabular-nums ${
                         mark
                           ? "text-terracotta font-semibold text-xs"
-                          : standing?.rank === 1
+                          : winner
                             ? "text-gold font-semibold"
                             : standing
                               ? "text-midnight"
@@ -863,7 +958,12 @@ export default function ResultsEditor({
                           : "--"}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <p className="t-headline text-[1.1rem] truncate">{entrant.name}</p>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <p className="t-headline text-[1.1rem] truncate">{entrant.name}</p>
+                        {(entrant.raceCategory || byCategory) && (
+                          <CategoryTag category={entrant.raceCategory} flag={byCategory} />
+                        )}
+                      </div>
                       <p className="text-[11px] text-midnight/50 truncate">{meta}</p>
                     </div>
                     <div
@@ -1074,17 +1174,64 @@ export default function ResultsEditor({
           : "Type a time and press Enter. "}
         On a phone, 4.32.10 works as well as 4:32.10. DNF, DNS and DQ never count toward places,
         prizes or personal bests, and DNS is only shown here. Every save re-ranks the whole event
-        {prizes.length > 0
-          ? " and assigns prize money down the finishing order."
-          : "."}{" "}
+        {prizes.length === 0
+          ? "."
+          : byCategory
+            ? " and pays each prize place once to the women and once to the men."
+            : " and assigns prize money down the finishing order."}{" "}
+        {ageGroupPrize &&
+          `${ageGroupPrize} goes to the fastest in each age group without a prize place. `}
         The public leaderboard refreshes itself.
       </div>
     </div>
   );
 }
 
-function ordinal(n: number) {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+/** W or M beside a name, or a flag when the athlete has not set one. */
+export function CategoryTag({
+  category,
+  flag,
+}: {
+  category: RaceCategory | null;
+  /** The event pays women and men, so a missing category matters. */
+  flag: boolean;
+}) {
+  const base = "shrink-0 t-eyebrow text-[0.62rem] leading-none px-1.5 py-1 border";
+  if (category) {
+    return (
+      <span title={CATEGORY_LABEL[category]} className={`${base} border-stone/60 text-dust`}>
+        <span aria-hidden>{CATEGORY_LABEL[category].charAt(0)}</span>
+        <span className="sr-only">{CATEGORY_LABEL[category]}</span>
+      </span>
+    );
+  }
+  return (
+    <span
+      className={`${base} whitespace-nowrap ${
+        flag ? "border-terracotta/50 text-terracotta" : "border-stone/60 text-dust"
+      }`}
+    >
+      No category
+    </span>
+  );
+}
+
+/** A labelled line of athletes, each linking to their admin profile. */
+function NameLinks({ label, people }: { label: string; people: Entrant[] }) {
+  return (
+    <p className="mt-2 text-sm text-midnight leading-relaxed">
+      <span className="t-eyebrow text-dust mr-2">{label}</span>
+      {people.map((p, i) => (
+        <span key={p.userId}>
+          {i > 0 && ", "}
+          <Link
+            href={`/admin/athletes/${p.userId}`}
+            className="link-quiet hover:text-terracotta transition-colors"
+          >
+            {p.name}
+          </Link>
+        </span>
+      ))}
+    </p>
+  );
 }

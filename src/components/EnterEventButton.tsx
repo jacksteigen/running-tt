@@ -71,6 +71,10 @@ export default function EnterEventButton({
       } else if (data.code === "ALREADY_BOOKED" && eventSlug) {
         // Already entered, or the payment from an earlier checkout went through.
         router.push(`/events/${eventSlug}/booked`);
+      } else if (data.code === "CATEGORY_REQUIRED") {
+        // The race now pays by category: the page redraws with the question.
+        setError(data.error || "Pick the category you race in before you enter.");
+        router.refresh();
       } else {
         setError(data.error || "Something went wrong");
       }

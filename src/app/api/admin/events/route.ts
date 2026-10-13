@@ -35,13 +35,13 @@ export async function POST(request: NextRequest) {
   await db
     .prepare(
       `INSERT INTO events (id, slug, name, distance, date, time, venue, location, status,
-         entry_fee_cents, description, check_in, what_to_bring, prizes,
+         entry_fee_cents, description, check_in, what_to_bring, prizes, prize_split, age_group_prize,
          first_heat_time, heat_interval_minutes, heat_count, heat_capacity, change_fee_cents, is_test)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
       id, slug, f.name, f.distance, f.date, f.time, f.venue, f.location, f.status,
-      f.entry_fee_cents, f.description, f.check_in, f.what_to_bring, f.prizes,
+      f.entry_fee_cents, f.description, f.check_in, f.what_to_bring, f.prizes, f.prize_split, f.age_group_prize,
       f.first_heat_time, f.heat_interval_minutes, f.heat_count, f.heat_capacity, f.change_fee_cents, f.is_test
     )
     .run();

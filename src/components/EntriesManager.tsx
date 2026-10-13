@@ -10,6 +10,8 @@ import WalkUpForm, {
   sendWithHeatCheck,
   type HeatOption,
 } from "@/components/WalkUpForm";
+import { CategoryTag } from "@/components/ResultsEditor";
+import type { RaceCategory } from "@/lib/categories";
 
 export interface StartListEntry {
   id: string;
@@ -25,6 +27,8 @@ export interface StartListEntry {
   hasResult: boolean;
   /** Paid through Stripe, rather than added by an admin. */
   paidOnline: boolean;
+  /** The category on their profile now. */
+  raceCategory: RaceCategory | null;
 }
 
 interface Candidate {
@@ -46,6 +50,7 @@ export default function EntriesManager({
   entries,
   candidates,
   paidEvent,
+  byCategory = false,
 }: {
   eventId: string;
   /** Empty for events without heat booking. */
@@ -53,6 +58,8 @@ export default function EntriesManager({
   entries: StartListEntry[];
   candidates: Candidate[];
   paidEvent: boolean;
+  /** The event pays women and men separately, so a missing category matters. */
+  byCategory?: boolean;
 }) {
   const router = useRouter();
   const withHeats = heats.length > 0;
@@ -206,6 +213,9 @@ export default function EntriesManager({
             >
               {e.name}
             </Link>
+            {(e.raceCategory || byCategory) && (
+              <CategoryTag category={e.raceCategory} flag={byCategory} />
+            )}
             <StatusBadge entry={e} />
           </div>
           <p className="text-[11px] text-midnight/50 truncate">{meta}</p>
@@ -445,6 +455,8 @@ function AddExisting({
         error?: string;
         code?: string;
         note?: string;
+        /** Added, but with no race category on a women-and-men event. */
+        warning?: string;
       }>(
         "/api/admin/entries",
         "POST",
@@ -454,10 +466,11 @@ function AddExisting({
       if (data === "cancelled") return;
       if (data.success) {
         onAdded(
-          data.note
+          (data.note
             ? // They paid online while this was going on, so they keep the heat they booked.
               `${picked.name} is on the start list${withHeats ? " in the heat they booked" : ""}. ${data.note}`
-            : `${picked.name} added${withHeats ? ` to ${heatName(heats, heatNumber)}` : ""}. Their confirmation email is on its way.`
+            : `${picked.name} added${withHeats ? ` to ${heatName(heats, heatNumber)}` : ""}. Their confirmation email is on its way.`) +
+            (data.warning ? ` ${data.warning}` : "")
         );
         setPicked(null);
         setQuery("");

@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import CountrySelect from "@/components/CountrySelect";
+import { CategoryChoice } from "@/components/CategoryPrompt";
+import { toRaceCategory, type RaceCategory } from "@/lib/categories";
 import { formatEventDate } from "@/lib/dates";
 import { formatFee } from "@/lib/money";
 import { fieldInputCls, fieldLabelCls, fieldSelectCls, fieldTextareaCls } from "@/components/fieldStyles";
@@ -14,6 +16,8 @@ interface Initial {
   city: string;
   country: string;
   bio: string;
+  /** Already set when an admin added them at the track. */
+  raceCategory?: string | null;
 }
 
 interface OpenEvent {
@@ -37,6 +41,7 @@ const textareaCls = fieldTextareaCls;
 const selectCls = fieldSelectCls;
 const labelCls = fieldLabelCls;
 const helpCls = "text-[0.98rem] text-midnight/65 leading-relaxed";
+const CATEGORY_ERROR = "Pick the category you race in.";
 
 /** What kind of backing an athlete is after. Saved as a short list. */
 const SUPPORT_OPTIONS = [
@@ -64,6 +69,10 @@ export default function Onboarding({
 }) {
   const [step, setStep] = useState(0);
   const [form, setForm] = useState<Initial>(initial);
+  const [raceCategory, setRaceCategory] = useState<RaceCategory | null>(
+    toRaceCategory(initial.raceCategory)
+  );
+  const categoryInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [dreamBrands, setDreamBrands] = useState("");
@@ -89,6 +98,10 @@ export default function Onboarding({
     }
     if (step === 1) {
       if (!form.dateOfBirth) return setError("Your date of birth sets your age group.");
+      if (!raceCategory) {
+        categoryInput.current?.focus();
+        return setError(CATEGORY_ERROR);
+      }
       if (!form.city.trim()) return setError("Which town or city are you based in?");
       if (!form.country) return setError("Pick your country from the list.");
     }
@@ -125,6 +138,7 @@ export default function Onboarding({
           middleName: form.middleName,
           lastName: form.lastName,
           dateOfBirth: form.dateOfBirth,
+          raceCategory,
           city: form.city,
           country: form.country,
           bio: form.bio,
@@ -331,6 +345,23 @@ export default function Onboarding({
               className={inputCls}
             />
           </div>
+          <fieldset>
+            <legend className={labelCls}>Which category do you race in?</legend>
+            <CategoryChoice
+              name="raceCategory"
+              value={raceCategory}
+              onChange={(category) => {
+                setRaceCategory(category);
+                if (error === CATEGORY_ERROR) setError("");
+              }}
+              describedBy="raceCategory-help"
+              inputRef={categoryInput}
+            />
+            <p id="raceCategory-help" className="t-caption mt-2.5 text-midnight/50">
+              Races that pay prize money in women&apos;s and men&apos;s categories use this
+              for prize places and age groups.
+            </p>
+          </fieldset>
           <div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
               <div>

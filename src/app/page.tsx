@@ -17,6 +17,15 @@ import {
 } from "@/lib/heats";
 import { bookingClosedReason, type BookableEvent } from "@/lib/bookings";
 import { formatFee } from "@/lib/money";
+import { parsePrizes } from "@/lib/racetime";
+import {
+  CATEGORY_LABEL,
+  RACE_CATEGORIES,
+  purseCents,
+  toPrizeSplit,
+  toRaceCategory,
+  type RaceCategory,
+} from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -39,9 +48,56 @@ const steps = [
   },
 ];
 
+/** An event row as the home page reads it: booking fields plus the prizes. */
+type EventRow = BookableEvent & { prizes: string | null };
+
+/** The cash an event pays out, in cents. 0 when there is no cash purse. */
+function eventPurse(event: EventRow): number {
+  return purseCents(parsePrizes(event.prizes), toPrizeSplit(event.prize_split));
+}
+
+interface Finisher {
+  rank: number;
+  category_rank: number | null;
+  race_category: string | null;
+  time_display: string;
+  user_id: string;
+  name: string;
+}
+
+/**
+ * Who leads the last race home: the top three women and the top three men
+ * for a race paid by category, otherwise the overall top five. A category
+ * race where nobody has a category falls back to the overall top five.
+ */
+function leaderBoards(
+  rows: Finisher[],
+  prizeSplit: string | null
+): { category: RaceCategory | null; rows: { place: number; row: Finisher }[] }[] {
+  if (toPrizeSplit(prizeSplit) === "category") {
+    const boards = RACE_CATEGORIES.map((category) => ({
+      category,
+      rows: rows
+        .filter(
+          (r) =>
+            toRaceCategory(r.race_category) === category &&
+            r.category_rank !== null &&
+            r.category_rank <= 3
+        )
+        .sort((a, b) => (a.category_rank as number) - (b.category_rank as number))
+        .map((row) => ({ place: row.category_rank as number, row })),
+    })).filter((b) => b.rows.length > 0);
+    if (boards.length > 0) return boards;
+  }
+  const overall = rows
+    .filter((r) => r.rank <= 5)
+    .map((row) => ({ place: row.rank, row }));
+  return overall.length > 0 ? [{ category: null, rows: overall }] : [];
+}
+
 /** What the "Next event" band says and where its button goes. */
 function describeSpotlight(
-  event: BookableEvent,
+  event: EventRow,
   entered: number,
   heats: HeatAvailability[]
 ) {
@@ -62,10 +118,12 @@ function describeSpotlight(
       ? "Every heat is full right now. Spots can free up as unfinished checkouts expire."
       : "Every heat still to run is full. Spots can free up as unfinished checkouts expire."
     : null;
+  const purse = eventPurse(event);
   const facts = [
     event.entry_fee_cents > 0
       ? `${formatFee(event.entry_fee_cents)} entry`
       : "Free entry",
+    purse > 0 ? `${formatFee(purse)} prize purse` : null,
     withHeats
       ? `${event.heat_count} heats${
           event.heat_interval_minutes ? `, every ${event.heat_interval_minutes} min` : ""
@@ -86,8 +144,6 @@ function describeSpotlight(
 
 export default async function Home() {
   const db = await getDB();
-
-  type EventRow = BookableEvent;
 
   // "Upcoming" means the event's date is today or later. This lets an event
   // automatically shift from upcoming to past without any manual status change.
@@ -126,14 +182,22 @@ export default async function Home() {
   // finishers rather than describing them.
   const lastRace = await db
     .prepare(
-      `SELECT ev.id, ev.slug, ev.name, ev.distance, ev.date, ev.venue
+      `SELECT ev.id, ev.slug, ev.name, ev.distance, ev.date, ev.venue, ev.prize_split
        FROM events ev
        WHERE ev.date < ? AND ev.is_test = 0
          AND EXISTS (SELECT 1 FROM results r WHERE r.event_id = ev.id)
        ORDER BY ev.date DESC LIMIT 1`
     )
     .bind(todayInMelbourne())
-    .first<{ id: string; slug: string; name: string; distance: string; date: string; venue: string }>();
+    .first<{
+      id: string;
+      slug: string;
+      name: string;
+      distance: string;
+      date: string;
+      venue: string;
+      prize_split: string | null;
+    }>();
 
   const testRun = await db
     .prepare(
@@ -143,18 +207,21 @@ export default async function Home() {
     )
     .first<{ slug: string; name: string; date: string; venue: string }>();
 
+  // The overall top five, plus the top three in each category for a race
+  // paid by category.
   const finishers = lastRace
     ? ((await db
         .prepare(
-          `SELECT r.rank, r.time_display, u.id as user_id, u.name
+          `SELECT r.rank, r.category_rank, r.race_category, r.time_display,
+                  u.id as user_id, u.name
            FROM results r JOIN users u ON u.id = r.user_id
-           WHERE r.event_id = ? ORDER BY r.rank ASC LIMIT 5`
+           WHERE r.event_id = ? AND (r.rank <= 5 OR r.category_rank <= 3)
+           ORDER BY r.rank ASC`
         )
         .bind(lastRace.id)
-        .all()) as unknown as {
-        results: { rank: number; time_display: string; user_id: string; name: string }[];
-      }).results
+        .all()) as unknown as { results: Finisher[] }).results
     : [];
+  const finisherBoards = lastRace ? leaderBoards(finishers, lastRace.prize_split) : [];
 
   return (
     <>
@@ -280,21 +347,33 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Why it exists */}
+      {/* Why it exists. The statement leads; the photo sits beside it on
+          desktop and follows it on phones. */}
       <Reveal>
         <section className="bg-bone">
           <div className="mx-auto max-w-6xl px-6 py-24 md:py-36">
-            <div className="max-w-4xl">
-              <p className="t-eyebrow text-dust">What Running TT is</p>
-              <p className="t-headline mt-6 text-[1.9rem] sm:text-[2.4rem] md:text-[3.1rem] text-midnight">
-                A start line, a clock, and a purse worth racing for.{" "}
-                <em className="text-terracotta">Open to every runner who wants to race.</em>
-              </p>
-              <p className="mt-8 max-w-xl text-[1.05rem] leading-relaxed text-midnight/70">
-                Book a heat, run your best, and your time goes on the record.
-                The fastest times take home prize money, backed by brands who
-                want to support people who run.
-              </p>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-14 lg:gap-12 items-end">
+              <div className="lg:col-span-8">
+                <p className="t-eyebrow text-dust">What Running TT is</p>
+                <p className="t-headline mt-6 text-[1.9rem] sm:text-[2.4rem] md:text-[3.1rem] text-midnight">
+                  A start line, a clock, and a purse worth racing for.{" "}
+                  <em className="text-terracotta">Open to every runner who wants to race.</em>
+                </p>
+                <p className="mt-8 max-w-xl text-[1.05rem] leading-relaxed text-midnight/70">
+                  Book a heat, run your best, and your time goes on the record.
+                  The fastest times take home prize money, backed by brands who
+                  want to support people who run.
+                </p>
+              </div>
+              <div className="lg:col-span-4 relative aspect-[4/5] w-full max-w-sm lg:max-w-none overflow-hidden bg-midnight/5">
+                <Image
+                  src="/images/night-track.webp"
+                  alt="A woman racing on a track at night under stadium lights"
+                  fill
+                  sizes="(min-width: 640px) 24rem, 100vw"
+                  className="object-cover object-center"
+                />
+              </div>
             </div>
           </div>
         </section>
@@ -333,6 +412,7 @@ export default async function Home() {
                   location: event.location,
                   status: displayStatus(event.status, event.date),
                   entryFeeCents: event.entry_fee_cents,
+                  prizeCents: eventPurse(event),
                   entered: countMap.get(event.id) ?? 0,
                 }))}
               />
@@ -362,7 +442,7 @@ export default async function Home() {
       </Reveal>
 
       {/* Recent finishers */}
-      {lastRace && finishers.length > 0 && (
+      {lastRace && finisherBoards.length > 0 && (
         <Reveal>
           <section className="bg-midnight text-bone">
             <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
@@ -387,24 +467,36 @@ export default async function Home() {
                     Full results
                   </Link>
                 </div>
-                <ol className="lg:col-span-7 border-t rule-light">
-                  {finishers.map((f) => (
-                    <li key={f.user_id} className="border-b rule-light">
-                      <Link
-                        href={`/athletes/${f.user_id}`}
-                        className="group grid grid-cols-[3rem_1fr_auto] items-baseline gap-4 py-5"
+                <div className="lg:col-span-7 space-y-10">
+                  {finisherBoards.map((board) => (
+                    <div key={board.category ?? "overall"}>
+                      {board.category && (
+                        <p className="t-eyebrow text-bone/60 mb-3">{CATEGORY_LABEL[board.category]}</p>
+                      )}
+                      <ol
+                        className="border-t rule-light"
+                        aria-label={board.category ? `${CATEGORY_LABEL[board.category]}, leading finishers` : undefined}
                       >
-                        <span className={`t-numeral text-2xl ${f.rank === 1 ? "text-gold" : "text-bone/45"}`}>
-                          {f.rank}
-                        </span>
-                        <span className="t-headline text-[1.4rem] md:text-[1.7rem] truncate group-hover:text-terracotta transition-colors duration-300">
-                          {f.name}
-                        </span>
-                        <span className="t-numeral text-[1.8rem] md:text-[2.2rem]">{f.time_display}</span>
-                      </Link>
-                    </li>
+                        {board.rows.map(({ place, row: f }) => (
+                          <li key={f.user_id} className="border-b rule-light">
+                            <Link
+                              href={`/athletes/${f.user_id}`}
+                              className="group grid grid-cols-[3rem_1fr_auto] items-baseline gap-4 py-5"
+                            >
+                              <span className={`t-numeral text-2xl ${place === 1 ? "text-gold" : "text-bone/45"}`}>
+                                {place}
+                              </span>
+                              <span className="t-headline text-[1.4rem] md:text-[1.7rem] truncate group-hover:text-terracotta transition-colors duration-300">
+                                {f.name}
+                              </span>
+                              <span className="t-numeral text-[1.8rem] md:text-[2.2rem]">{f.time_display}</span>
+                            </Link>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
                   ))}
-                </ol>
+                </div>
               </div>
             </div>
           </section>
@@ -462,9 +554,11 @@ export default async function Home() {
                   rewarded.
                 </p>
                 <p>
-                  The purse and how it splits is listed on each race before
-                  you enter, and it is handed out at the finish. It comes from
-                  entry fees and from sponsors who back the runners.
+                  The purse is listed on each race before you enter, along
+                  with how it splits: down the whole field, or in women&apos;s
+                  and men&apos;s categories. It is handed out at the finish, and
+                  it comes from entry fees and from sponsors who back the
+                  runners.
                 </p>
               </div>
             </div>

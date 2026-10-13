@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { toRaceCategory } from "@/lib/categories";
 
 const SESSION_COOKIE = "rtt_session";
 const SESSION_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
@@ -103,7 +104,7 @@ export async function getSession(db: D1Database) {
               u.bio, u.story, u.photo_url, u.instagram, u.strava_url, u.tiktok, u.website,
               u.sponsors, u.sponsor_interests, u.open_to_sponsorship, u.is_admin,
               u.first_name, u.middle_name, u.last_name, u.date_of_birth, u.profile_completed,
-              u.city, u.country, u.dream_brands,
+              u.city, u.country, u.dream_brands, u.race_category,
               (u.password_hash IS NOT NULL) as has_password
        FROM sessions s
        JOIN users u ON s.user_id = u.id
@@ -139,6 +140,7 @@ export async function getSession(db: D1Database) {
       city: string | null;
       country: string | null;
       dream_brands: string | null;
+      race_category: string | null;
       has_password: number;
     }>();
 
@@ -173,6 +175,7 @@ export async function getSession(db: D1Database) {
       city: session.city,
       country: session.country,
       dreamBrands: session.dream_brands,
+      raceCategory: toRaceCategory(session.race_category),
       hasPassword: !!session.has_password,
     },
   };

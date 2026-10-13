@@ -117,7 +117,9 @@ export default function AboutPage() {
                   Every heat races the same distance against the same clock,
                   so where you finish comes down to your time, not who you
                   happened to line up beside. Run the fastest time of the day
-                  and you have beaten the whole field.
+                  and you have beaten the whole field. Where a race pays in
+                  women&apos;s and men&apos;s categories, the fastest time in
+                  yours beats everyone in it, whichever heat they ran.
                 </p>
                 <p>
                   There is a third part to it, and it matters as much as the
@@ -134,15 +136,26 @@ export default function AboutPage() {
       {/* Where brands come in */}
       <section id="brands" className="bg-stone scroll-mt-20">
         <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
-          <div className="max-w-3xl">
-            <h2 className="t-display text-[2.6rem] md:text-[3.8rem]">
-              Where brands <em>come in.</em>
-            </h2>
-            <p className="t-lede mt-6 text-midnight/75">
-              Running TT works when three things line up: runners racing for
-              something real, brands backing them, and someone making the
-              connection.
-            </p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-end">
+            <div className="lg:col-span-7">
+              <h2 className="t-display text-[2.6rem] md:text-[3.8rem]">
+                Where brands <em>come in.</em>
+              </h2>
+              <p className="t-lede mt-6 max-w-3xl text-midnight/75">
+                Running TT works when three things line up: runners racing for
+                something real, brands backing them, and someone making the
+                connection.
+              </p>
+            </div>
+            <div className="lg:col-span-5 relative aspect-[3/2] w-full overflow-hidden bg-midnight/5">
+              <Image
+                src="/images/spikes.webp"
+                alt="Track spikes and pink running socks stepping across a lane line"
+                fill
+                sizes="(min-width: 1024px) 28rem, 100vw"
+                className="object-cover object-[60%_55%]"
+              />
+            </div>
           </div>
           <ol className="mt-14 grid grid-cols-1 md:grid-cols-3 gap-x-10 border-t border-midnight/15">
             {brandCase.map((item, i) => (
@@ -276,7 +289,21 @@ export default function AboutPage() {
         <section className="bg-bone">
           <div className="mx-auto max-w-6xl px-6 py-24 md:py-32">
             <div className="max-w-3xl">
-              <h2 className="t-display text-[2.6rem] md:text-[3.6rem]">
+              <a
+                href="https://www.steigen.com.au"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block py-2.5 -my-2.5 transition-opacity hover:opacity-70"
+              >
+                <Image
+                  src="/images/steigen-logo-black.png"
+                  alt="Steigen"
+                  width={119}
+                  height={28}
+                  className="h-7 w-auto"
+                />
+              </a>
+              <h2 className="mt-12 t-display text-[2.6rem] md:text-[3.6rem]">
                 A Steigen initiative
               </h2>
               <div className={`mt-8 ${prose} text-midnight/80`}>

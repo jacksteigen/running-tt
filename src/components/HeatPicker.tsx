@@ -429,6 +429,13 @@ export default function HeatPicker({
           setError({ text: data.error || "Bookings have closed." });
           router.refresh();
           break;
+        case "CATEGORY_REQUIRED":
+          // Prize money here is paid by category and theirs is not set. The
+          // page reloads with that question in place of the heats, and their
+          // pick stays in the address for when they come back to it.
+          setError({ text: data.error || "Pick the category you race in before you book." });
+          router.refresh();
+          break;
         case "PROFILE": {
           setBusy("redirecting");
           const to = data.next || "/welcome";

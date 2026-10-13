@@ -10,6 +10,7 @@ import { displayStatus } from "@/lib/events";
 import { HOLD_MINUTES, getHeatAvailability, hasHeats, heatWindow } from "@/lib/heats";
 import { EVENT_BOOKING_COLUMNS, bookingClosedReason, type BookableEvent } from "@/lib/bookings";
 import { formatFee } from "@/lib/money";
+import { purseCents, toPrizeSplit, toRaceCategory } from "@/lib/categories";
 import EntriesManager, { type StartListEntry } from "@/components/EntriesManager";
 import ResultsEditor, { type Standing } from "@/components/ResultsEditor";
 import ChangeRequestsPanel, { type ChangeRequest } from "@/components/ChangeRequestsPanel";
@@ -33,12 +34,16 @@ interface EntryRow {
   holding: number;
   name: string;
   email: string;
+  race_category: string | null;
   time_display: string | null;
   result_heat: number | null;
   rank: number | null;
   age_group_rank: number | null;
   prize_amount_cents: number | null;
   result_age_group: string | null;
+  result_race_category: string | null;
+  category_rank: number | null;
+  age_group_award: number | null;
 }
 
 interface RequestRow {
@@ -87,10 +92,11 @@ export default async function AdminEventPage({
   if (!session) redirect("/login");
   if (!session.user.isAdmin) redirect("/dashboard");
 
+  // prize_split comes with the booking columns.
   const event = await db
-    .prepare(`SELECT ${EVENT_BOOKING_COLUMNS}, prizes FROM events WHERE slug = ?`)
+    .prepare(`SELECT ${EVENT_BOOKING_COLUMNS}, prizes, age_group_prize FROM events WHERE slug = ?`)
     .bind(slug)
-    .first<BookableEvent & { prizes: string | null }>();
+    .first<BookableEvent & { prizes: string | null; age_group_prize: string | null }>();
 
   if (!event) notFound();
 
@@ -102,9 +108,10 @@ export default async function AdminEventPage({
       `SELECT e.id, e.user_id, e.status, e.age_group, e.heat_number, e.created_at, e.stripe_payment_id, e.outcome,
               CASE WHEN e.status = 'pending' AND e.created_at > datetime('now', '-${HOLD_MINUTES} minutes')
                    THEN 1 ELSE 0 END AS holding,
-              u.name, u.email,
+              u.name, u.email, u.race_category,
               r.time_display, r.heat_number AS result_heat, r.rank, r.age_group_rank,
-              r.prize_amount_cents, r.age_group AS result_age_group
+              r.prize_amount_cents, r.age_group AS result_age_group,
+              r.race_category AS result_race_category, r.category_rank, r.age_group_award
        FROM entries e
        JOIN users u ON u.id = e.user_id
        LEFT JOIN results r ON r.event_id = e.event_id AND r.user_id = e.user_id
@@ -140,6 +147,9 @@ export default async function AdminEventPage({
   const confirmed = entries.results.filter((e) => e.status === "confirmed");
   const holding = entries.results.filter((e) => e.status === "pending" && e.holding);
   const prizes = parsePrizes(event.prizes);
+  const prizeSplit = toPrizeSplit(event.prize_split);
+  const ageGroupPrize = event.age_group_prize?.trim() || null;
+  const purse = purseCents(prizes, prizeSplit);
   const status = displayStatus(event.status, event.date);
   const closedReason = bookingClosedReason(event);
   const when = (withHeats && heatWindow(event)) || event.time;
@@ -155,6 +165,9 @@ export default async function AdminEventPage({
       timeDisplay: e.time_display as string,
       heat: e.result_heat ?? e.heat_number ?? 1,
       prizeCents: e.prize_amount_cents ?? 0,
+      raceCategory: toRaceCategory(e.result_race_category),
+      categoryRank: e.category_rank,
+      ageGroupAward: e.age_group_award === 1,
     }));
 
   const startList: StartListEntry[] = entries.results.map((e) => {
@@ -173,6 +186,7 @@ export default async function AdminEventPage({
       heatNumber: e.heat_number,
       hasResult: !!e.time_display,
       paidOnline: !!e.stripe_payment_id,
+      raceCategory: toRaceCategory(e.race_category),
     };
   });
 
@@ -297,6 +311,21 @@ export default async function AdminEventPage({
                     {p.label} <span className="font-mono text-gold">{p.amount}</span>
                   </span>
                 ))}
+                {prizeSplit === "category" && <span className="text-bone/45"> for women and for men</span>}
+                {purse > 0 && (
+                  <>
+                    <span className="text-bone/30"> · </span>
+                    <span className="text-bone/45">Purse </span>
+                    <span className="font-mono text-bone">{formatFee(purse)}</span>
+                  </>
+                )}
+              </>
+            )}
+            {ageGroupPrize && (
+              <>
+                <span className="text-bone/30"> · </span>
+                <span className="text-bone/45">Age group prize </span>
+                <span className="text-bone">{ageGroupPrize}</span>
               </>
             )}
             <span className="text-bone/30"> · </span>
@@ -333,12 +362,15 @@ export default async function AdminEventPage({
                 email: e.email,
                 ageGroup: e.age_group,
                 heat: e.heat_number,
+                raceCategory: toRaceCategory(e.race_category),
               }))}
               initialStandings={initialStandings}
               initialOutcomes={confirmed
                 .filter((e) => e.outcome)
                 .map((e) => ({ userId: e.user_id, outcome: e.outcome as Outcome }))}
               prizes={prizes}
+              prizeSplit={prizeSplit}
+              ageGroupPrize={ageGroupPrize}
             />
           </div>
 
@@ -349,6 +381,7 @@ export default async function AdminEventPage({
               entries={startList}
               candidates={candidates}
               paidEvent={event.entry_fee_cents > 0}
+              byCategory={prizeSplit === "category"}
             />
           </div>
         </div>

@@ -4,6 +4,7 @@ import { generateId } from "@/lib/auth";
 import { requireAdmin } from "@/lib/adminAuth";
 import { isValidDob } from "@/lib/agegroups";
 import { composeLocation, isKnownCountry } from "@/lib/countries";
+import { isRaceCategory } from "@/lib/categories";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -33,9 +34,13 @@ export async function POST(request: NextRequest) {
   const dateOfBirth = clean(body.dateOfBirth, 10);
   const city = clean(body.city, 60);
   const country = clean(body.country, 60);
+  const raceCategory = body.raceCategory;
 
   if (!firstName || !lastName) {
     return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
+  }
+  if (!isRaceCategory(raceCategory)) {
+    return NextResponse.json({ error: "Pick the category they race in" }, { status: 400 });
   }
   if (!EMAIL_RE.test(email)) {
     return NextResponse.json({ error: "An email is needed so they can claim the account" }, { status: 400 });
@@ -62,11 +67,11 @@ export async function POST(request: NextRequest) {
   const completed = dateOfBirth && city && country ? 1 : 0;
   await db
     .prepare(
-      `INSERT INTO users (id, email, name, first_name, last_name, date_of_birth, city, country, location, profile_completed)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO users (id, email, name, first_name, last_name, race_category, date_of_birth, city, country, location, profile_completed)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .bind(
-      id, email, `${firstName} ${lastName}`, firstName, lastName,
+      id, email, `${firstName} ${lastName}`, firstName, lastName, raceCategory,
       dateOfBirth || null, city || null, country || null,
       composeLocation(city, country) || null, completed
     )

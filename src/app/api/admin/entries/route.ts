@@ -6,10 +6,16 @@ import { ageGroupOn } from "@/lib/agegroups";
 import { OCCUPYING_SQL, type HeatConfig } from "@/lib/heats";
 import { confirmPaidCheckout, sendConfirmationOnce } from "@/lib/bookings";
 import { expireCheckoutSession, retrieveCheckoutSession } from "@/lib/stripe";
+import { CATEGORY_LABEL, toPrizeSplit, toRaceCategory, type RaceCategory } from "@/lib/categories";
+import { recomputeForAthlete } from "@/lib/standings";
+
+const NO_CATEGORY_WARNING =
+  "They have no race category, so they cannot be placed for prize money until it is set on their profile.";
 
 /**
  * Add an athlete to an event by hand (walk-ups, comps, fixes). Respects heat
  * capacity unless `force` is set, so a full heat needs a deliberate yes.
+ * A `raceCategory` fills in an athlete who has none; it never replaces one.
  */
 export async function POST(request: NextRequest) {
   const db = await getDB();
@@ -21,9 +27,11 @@ export async function POST(request: NextRequest) {
   let heatNumber: number | null = null;
   let force = false;
   let notify = false;
+  let raceCategory: RaceCategory | null = null;
   try {
     const body = (await request.json()) as {
       eventId?: string; userId?: string; heatNumber?: number | string | null; force?: boolean; notify?: boolean;
+      raceCategory?: string | null;
     };
     eventId = typeof body.eventId === "string" ? body.eventId : "";
     userId = typeof body.userId === "string" ? body.userId : "";
@@ -31,18 +39,21 @@ export async function POST(request: NextRequest) {
     heatNumber = Number.isInteger(h) && h > 0 ? h : null;
     force = body.force === true;
     notify = body.notify === true;
+    raceCategory = toRaceCategory(body.raceCategory);
   } catch {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
   const event = await db
-    .prepare("SELECT id, date, first_heat_time, heat_interval_minutes, heat_count, heat_capacity FROM events WHERE id = ?")
+    .prepare(
+      "SELECT id, date, first_heat_time, heat_interval_minutes, heat_count, heat_capacity, prize_split FROM events WHERE id = ?"
+    )
     .bind(eventId)
-    .first<HeatConfig & { id: string; date: string }>();
+    .first<HeatConfig & { id: string; date: string; prize_split: string | null }>();
   const user = await db
-    .prepare("SELECT id, date_of_birth FROM users WHERE id = ?")
+    .prepare("SELECT id, date_of_birth, race_category FROM users WHERE id = ?")
     .bind(userId)
-    .first<{ id: string; date_of_birth: string | null }>();
+    .first<{ id: string; date_of_birth: string | null; race_category: string | null }>();
 
   if (!event || !user) {
     return NextResponse.json({ error: "Event or athlete not found" }, { status: 404 });
@@ -69,6 +80,29 @@ export async function POST(request: NextRequest) {
     heatNumber = null;
   }
 
+  // Fill in a missing category, then re-rank anything they have raced.
+  let category = toRaceCategory(user.race_category);
+  if (!category && raceCategory) {
+    await db
+      .prepare(
+        "UPDATE users SET race_category = ?, updated_at = datetime('now') WHERE id = ? AND race_category IS NULL"
+      )
+      .bind(raceCategory, userId)
+      .run();
+    category = raceCategory;
+    await recomputeForAthlete(db, userId);
+  }
+  const warnings: string[] = [];
+  if (toPrizeSplit(event.prize_split) === "category" && !category) warnings.push(NO_CATEGORY_WARNING);
+  // The pick never replaces the category on their profile, so say which one counts.
+  if (raceCategory && category && raceCategory !== category) {
+    const label = CATEGORY_LABEL[category];
+    warnings.push(
+      `Their profile says ${label}, so they race as ${label}. Change it on their profile if that is wrong.`
+    );
+  }
+  const warning = warnings.length ? warnings.join(" ") : undefined;
+
   const ageGroup = ageGroupOn(user.date_of_birth, event.date);
   const existing = await db
     .prepare("SELECT id, status, stripe_payment_id FROM entries WHERE event_id = ? AND user_id = ?")
@@ -92,7 +126,7 @@ export async function POST(request: NextRequest) {
             metadata: (checkout.metadata ?? null) as Record<string, string> | null,
           });
         }
-        return NextResponse.json({ success: true, entryId, note: "They had already paid online." });
+        return NextResponse.json({ success: true, entryId, note: "They had already paid online.", warning });
       }
       if (outcome === "unknown") {
         return NextResponse.json(
@@ -121,5 +155,5 @@ export async function POST(request: NextRequest) {
   }
 
   if (notify) await sendConfirmationOnce(db, entryId);
-  return NextResponse.json({ success: true, entryId });
+  return NextResponse.json({ success: true, entryId, warning });
 }

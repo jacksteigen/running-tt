@@ -1,5 +1,6 @@
 import { DATE_TBC } from "@/lib/dates";
 import { formatClock, isValidClock } from "@/lib/heats";
+import { toPrizeSplit, type PrizeSplit } from "@/lib/categories";
 
 export const EVENT_STATUSES = ["Coming Soon", "Open", "Sold Out"] as const;
 
@@ -16,6 +17,10 @@ export interface EventFields {
   check_in: string | null;
   what_to_bring: string | null;
   prizes: string | null;
+  /** Pay the prize places down the overall order, or once per category. */
+  prize_split: PrizeSplit;
+  /** What each age group winner outside the prize places gets, or null for nothing. */
+  age_group_prize: string | null;
   first_heat_time: string | null;
   heat_interval_minutes: number | null;
   heat_count: number | null;
@@ -154,6 +159,8 @@ export function parseEventInput(
       check_in: str(body.checkIn, 600) || null,
       what_to_bring: bring.length ? JSON.stringify(bring) : null,
       prizes: prizes.length ? JSON.stringify(prizes) : null,
+      prize_split: toPrizeSplit(body.prizeSplit),
+      age_group_prize: str(body.ageGroupPrize, 80) || null,
       first_heat_time: firstHeat,
       heat_interval_minutes: interval,
       heat_count: count,

@@ -47,7 +47,9 @@ const sections: Section[] = [
       "You race at your own risk. You are responsible for ensuring you are medically fit to race the distance you enter.",
       "You must follow the reasonable directions of event staff and the rules of the venue at all times.",
       "Recorded times, placings and prize outcomes are determined by Running TT and published on the event page. Obvious errors will be corrected. Our decision on results is final.",
-      "Prize money is paid as published on the event page for that race.",
+      "Where a race pays prize money in women's and men's categories, you race in the category on your athlete profile.",
+      "Where a race offers age group prizes, each age group's prize goes to its fastest finisher who has not already won a prize place. In a race paid in categories, each category has its own age groups.",
+      "Prizes are paid as published on the event page for that race.",
     ],
   },
   {

@@ -3,6 +3,8 @@ import { getDB } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { normaliseUrl } from "@/lib/urls";
 import { composeLocation, isKnownCountry } from "@/lib/countries";
+import { isRaceCategory, toRaceCategory, type RaceCategory } from "@/lib/categories";
+import { hasCategoryResults, recomputeForAthlete } from "@/lib/standings";
 
 interface SponsorRef {
   name: string;
@@ -24,6 +26,8 @@ interface ProfilePatch {
   sponsorInterests?: string;
   dreamBrands?: string;
   openToSponsorship?: boolean;
+  /** Women or Men. Left out to keep it as it is; an athlete cannot clear it. */
+  raceCategory?: string | null;
 }
 
 const TEXT_LIMITS: Record<string, number> = {
@@ -147,6 +151,28 @@ export async function PATCH(request: NextRequest) {
     updates.push("open_to_sponsorship = ?");
     values.push(body.openToSponsorship ? 1 : 0);
   }
+  let categoryChanged = false;
+  if (body.raceCategory !== undefined && body.raceCategory !== null) {
+    if (!isRaceCategory(body.raceCategory)) {
+      return NextResponse.json({ error: "Pick Women or Men" }, { status: 400 });
+    }
+    const raceCategory: RaceCategory = body.raceCategory;
+    const current = await db
+      .prepare("SELECT race_category FROM users WHERE id = ?")
+      .bind(session.user.id)
+      .first<{ race_category: string | null }>();
+    categoryChanged = toRaceCategory(current?.race_category) !== raceCategory;
+    // Once a category has decided places or prize money in a race, only an
+    // admin can change it, the same as a date of birth.
+    if (categoryChanged && (await hasCategoryResults(db, session.user.id))) {
+      return NextResponse.json(
+        { error: "Your category is set. Ask us if it needs changing." },
+        { status: 409 }
+      );
+    }
+    updates.push("race_category = ?");
+    values.push(raceCategory);
+  }
 
   if (updates.length === 0) {
     return NextResponse.json({ error: "No fields to update" }, { status: 400 });
@@ -159,6 +185,10 @@ export async function PATCH(request: NextRequest) {
     .prepare(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`)
     .bind(...values)
     .run();
+
+  // Results already raced keep their category. This only fills in results
+  // that have none yet, in races not paid by category.
+  if (categoryChanged) await recomputeForAthlete(db, session.user.id);
 
   return NextResponse.json({ success: true });
 }

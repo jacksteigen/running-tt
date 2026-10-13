@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { formatEventDate } from "@/lib/dates";
 import { composeLocation, isKnownCountry } from "@/lib/countries";
 import { heatLabel } from "@/lib/heats";
+import { CATEGORY_LABEL, toRaceCategory } from "@/lib/categories";
 import AthleteEditor from "@/components/AthleteEditor";
 import RemoveEntryButton from "@/components/RemoveEntryButton";
 
@@ -43,7 +44,7 @@ export default async function AdminAthletePage({
 
   const athlete = await db
     .prepare(
-      `SELECT id, name, email, first_name, middle_name, last_name, date_of_birth,
+      `SELECT id, name, email, first_name, middle_name, last_name, date_of_birth, race_category,
               city, country, location, bio, is_admin, profile_completed, created_at,
               dream_brands, sponsor_interests, open_to_sponsorship
        FROM users WHERE id = ?`
@@ -57,6 +58,7 @@ export default async function AdminAthletePage({
       middle_name: string | null;
       last_name: string | null;
       date_of_birth: string | null;
+      race_category: string | null;
       city: string | null;
       country: string | null;
       location: string | null;
@@ -101,6 +103,7 @@ export default async function AdminAthletePage({
 
   const place = splitPlace(athlete.city, athlete.country, athlete.location);
   const placeText = composeLocation(athlete.city, athlete.country) || athlete.location;
+  const raceCategory = toRaceCategory(athlete.race_category);
 
   return (
     <>
@@ -112,7 +115,13 @@ export default async function AdminAthletePage({
           <h1 className="t-display mt-5 text-[2.6rem] md:text-[3.6rem] break-words">{athlete.name}</h1>
           <p className="mt-3 text-[0.95rem] text-bone/65">
             {athlete.email}
-            {placeText ? ` · ${placeText}` : ""} · joined {athlete.created_at.slice(0, 10)}
+            {placeText ? ` · ${placeText}` : ""} ·{" "}
+            {raceCategory ? (
+              CATEGORY_LABEL[raceCategory]
+            ) : (
+              <span className="text-gold">no race category</span>
+            )}{" "}
+            · joined {athlete.created_at.slice(0, 10)}
             {athlete.profile_completed ? "" : " · profile incomplete"}
           </p>
           <Link
@@ -136,6 +145,7 @@ export default async function AdminAthletePage({
                 middleName: athlete.middle_name ?? "",
                 lastName: athlete.last_name ?? "",
                 dateOfBirth: athlete.date_of_birth ?? "",
+                raceCategory,
                 city: place.city,
                 country: place.country,
                 bio: athlete.bio ?? "",

@@ -61,6 +61,8 @@ export default async function NewEventPage() {
           heatCount: 12,
           heatCapacity: 10,
           prizes: [],
+          prizeSplit: "overall",
+          ageGroupPrize: "",
           description: "",
           checkIn: "",
           whatToBring: [],

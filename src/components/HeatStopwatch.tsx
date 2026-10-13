@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatSeconds, LONG_TIME_SECONDS } from "@/lib/racetime";
 import { OUTCOMES, type Outcome } from "@/lib/outcomes";
+import { CATEGORY_LABEL, type RaceCategory } from "@/lib/categories";
 
 export type FinishOutcome = { ok: true } | { ok: false; error: string };
 
@@ -21,6 +22,8 @@ export interface StopwatchAthlete {
   userId: string;
   name: string;
   ageGroup: string | null;
+  /** Women or Men, shown beside the age group when the event pays each. */
+  raceCategory?: RaceCategory | null;
   timeDisplay: string | null;
   rank: number | null;
   /** DNF, DNS or DQ, when the athlete has no time. */
@@ -396,6 +399,7 @@ export default function HeatStopwatch({
                   <span className="min-w-0">
                     <span className="block font-medium truncate">{a.name}</span>
                     <span className="block text-[11px] opacity-60 truncate">
+                      {a.raceCategory && `${CATEGORY_LABEL[a.raceCategory]} · `}
                       {a.ageGroup ?? "No age group"}
                     </span>
                   </span>

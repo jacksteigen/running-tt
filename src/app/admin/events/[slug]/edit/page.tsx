@@ -9,6 +9,7 @@ import { formatEventDate, isDateTbc } from "@/lib/dates";
 import { getHeatAvailability, hasHeats, type HeatConfig } from "@/lib/heats";
 import { EVENT_STATUSES } from "@/lib/eventInput";
 import { parsePrizes } from "@/lib/racetime";
+import { toPrizeSplit } from "@/lib/categories";
 import EventEditor, { type EventStatus } from "@/components/EventEditor";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +36,8 @@ interface EventRow extends HeatConfig {
   check_in: string | null;
   what_to_bring: string | null;
   prizes: string | null;
+  prize_split: string | null;
+  age_group_prize: string | null;
 }
 
 function parseList(raw: string | null): string[] {
@@ -138,6 +141,8 @@ export default async function EditEventPage({
           heatCount: event.heat_count || 12,
           heatCapacity: event.heat_capacity || 10,
           prizes: parsePrizes(event.prizes),
+          prizeSplit: toPrizeSplit(event.prize_split),
+          ageGroupPrize: event.age_group_prize ?? "",
           description: event.description ?? "",
           checkIn: event.check_in ?? "",
           whatToBring: parseList(event.what_to_bring),

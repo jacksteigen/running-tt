@@ -3,6 +3,7 @@ import { getDB } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { ageGroupOn, isValidDob } from "@/lib/agegroups";
 import { composeLocation, isKnownCountry } from "@/lib/countries";
+import { isRaceCategory, toRaceCategory, type RaceCategory } from "@/lib/categories";
 import { recomputeForAthlete } from "@/lib/standings";
 
 function clean(value: unknown, limit: number): string {
@@ -28,9 +29,9 @@ export async function PATCH(
   }
 
   const target = await db
-    .prepare("SELECT id FROM users WHERE id = ?")
+    .prepare("SELECT id, race_category FROM users WHERE id = ?")
     .bind(id)
-    .first<{ id: string }>();
+    .first<{ id: string; race_category: string | null }>();
   if (!target) {
     return NextResponse.json({ error: "Athlete not found" }, { status: 404 });
   }
@@ -44,6 +45,15 @@ export async function PATCH(
   const location = composeLocation(city, country);
   const bio = clean(body.bio, 600);
   const isAdmin = body.isAdmin === true;
+
+  // Race category: left out keeps it, "" or null clears it.
+  let raceCategory: RaceCategory | null = toRaceCategory(target.race_category);
+  if ("raceCategory" in body) {
+    const raw = body.raceCategory;
+    if (raw === null || raw === "") raceCategory = null;
+    else if (isRaceCategory(raw)) raceCategory = raw;
+    else return NextResponse.json({ error: "Pick Women or Men" }, { status: 400 });
+  }
 
   if (!firstName || !lastName) {
     return NextResponse.json({ error: "First and last name are required" }, { status: 400 });
@@ -64,7 +74,7 @@ export async function PATCH(
     .prepare(
       `UPDATE users
        SET first_name = ?, middle_name = ?, last_name = ?, name = ?,
-           date_of_birth = ?, city = ?, country = ?, location = ?, bio = ?, is_admin = ?,
+           race_category = ?, date_of_birth = ?, city = ?, country = ?, location = ?, bio = ?, is_admin = ?,
            profile_completed = CASE WHEN profile_completed = 1 THEN 1 ELSE ? END,
            updated_at = datetime('now')
        WHERE id = ?`
@@ -74,6 +84,7 @@ export async function PATCH(
       middleName || null,
       lastName,
       `${firstName} ${lastName}`,
+      raceCategory,
       dateOfBirth || null,
       city || null,
       country || null,
@@ -99,6 +110,17 @@ export async function PATCH(
       .run();
   }
 
+  // Results keep the category they were raced in. An admin changing or
+  // clearing it is a deliberate correction, so it moves their past results too.
+  if (raceCategory !== toRaceCategory(target.race_category)) {
+    await db
+      .prepare("UPDATE results SET race_category = ? WHERE user_id = ?")
+      .bind(raceCategory, id)
+      .run();
+  }
+
+  // Always re-rank: a new date of birth moves age groups, and a new category
+  // moves category places, age group places and prize money.
   await recomputeForAthlete(db, id);
 
   return NextResponse.json({ success: true });

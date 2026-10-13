@@ -4,10 +4,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import CountrySelect from "@/components/CountrySelect";
+import { CategoryChoice } from "@/components/WalkUpForm";
+import type { RaceCategory } from "@/lib/categories";
 
 interface Fields {
   firstName: string;
   lastName: string;
+  raceCategory: RaceCategory | null;
   email: string;
   dateOfBirth: string;
   city: string;
@@ -17,6 +20,7 @@ interface Fields {
 const EMPTY: Fields = {
   firstName: "",
   lastName: "",
+  raceCategory: null,
   email: "",
   dateOfBirth: "",
   city: "",
@@ -40,7 +44,7 @@ export default function AddAthleteForm() {
   const [existingId, setExistingId] = useState<string | null>(null);
   const [created, setCreated] = useState<{ id: string; name: string } | null>(null);
 
-  function set<K extends keyof Fields>(key: K, value: string) {
+  function set<K extends keyof Fields>(key: K, value: Fields[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -52,6 +56,9 @@ export default function AddAthleteForm() {
 
     if (!form.firstName.trim() || !form.lastName.trim()) {
       return setError("First and last name are required.");
+    }
+    if (!form.raceCategory) {
+      return setError("Pick Women or Men.");
     }
     if (!form.email.trim()) {
       return setError("An email is needed so they can claim the account.");
@@ -154,6 +161,14 @@ export default function AddAthleteForm() {
               className={inputCls}
             />
           </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <CategoryChoice
+            name="n-category"
+            value={form.raceCategory}
+            onChange={(value) => set("raceCategory", value)}
+            labelClassName={labelCls}
+          />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>

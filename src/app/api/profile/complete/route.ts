@@ -3,6 +3,7 @@ import { getDB } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { ageGroupOn, isValidDob } from "@/lib/agegroups";
 import { composeLocation, isKnownCountry } from "@/lib/countries";
+import { isRaceCategory } from "@/lib/categories";
 import { recomputeForAthlete } from "@/lib/standings";
 
 function clean(value: unknown, limit: number): string {
@@ -11,8 +12,8 @@ function clean(value: unknown, limit: number): string {
 
 /**
  * First-run profile. Every athlete completes this once before they can use
- * the dashboard or enter an event, so that names, ages and age groups on
- * results are real from day one.
+ * the dashboard or enter an event, so that names, ages, categories and age
+ * groups on results are real from day one.
  */
 export async function POST(request: NextRequest) {
   const db = await getDB();
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
   const middleName = clean(body.middleName, 60);
   const lastName = clean(body.lastName, 60);
   const dateOfBirth = clean(body.dateOfBirth, 10);
+  const raceCategory = body.raceCategory;
   const city = clean(body.city, 60);
   const country = clean(body.country, 60);
   const location = composeLocation(city, country);
@@ -57,6 +59,9 @@ export async function POST(request: NextRequest) {
       { error: "Enter a real date of birth" },
       { status: 400 }
     );
+  }
+  if (!isRaceCategory(raceCategory)) {
+    return NextResponse.json({ error: "Pick the category you race in" }, { status: 400 });
   }
   if (!city) {
     return NextResponse.json({ error: "Which town or city are you based in?" }, { status: 400 });
@@ -84,7 +89,7 @@ export async function POST(request: NextRequest) {
     .prepare(
       `UPDATE users
        SET first_name = ?, middle_name = ?, last_name = ?, name = ?,
-           date_of_birth = ?, city = ?, country = ?, location = ?, bio = ?,
+           date_of_birth = ?, race_category = ?, city = ?, country = ?, location = ?, bio = ?,
            dream_brands = ?, sponsor_interests = ?, open_to_sponsorship = ?,
            profile_completed = 1, updated_at = datetime('now')
        WHERE id = ?`
@@ -95,6 +100,7 @@ export async function POST(request: NextRequest) {
       lastName,
       name,
       dateOfBirth,
+      raceCategory,
       city,
       country,
       location,

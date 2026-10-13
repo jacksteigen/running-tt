@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { getDB } from "@/lib/db";
 import EventCard from "@/components/EventCard";
@@ -6,6 +7,8 @@ import GlobeMap from "@/components/GlobeMap";
 import RaceList from "@/components/RaceList";
 import FirstInBand from "@/components/FirstInBand";
 import { displayStatus, todayInMelbourne } from "@/lib/events";
+import { parsePrizes } from "@/lib/racetime";
+import { purseCents, toPrizeSplit } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +30,8 @@ interface EventRow {
   status: string;
   entry_fee_cents: number;
   is_test: number;
+  prizes: string | null;
+  prize_split: string | null;
 }
 
 export default async function EventsPage() {
@@ -61,15 +66,28 @@ export default async function EventsPage() {
     <>
       <section className="bg-bone">
         <div className="mx-auto max-w-6xl px-6 pt-16 pb-24 md:pt-24 md:pb-32">
+          {/* On phones the race list comes first, so the photo only joins
+              the header once there is room beside the title. */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-7 lg:gap-12 items-end motion-safe:animate-fade-up">
-            <h1 className="lg:col-span-7 t-display text-[3.4rem] sm:text-[4.4rem] md:text-[5.6rem]">
-              Find your <em>race.</em>
-            </h1>
-            <p className="lg:col-span-5 t-lede max-w-md text-midnight/75 lg:pb-2">
-              Time trials held around the world, wherever there is a good
-              venue and runners who want to race. Small heats, an honest
-              clock, and prize money at every one.
-            </p>
+            <div className="lg:col-span-7">
+              <h1 className="t-display text-[3.4rem] sm:text-[4.4rem] md:text-[5.6rem]">
+                Find your <em>race.</em>
+              </h1>
+              <p className="t-lede mt-7 lg:mt-9 max-w-md text-midnight/75">
+                Time trials held around the world, wherever there is a good
+                venue and runners who want to race. Small heats, an honest
+                clock, and prize money at every one.
+              </p>
+            </div>
+            <div className="hidden lg:block lg:col-span-4 lg:col-start-9 relative aspect-[4/5] overflow-hidden bg-midnight/5">
+              <Image
+                src="/images/road-race.webp"
+                alt="A runner leading a group along a city road race"
+                fill
+                sizes="22rem"
+                className="object-cover object-[45%_40%]"
+              />
+            </div>
           </div>
 
           <div className="mt-16 md:mt-24">
@@ -91,6 +109,7 @@ export default async function EventsPage() {
                     location: event.location,
                     status: displayStatus(event.status, event.date),
                     entryFeeCents: event.entry_fee_cents,
+                    prizeCents: purseCents(parsePrizes(event.prizes), toPrizeSplit(event.prize_split)),
                     entered: countMap.get(event.id) ?? 0,
                   }))}
                 />

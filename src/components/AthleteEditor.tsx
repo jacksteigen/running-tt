@@ -3,12 +3,15 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import CountrySelect from "@/components/CountrySelect";
+import { CategoryChoice } from "@/components/WalkUpForm";
+import type { RaceCategory } from "@/lib/categories";
 
 interface AthleteFields {
   firstName: string;
   middleName: string;
   lastName: string;
   dateOfBirth: string;
+  raceCategory: RaceCategory | null;
   city: string;
   country: string;
   bio: string;
@@ -52,6 +55,7 @@ export default function AthleteEditor({
           middleName: form.middleName,
           lastName: form.lastName,
           dateOfBirth: form.dateOfBirth,
+          raceCategory: form.raceCategory,
           city: form.city,
           country: form.country,
           bio: form.bio,
@@ -111,6 +115,21 @@ export default function AthleteEditor({
       <p className="text-[11px] text-midnight/45 -mt-1">
         Date of birth sets the age group on every entry. With a town and country as well, the profile counts as complete.
       </p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+        <div className="sm:col-span-2">
+          <CategoryChoice
+            name="a-category"
+            value={form.raceCategory}
+            onChange={(value) => set("raceCategory", value)}
+            labelClassName={labelCls}
+            allowUnset
+            describedBy="a-category-help"
+          />
+        </div>
+        <p id="a-category-help" className="text-[11px] text-midnight/45 leading-relaxed sm:pb-1">
+          When a race pays women and men separately, this is the field they race in. Changing it re-ranks their results.
+        </p>
+      </div>
       <div>
         <label htmlFor="a-bio" className={labelCls}>Short intro</label>
         <textarea id="a-bio" rows={3} maxLength={600} value={form.bio} onChange={(e) => set("bio", e.target.value)} className={inputCls} />

@@ -24,9 +24,16 @@ export async function PATCH(
   }
 
   const current = await db
-    .prepare("SELECT id, slug, date, prizes FROM events WHERE id = ?")
+    .prepare("SELECT id, slug, date, prizes, prize_split, age_group_prize FROM events WHERE id = ?")
     .bind(id)
-    .first<{ id: string; slug: string; date: string; prizes: string | null }>();
+    .first<{
+      id: string;
+      slug: string;
+      date: string;
+      prizes: string | null;
+      prize_split: string | null;
+      age_group_prize: string | null;
+    }>();
   if (!current) return NextResponse.json({ error: "Event not found" }, { status: 404 });
 
   const parsed = parseEventInput(body);
@@ -83,6 +90,7 @@ export async function PATCH(
     .prepare(
       `UPDATE events SET slug = ?, name = ?, distance = ?, date = ?, time = ?, venue = ?, location = ?,
          status = ?, entry_fee_cents = ?, description = ?, check_in = ?, what_to_bring = ?, prizes = ?,
+         prize_split = ?, age_group_prize = ?,
          first_heat_time = ?, heat_interval_minutes = ?, heat_count = ?, heat_capacity = ?, change_fee_cents = ?,
          is_test = ?
        WHERE id = ?`
@@ -90,6 +98,7 @@ export async function PATCH(
     .bind(
       slug, f.name, f.distance, f.date, f.time, f.venue, f.location, f.status,
       f.entry_fee_cents, f.description, f.check_in, f.what_to_bring, f.prizes,
+      f.prize_split, f.age_group_prize,
       f.first_heat_time, f.heat_interval_minutes, f.heat_count, f.heat_capacity, f.change_fee_cents,
       f.is_test,
       id
@@ -112,9 +121,15 @@ export async function PATCH(
     }
   }
 
-  // Results carry prize money and age group places; rebuild them when the
-  // purse or the date (and so age groups) change after times are in.
-  if (f.prizes !== current.prizes || f.date !== current.date) {
+  // Results carry prize money, category and age group places and age group
+  // awards; rebuild them when the purse, how it is split, the age group prize
+  // or the date (and so age groups) change after times are in.
+  if (
+    f.prizes !== current.prizes ||
+    f.prize_split !== current.prize_split ||
+    f.age_group_prize !== current.age_group_prize ||
+    f.date !== current.date
+  ) {
     await recompute(db, id);
   }
 

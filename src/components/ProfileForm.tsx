@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import CountrySelect from "@/components/CountrySelect";
+import { CategoryChoice } from "@/components/CategoryPrompt";
 import { isKnownCountry } from "@/lib/countries";
+import { CATEGORY_LABEL, toRaceCategory, type RaceCategory } from "@/lib/categories";
 import { fieldInputCls, fieldLabelCls, fieldTextareaCls } from "@/components/fieldStyles";
 
 interface SponsorRef {
@@ -28,7 +30,10 @@ interface ProfileFormProps {
     sponsorInterests?: string | null;
     dreamBrands?: string | null;
     openToSponsorship?: number;
+    raceCategory?: RaceCategory | null;
   };
+  /** True once their category has counted in a race paid by category: only an admin changes it then. */
+  categoryLocked?: boolean;
 }
 
 // 16px text so phones do not zoom in on focus.
@@ -59,7 +64,7 @@ function initialPlace(user: ProfileFormProps["user"]) {
   return { city: legacy, country: "" };
 }
 
-export default function ProfileForm({ user }: ProfileFormProps) {
+export default function ProfileForm({ user, categoryLocked = false }: ProfileFormProps) {
   const router = useRouter();
 
   let initialSponsors: SponsorRef[] = [];
@@ -73,6 +78,14 @@ export default function ProfileForm({ user }: ProfileFormProps) {
   const place = initialPlace(user);
   const [city, setCity] = useState(place.city);
   const [country, setCountry] = useState(place.country);
+  const serverCategory = toRaceCategory(user.raceCategory);
+  const [raceCategory, setRaceCategory] = useState<RaceCategory | null>(serverCategory);
+  // Answered somewhere else on the page (the dashboard prompt): follow it.
+  const [seenCategory, setSeenCategory] = useState(serverCategory);
+  if (serverCategory !== seenCategory) {
+    setSeenCategory(serverCategory);
+    setRaceCategory(serverCategory);
+  }
   const [bio, setBio] = useState(user.bio || "");
   const [story, setStory] = useState(user.story || "");
   const [instagram, setInstagram] = useState(user.instagram || "");
@@ -155,6 +168,9 @@ export default function ProfileForm({ user }: ProfileFormProps) {
           sponsorInterests,
           dreamBrands,
           openToSponsorship,
+          // Only sent once chosen: an athlete can change it but not clear it,
+          // and once it has counted in a race only an admin changes it.
+          ...(raceCategory && !categoryLocked ? { raceCategory } : {}),
         }),
       });
       if (!res.ok) {
@@ -260,6 +276,34 @@ export default function ProfileForm({ user }: ProfileFormProps) {
               />
             </div>
           </div>
+
+          {categoryLocked ? (
+            <div>
+              <span className={labelCls}>Category</span>
+              <p className="t-headline text-[1.3rem] text-midnight">
+                {serverCategory ? CATEGORY_LABEL[serverCategory] : "Not set yet"}
+              </p>
+              <p className={hintCls}>
+                {serverCategory
+                  ? "It already counts in your race results. Ask us if it needs changing."
+                  : "You have already raced a category race without one, so ask us and we will set it for you."}
+              </p>
+            </div>
+          ) : (
+            <fieldset>
+              <legend className={labelCls}>Category</legend>
+              <CategoryChoice
+                name="raceCategory"
+                value={raceCategory}
+                onChange={setRaceCategory}
+                describedBy="raceCategory-hint"
+              />
+              <p id="raceCategory-hint" className={hintCls}>
+                Races that pay prize money in women&apos;s and men&apos;s categories use this for
+                prize places and age groups.
+              </p>
+            </fieldset>
+          )}
 
           <div>
             <label htmlFor="bio" className={labelCls}>

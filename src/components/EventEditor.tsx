@@ -8,6 +8,7 @@ import { dateParts } from "@/lib/dates";
 import { EVENT_STATUSES, slugify } from "@/lib/eventInput";
 import { prizeToCents, type PrizeSlot } from "@/lib/racetime";
 import { formatFee } from "@/lib/money";
+import { RACE_CATEGORIES, purseCents, type PrizeSplit } from "@/lib/categories";
 
 export type EventStatus = (typeof EVENT_STATUSES)[number];
 
@@ -31,6 +32,10 @@ export interface EventFormValues {
   heatCount: number;
   heatCapacity: number;
   prizes: PrizeSlot[];
+  /** Pay the places down the whole field, or once to the women and once to the men. */
+  prizeSplit: PrizeSplit;
+  /** What each age group winner without a prize place gets. Blank for none. */
+  ageGroupPrize: string;
   description: string;
   checkIn: string;
   whatToBring: string[];
@@ -61,6 +66,8 @@ interface Draft {
   heatCount: string;
   heatCapacity: string;
   prizes: PrizeRow[];
+  prizeSplit: PrizeSplit;
+  ageGroupPrize: string;
   description: string;
   checkIn: string;
   whatToBring: string;
@@ -79,6 +86,15 @@ const statusChip: Record<string, string> = {
   "Sold Out": "bg-terracotta text-white",
   "Coming Soon": "bg-stone text-midnight/70",
 };
+
+const SPLIT_OPTIONS: { value: PrizeSplit; label: string; help: string }[] = [
+  { value: "overall", label: "Overall", help: "1st, 2nd and 3rd down the whole field." },
+  {
+    value: "category",
+    label: "Women and men",
+    help: "Each place is paid once to the women and once to the men.",
+  },
+];
 
 const MAX_PRIZES = 20;
 
@@ -106,6 +122,8 @@ function toDraft(v: EventFormValues): Draft {
     heatCount: String(v.heatCount),
     heatCapacity: String(v.heatCapacity),
     prizes: v.prizes.map((p, i) => ({ key: i, label: p.label, amount: p.amount })),
+    prizeSplit: v.prizeSplit,
+    ageGroupPrize: v.ageGroupPrize,
     description: v.description,
     checkIn: v.checkIn,
     whatToBring: v.whatToBring.join("\n"),
@@ -133,6 +151,8 @@ function toPayload(d: Draft): EventFormValues {
     prizes: d.prizes
       .map((p) => ({ label: p.label.trim(), amount: p.amount.trim() }))
       .filter((p) => p.label || p.amount),
+    prizeSplit: d.prizeSplit,
+    ageGroupPrize: d.ageGroupPrize.trim(),
     description: d.description.trim(),
     checkIn: d.checkIn.trim(),
     whatToBring: d.whatToBring
@@ -395,11 +415,12 @@ export default function EventEditor({
   const bringCount = d.whatToBring.split("\n").filter((l) => l.trim()).length;
   // The cash total of the prize rows, for display only. A non-cash prize
   // (a voucher, kit) counts as nothing, the same as when results are saved.
-  const cashPrizes = d.prizes
-    .filter((p) => p.label.trim() && p.amount.trim())
-    .map((p) => prizeToCents(p.amount))
-    .filter((cents) => cents > 0);
-  const purseCents = cashPrizes.reduce((n, cents) => n + cents, 0);
+  // Paid to women and men, every place is paid twice.
+  const filledPrizes = d.prizes.filter((p) => p.label.trim() && p.amount.trim());
+  const purse = purseCents(filledPrizes, d.prizeSplit);
+  const cashPlaces =
+    filledPrizes.filter((p) => prizeToCents(p.amount) > 0).length *
+    (d.prizeSplit === "category" ? RACE_CATEGORIES.length : 1);
   const cancelHref = mode === "edit" && slug ? `/admin/events/${slug}` : "/admin";
   const busy = saving || deleting || done;
 
@@ -953,6 +974,40 @@ export default function EventEditor({
               </>
             }
           >
+            <fieldset>
+              <legend className={labelCls}>Who the places pay</legend>
+              <div className="grid grid-cols-1 sm:grid-cols-2 border border-stone/60 divide-y sm:divide-y-0 sm:divide-x divide-stone/60">
+                {SPLIT_OPTIONS.map((opt) => {
+                  const selected = d.prizeSplit === opt.value;
+                  return (
+                    <label
+                      key={opt.value}
+                      className={`relative cursor-pointer px-4 py-3.5 transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset has-[:focus-visible]:ring-terracotta ${
+                        selected ? "bg-midnight text-white" : "bg-white hover:bg-bone"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="ev-prize-split"
+                        value={opt.value}
+                        checked={selected}
+                        onChange={() => set("prizeSplit", opt.value)}
+                        className="sr-only"
+                      />
+                      <span className="block text-sm font-medium">{opt.label}</span>
+                      <span
+                        className={`block text-xs mt-1 leading-relaxed ${
+                          selected ? "text-stone/70" : "text-midnight/55"
+                        }`}
+                      >
+                        {opt.help}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+
             {d.prizes.length === 0 ? (
               <p className="text-sm text-midnight/60 leading-relaxed">
                 No prizes yet, so the event page leaves prize money out. Add a place
@@ -1017,13 +1072,34 @@ export default function EventEditor({
               >
                 Add a prize
               </button>
-              {purseCents > 0 && (
+              {purse > 0 && (
                 <p className="text-sm text-midnight/60" aria-live="polite">
                   Total{" "}
-                  <span className="t-numeral text-[1.35rem] text-midnight">{formatFee(purseCents)}</span>{" "}
-                  across {cashPrizes.length} {cashPrizes.length === 1 ? "place" : "places"}
+                  <span className="t-numeral text-[1.35rem] text-midnight">{formatFee(purse)}</span>{" "}
+                  across {cashPlaces} {cashPlaces === 1 ? "place" : "places"}
                 </p>
               )}
+            </div>
+
+            <div className="border-t border-stone/40 pt-5">
+              <label htmlFor="ev-age-group-prize" className={labelCls}>
+                Age group winners get <span className="text-midnight/40 font-normal">(optional)</span>
+              </label>
+              <input
+                id="ev-age-group-prize"
+                value={d.ageGroupPrize}
+                maxLength={80}
+                onChange={(e) => set("ageGroupPrize", e.target.value)}
+                placeholder="Product prize pack"
+                aria-describedby="ev-age-group-prize-help"
+                className={inputCls}
+              />
+              <p id="ev-age-group-prize-help" className={helpCls}>
+                Goes to the fastest in each age group who has not already won a prize
+                place. Leave it empty for none.
+                {d.prizeSplit === "category" &&
+                  " With women and men paid separately, each age group has a women's winner and a men's winner."}
+              </p>
             </div>
           </Section>
 
@@ -1116,6 +1192,7 @@ export default function EventEditor({
                 }
                 timeText={d.heatsEnabled ? windowText ?? "Time TBC" : d.startTime.trim() || "Time TBC"}
                 feeText={fee > 0 && Number.isFinite(fee) ? `${money(fee)} AUD` : "Free"}
+                purseText={purse > 0 ? formatFee(purse) : null}
               />
             </div>
             <nav aria-label="Form sections">
@@ -1300,14 +1377,18 @@ function Glance({
   heatsSummary,
   timeText,
   feeText,
+  purseText,
 }: {
   draft: Draft;
   heatsSummary: string | null;
   timeText: string;
   feeText: string;
+  /** The cash purse, or null when there is no prize money. */
+  purseText: string | null;
 }) {
   const parts = dateParts(draft.dateTbc ? null : draft.date);
   const prizeCount = draft.prizes.filter((p) => p.label.trim() && p.amount.trim()).length;
+  const ageGroupPrize = draft.ageGroupPrize.trim();
   return (
     <div className="bg-midnight text-white">
       <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-white/10">
@@ -1346,6 +1427,24 @@ function Glance({
         <dt className="text-stone/50">Prizes</dt>
         <dd className="text-right font-mono tabular-nums">
           {prizeCount ? `${prizeCount} ${prizeCount === 1 ? "place" : "places"}` : "None"}
+        </dd>
+        {prizeCount > 0 && (
+          <>
+            <dt className="text-stone/50">Paid to</dt>
+            <dd className="text-right font-mono tabular-nums">
+              {draft.prizeSplit === "category" ? "Women and men" : "Overall"}
+            </dd>
+          </>
+        )}
+        {purseText && (
+          <>
+            <dt className="text-stone/50">Purse</dt>
+            <dd className="text-right font-mono tabular-nums">{purseText}</dd>
+          </>
+        )}
+        <dt className="text-stone/50">Age groups</dt>
+        <dd className="min-w-0 text-right font-mono truncate" title={ageGroupPrize || undefined}>
+          {ageGroupPrize || "None"}
         </dd>
       </dl>
     </div>

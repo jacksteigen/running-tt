@@ -6,6 +6,7 @@ import { getSession } from "@/lib/auth";
 import { ageOn } from "@/lib/agegroups";
 import { composeLocation } from "@/lib/countries";
 import { todayInMelbourne } from "@/lib/events";
+import { CATEGORY_LABEL, toRaceCategory } from "@/lib/categories";
 import AddAthleteForm from "@/components/AddAthleteForm";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,7 @@ interface AthleteRow {
   country: string | null;
   location: string | null;
   date_of_birth: string | null;
+  race_category: string | null;
   profile_completed: number;
   is_admin: number;
   created_at: string;
@@ -38,7 +40,8 @@ export default async function AdminAthletesPage() {
 
   const athletes = await db
     .prepare(
-      `SELECT u.id, u.name, u.email, u.city, u.country, u.location, u.date_of_birth, u.profile_completed, u.is_admin, u.created_at,
+      `SELECT u.id, u.name, u.email, u.city, u.country, u.location, u.date_of_birth, u.race_category,
+              u.profile_completed, u.is_admin, u.created_at,
               (SELECT COUNT(*) FROM entries WHERE user_id = u.id AND status = 'confirmed') as entries,
               (SELECT COUNT(*) FROM results WHERE user_id = u.id) as results
        FROM users u
@@ -47,6 +50,11 @@ export default async function AdminAthletesPage() {
     .all() as unknown as { results: AthleteRow[] };
 
   const today = todayInMelbourne();
+
+  const categoryCounts = { women: 0, men: 0, unset: 0 };
+  for (const a of athletes.results) {
+    categoryCounts[toRaceCategory(a.race_category) ?? "unset"] += 1;
+  }
 
   // Which brands athletes most want to run for: the outreach list.
   const wishes = (await db
@@ -78,6 +86,9 @@ export default async function AdminAthletesPage() {
           <h1 className="t-display mt-5 text-[2.6rem] md:text-[3.6rem]">Athletes</h1>
           <p className="mt-3 text-[0.95rem] text-bone/65">
             <span className="t-numeral text-[1.25rem] text-bone">{athletes.results.length}</span> registered
+          </p>
+          <p className="mt-1.5 text-[0.9rem] text-bone/55">
+            {categoryCounts.women} women, {categoryCounts.men} men, {categoryCounts.unset} not set
           </p>
         </div>
       </section>
@@ -112,6 +123,7 @@ export default async function AdminAthletesPage() {
               <thead>
                 <tr className="border-b rule text-left t-eyebrow text-dust">
                   <th className="px-4 py-3">Athlete</th>
+                  <th className="px-4 py-3 hidden sm:table-cell">Category</th>
                   <th className="px-4 py-3 hidden md:table-cell">Location</th>
                   <th className="px-4 py-3 text-right">Age</th>
                   <th className="px-4 py-3 text-right hidden sm:table-cell">Entries</th>
@@ -123,6 +135,7 @@ export default async function AdminAthletesPage() {
                 {athletes.results.map((a) => {
                   const age = a.date_of_birth ? ageOn(a.date_of_birth, today) : null;
                   const place = composeLocation(a.city, a.country) || a.location;
+                  const category = toRaceCategory(a.race_category);
                   return (
                     <tr key={a.id} className="border-b border-stone/20 last:border-b-0 hover:bg-bone/60 transition-colors">
                       <td className="px-4 py-3">
@@ -132,7 +145,13 @@ export default async function AdminAthletesPage() {
                         {a.is_admin === 1 && (
                           <span className="ml-2 t-eyebrow text-terracotta">Admin</span>
                         )}
-                        <p className="text-xs text-midnight/50">{a.email}</p>
+                        <p className="text-xs text-midnight/50">
+                          <span className="sm:hidden">{category ? CATEGORY_LABEL[category] : "No category"} · </span>
+                          {a.email}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3 hidden sm:table-cell text-midnight/70">
+                        {category ? CATEGORY_LABEL[category] : "-"}
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell text-midnight/70">{place || "-"}</td>
                       <td className="px-4 py-3 text-right t-numeral text-[1.05rem]">{age ?? "-"}</td>

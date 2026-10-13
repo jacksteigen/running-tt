@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const columns = [
@@ -53,15 +54,23 @@ export default function Footer() {
         </div>
 
         <div className="mt-16 border-t rule-light pt-6 flex flex-col md:flex-row justify-between gap-4 text-[0.85rem]">
+          {/* The lockup sits on the text baseline, the way the word did:
+              wordmark on the line, pinwheel rising above it. */}
           <p>
             A{" "}
             <a
               href="https://www.steigen.com.au"
               target="_blank"
               rel="noopener noreferrer"
-              className="link-quiet text-bone/80 decoration-bone/30"
+              className="inline-block mx-1 py-3 -my-3 opacity-80 transition-opacity hover:opacity-100"
             >
-              Steigen
+              <Image
+                src="/images/steigen-logo-white.png"
+                alt="Steigen"
+                width={93}
+                height={22}
+                className="inline-block h-[22px] w-auto align-baseline"
+              />
             </a>{" "}
             initiative
           </p>

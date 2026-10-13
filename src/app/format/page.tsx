@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import TrackDiagram from "@/components/TrackDiagram";
 import HeatsTimeline from "@/components/HeatsTimeline";
@@ -7,7 +8,7 @@ import Reveal from "@/components/Reveal";
 export const metadata: Metadata = {
   title: "The Format · Running TT",
   description:
-    "How a Running TT race works. Book a heat, race the clock, and the fastest times take the prize money.",
+    "How a Running TT race works. Book a heat, race the clock, and the fastest times take the prize money, in women's and men's categories where a race says so.",
 };
 
 const steps = [
@@ -52,7 +53,7 @@ const rules = [
   },
   {
     label: "Prize money",
-    body: "Every event pays out. The purse and how it is split gets announced with the race and is listed on the event page before you enter. The money comes from entry fees plus cash from our sponsors.",
+    body: "Every event pays out. The purse, how it is split, and any category or age group prizes are listed on the event page before you enter. The money comes from entry fees plus cash from our sponsors.",
   },
 ];
 
@@ -72,6 +73,11 @@ export default function FormatPage() {
               fastest times across all the heats take the prize money, so you
               are racing everyone on the day, one heat at a time.
             </p>
+            <p className="mt-6 max-w-xl text-bone/65 leading-relaxed">
+              Where a race says so, prize money is paid in women&apos;s and
+              men&apos;s categories, so you are racing everyone in yours. Some
+              races add prizes for age group winners too.
+            </p>
           </div>
         </div>
       </section>
@@ -90,6 +96,15 @@ export default function FormatPage() {
                   and your time is measured against every other heat on the
                   day.
                 </p>
+                <div className="relative mt-10 aspect-[6/5] w-full max-w-sm overflow-hidden bg-midnight/5">
+                  <Image
+                    src="/images/pack-heat.webp"
+                    alt="A pack of runners in matching singlets running together on a track"
+                    fill
+                    sizes="(min-width: 640px) 24rem, 100vw"
+                    className="object-cover object-[50%_25%]"
+                  />
+                </div>
               </div>
               <div className="lg:col-span-8">
                 <TrackDiagram />

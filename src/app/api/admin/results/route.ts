@@ -139,6 +139,12 @@ export async function POST(request: NextRequest) {
 
   const display = formatSeconds(seconds);
 
+  // A corrected time keeps the category the result already counted in.
+  const previous = await db
+    .prepare("SELECT race_category FROM results WHERE event_id = ? AND user_id = ?")
+    .bind(eventId, userId)
+    .first<{ race_category: string | null }>();
+
   await db
     .prepare("DELETE FROM results WHERE event_id = ? AND user_id = ?")
     .bind(eventId, userId)
@@ -147,8 +153,9 @@ export async function POST(request: NextRequest) {
   await db
     .prepare(
       `INSERT INTO results
-         (id, event_id, user_id, entry_id, time_seconds, time_display, heat_number, verified, age_group)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)`
+         (id, event_id, user_id, entry_id, time_seconds, time_display, heat_number, verified, age_group,
+          race_category)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`
     )
     .bind(
       `res_${generateId()}`,
@@ -158,7 +165,8 @@ export async function POST(request: NextRequest) {
       seconds,
       display,
       heat ?? entry.heat_number ?? 1,
-      entry.age_group
+      entry.age_group,
+      previous?.race_category ?? null
     )
     .run();
 

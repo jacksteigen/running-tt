@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
       id: session.user.id,
       email: session.user.email,
       dateOfBirth: session.user.dateOfBirth,
+      raceCategory: session.user.raceCategory,
     },
     heatNumber,
   });

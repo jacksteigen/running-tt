@@ -4,6 +4,13 @@ import { getDB } from "@/lib/db";
 import { formatEventDate } from "@/lib/dates";
 import { formatFee } from "@/lib/money";
 import Reveal from "@/components/Reveal";
+import {
+  CATEGORY_LABEL,
+  RACE_CATEGORIES,
+  toPrizeSplit,
+  toRaceCategory,
+  type RaceCategory,
+} from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -27,11 +34,48 @@ interface EventRow {
 interface PodiumRow {
   event_id: string;
   rank: number;
+  category_rank: number | null;
+  race_category: string | null;
+  prize_split: string | null;
   user_id: string;
   user_name: string;
   time_display: string;
   prize_amount_cents: number;
   verified: number;
+}
+
+/** One podium as it is shown: the overall top three, or one category's. */
+interface Podium {
+  category: RaceCategory | null;
+  rows: { place: number; row: PodiumRow }[];
+}
+
+/**
+ * The podiums to show for an event. A race paid by category shows the top
+ * three women and the top three men; anything else, or a category race
+ * where nobody had a category, shows the overall top three.
+ */
+function podiumsFor(rows: PodiumRow[]): Podium[] {
+  if (rows.length > 0 && toPrizeSplit(rows[0].prize_split) === "category") {
+    const byCategory = RACE_CATEGORIES.map((category) => ({
+      category,
+      rows: rows
+        .filter(
+          (r) =>
+            toRaceCategory(r.race_category) === category &&
+            r.category_rank !== null &&
+            r.category_rank <= 3
+        )
+        .sort((a, b) => (a.category_rank as number) - (b.category_rank as number))
+        .map((row) => ({ place: row.category_rank as number, row })),
+    })).filter((p) => p.rows.length > 0);
+    if (byCategory.length > 0) return byCategory;
+  }
+  const overall = rows
+    .filter((r) => r.rank <= 3)
+    .sort((a, b) => a.rank - b.rank)
+    .map((row) => ({ place: row.rank, row }));
+  return overall.length > 0 ? [{ category: null, rows: overall }] : [];
 }
 
 function formatDayMonth(dateStr: string) {
@@ -53,32 +97,38 @@ export default async function ResultsPage() {
     .prepare("SELECT * FROM events WHERE date < date('now') ORDER BY date DESC")
     .all() as unknown as { results: EventRow[] };
 
-  // All podium finishers across past events, in one query.
+  // All podium finishers across past events, in one query: the overall top
+  // three, and the top three in each category for races paid by category.
   const podiums = await db
     .prepare(
-      `SELECT r.event_id, r.rank, r.time_display, r.prize_amount_cents, r.verified,
-              u.id as user_id, u.name as user_name
+      `SELECT r.event_id, r.rank, r.category_rank, r.race_category,
+              r.time_display, r.prize_amount_cents, r.verified,
+              u.id as user_id, u.name as user_name, ev.prize_split
        FROM results r
        JOIN users u ON r.user_id = u.id
-       WHERE r.rank <= 3
+       JOIN events ev ON r.event_id = ev.id
+       WHERE r.rank <= 3 OR r.category_rank <= 3
        ORDER BY r.event_id, r.rank ASC`
     )
     .all() as unknown as { results: PodiumRow[] };
 
-  const podiumsByEvent = new Map<string, PodiumRow[]>();
+  const finishersByEvent = new Map<string, PodiumRow[]>();
   for (const p of podiums.results) {
-    const list = podiumsByEvent.get(p.event_id) ?? [];
+    const list = finishersByEvent.get(p.event_id) ?? [];
     list.push(p);
-    podiumsByEvent.set(p.event_id, list);
+    finishersByEvent.set(p.event_id, list);
   }
 
-  // All-time records: fastest time per distance across every RTT result.
+  // All-time records: fastest time per distance across every RTT result,
+  // for women and men once categories are known at that distance. The
+  // category is the one raced in, or the athlete's own for older results.
   interface RecordRow {
     time_display: string;
     time_seconds: number;
     verified: number;
     user_id: string;
     user_name: string;
+    race_category: string | null;
     distance: string;
     event_name: string;
     event_slug: string;
@@ -88,6 +138,7 @@ export default async function ResultsPage() {
     .prepare(
       `SELECT r.time_display, r.time_seconds, r.verified,
               u.id as user_id, u.name as user_name,
+              COALESCE(r.race_category, u.race_category) as race_category,
               ev.distance, ev.name as event_name, ev.slug as event_slug, ev.date
        FROM results r
        JOIN users u ON r.user_id = u.id
@@ -97,19 +148,46 @@ export default async function ResultsPage() {
     )
     .all() as unknown as { results: RecordRow[] };
 
-  const recordOrder = ["Mile", "3K", "5K", "10K"];
-  const recordsByDistance = new Map<string, RecordRow>();
+  const recordOrder = ["Mile", "2K", "3K", "5K", "10K"];
+  const fastestByDistance = new Map<string, RecordRow>();
+  const fastestByCategory = new Map<string, Map<RaceCategory, RecordRow>>();
   for (const row of allTimes.results) {
-    if (!recordsByDistance.has(row.distance)) {
-      recordsByDistance.set(row.distance, row);
+    if (!fastestByDistance.has(row.distance)) {
+      fastestByDistance.set(row.distance, row);
     }
+    const category = toRaceCategory(row.race_category);
+    if (!category) continue;
+    const forDistance = fastestByCategory.get(row.distance) ?? new Map<RaceCategory, RecordRow>();
+    if (!forDistance.has(category)) forDistance.set(category, row);
+    fastestByCategory.set(row.distance, forDistance);
   }
   const records = recordOrder
-    .filter((d) => recordsByDistance.has(d))
+    .filter((d) => fastestByDistance.has(d))
     .concat(
-      [...recordsByDistance.keys()].filter((d) => !recordOrder.includes(d))
+      [...fastestByDistance.keys()].filter((d) => !recordOrder.includes(d))
     )
-    .map((d) => recordsByDistance.get(d) as RecordRow);
+    .map((distance) => {
+      const top = fastestByDistance.get(distance) as RecordRow;
+      const byCategory = fastestByCategory.get(distance);
+      const rows: { category: RaceCategory | null; rec: RecordRow }[] = byCategory
+        ? RACE_CATEGORIES.filter((c) => byCategory.has(c)).map((c) => ({
+            category: c,
+            rec: byCategory.get(c) as RecordRow,
+          }))
+        : [];
+      // The fastest time ever stays on the board, even with no category on it.
+      if (!toRaceCategory(top.race_category)) rows.unshift({ category: null, rec: top });
+      return { distance, rows };
+    });
+  const recordsByCategory = records.some((r) => r.rows.some((row) => row.category));
+  // A women's and a men's record at every distance, and nothing unlabelled.
+  const recordsPaired =
+    recordsByCategory &&
+    records.every(
+      (r) =>
+        r.rows.every((row) => row.category) &&
+        RACE_CATEGORIES.every((c) => r.rows.some((row) => row.category === c))
+    );
 
   // Aggregate stats across past events
   // Test runs are listed but never counted toward Running TT totals or records.
@@ -177,8 +255,11 @@ export default async function ResultsPage() {
                   Running TT <em className="text-gold">records</em>
                 </h2>
                 <p className="mt-5 max-w-xs text-bone/65 leading-relaxed">
-                  Fastest time ever recorded at a Running TT event, per
-                  distance.
+                  {recordsPaired
+                    ? "The fastest woman and the fastest man ever timed at a Running TT event, per distance."
+                    : recordsByCategory
+                      ? "The fastest times ever recorded at a Running TT event, per distance, by category where we know it."
+                      : "Fastest time ever recorded at a Running TT event, per distance."}
                 </p>
               </div>
               <div className="lg:col-span-8">
@@ -186,6 +267,11 @@ export default async function ResultsPage() {
                   <caption className="sr-only">
                     Running TT records: the fastest time recorded at a Running
                     TT event, per distance
+                    {recordsPaired
+                      ? ", for women and for men"
+                      : recordsByCategory
+                        ? ", by category where we know it"
+                        : ""}
                   </caption>
                   <thead>
                     <tr className="border-b rule-light">
@@ -200,51 +286,65 @@ export default async function ResultsPage() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {records.map((rec) => (
-                      <tr key={rec.distance} className="border-b rule-light">
-                        <th
-                          scope="row"
-                          className="text-left t-headline text-[1.35rem] md:text-[1.9rem] py-6 md:py-7 pr-4 align-baseline"
-                        >
-                          {rec.distance}
-                        </th>
-                        <td className="py-6 md:py-7 pr-4 align-baseline whitespace-nowrap">
-                          <span className="t-numeral text-[1.8rem] md:text-[2.6rem] text-gold">
-                            {rec.time_display}
-                          </span>
-                        </td>
-                        <td className="py-6 md:py-7 align-baseline">
-                          <Link
-                            href={`/athletes/${rec.user_id}`}
-                            className="t-headline text-[1.15rem] md:text-[1.45rem] link-draw hover:text-gold transition-colors"
-                          >
-                            {rec.user_name}
-                          </Link>
-                          <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.88rem] text-bone/55">
-                            <Link
-                              href={`/events/${rec.event_slug}`}
-                              className="link-quiet decoration-bone/30 hover:text-bone transition-colors"
-                            >
-                              {rec.event_name}
-                            </Link>
-                            {rec.verified === 1 && (
-                              <span
-                                className="inline-flex items-center gap-1.5 t-eyebrow text-bone/60"
-                                title="Verified"
+                  {/* One group per distance: a single record, or the women's and the men's. */}
+                  {records.map(({ distance, rows }) => (
+                    <tbody key={distance}>
+                      {rows.map(({ category, rec }, i) => {
+                        const last = i === rows.length - 1;
+                        // Paired rows sit closer together, with the hairline under the pair.
+                        const pad = `${i === 0 ? "pt-6 md:pt-7" : "pt-2 md:pt-3"} ${last ? "pb-6 md:pb-7" : "pb-2 md:pb-3"}`;
+                        return (
+                          <tr key={category ?? "overall"} className={last ? "border-b rule-light" : undefined}>
+                            {i === 0 && (
+                              <th
+                                scope={rows.length > 1 ? "rowgroup" : "row"}
+                                rowSpan={rows.length > 1 ? rows.length : undefined}
+                                className={`text-left t-headline text-[1.35rem] md:text-[1.9rem] ${pad} pr-4 align-baseline`}
                               >
-                                <span
-                                  aria-hidden
-                                  className="inline-block w-1.5 h-1.5 rounded-full bg-trail ring-1 ring-bone/40"
-                                />
-                                Verified
-                              </span>
+                                {distance}
+                              </th>
                             )}
-                          </p>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
+                            <td className={`${pad} pr-4 align-baseline whitespace-nowrap`}>
+                              <span className="t-numeral text-[1.8rem] md:text-[2.6rem] text-gold">
+                                {rec.time_display}
+                              </span>
+                            </td>
+                            <td className={`${pad} align-baseline`}>
+                              {category && (
+                                <span className="t-eyebrow text-bone/50 mr-3">{CATEGORY_LABEL[category]}</span>
+                              )}
+                              <Link
+                                href={`/athletes/${rec.user_id}`}
+                                className="t-headline text-[1.15rem] md:text-[1.45rem] link-draw hover:text-gold transition-colors"
+                              >
+                                {rec.user_name}
+                              </Link>
+                              <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[0.88rem] text-bone/55">
+                                <Link
+                                  href={`/events/${rec.event_slug}`}
+                                  className="link-quiet decoration-bone/30 hover:text-bone transition-colors"
+                                >
+                                  {rec.event_name}
+                                </Link>
+                                {rec.verified === 1 && (
+                                  <span
+                                    className="inline-flex items-center gap-1.5 t-eyebrow text-bone/60"
+                                    title="Verified"
+                                  >
+                                    <span
+                                      aria-hidden
+                                      className="inline-block w-1.5 h-1.5 rounded-full bg-trail ring-1 ring-bone/40"
+                                    />
+                                    Verified
+                                  </span>
+                                )}
+                              </p>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  ))}
                 </table>
               </div>
             </div>
@@ -293,7 +393,7 @@ export default async function ResultsPage() {
                       <ol className="lg:col-span-10 border-t rule">
                         {events.map((event) => {
                           const { day, month } = formatDayMonth(event.date);
-                          const podium = podiumsByEvent.get(event.id) ?? [];
+                          const eventPodiums = podiumsFor(finishersByEvent.get(event.id) ?? []);
                           const place = [event.venue, event.location]
                             .filter((v) => v && !/TBC/i.test(v))
                             .join(", ");
@@ -331,39 +431,57 @@ export default async function ResultsPage() {
                                 </div>
 
                                 <div className="col-start-2 xl:col-start-3">
-                                  {podium.length > 0 ? (
-                                    <ol className="border-t rule" aria-label={`${event.name} podium`}>
-                                      {podium.map((p) => (
-                                        <li
-                                          key={`${p.rank}-${p.user_id}`}
-                                          className="grid grid-cols-[1.75rem_1fr_auto] items-baseline gap-x-3 border-b rule py-3"
-                                        >
-                                          <span
-                                            className={`t-numeral text-[1.25rem] ${
-                                              p.rank === 1 ? "text-gold" : "text-midnight/45"
-                                            }`}
+                                  {eventPodiums.length > 0 ? (
+                                    <div className="space-y-6">
+                                      {eventPodiums.map((podium) => (
+                                        <div key={podium.category ?? "overall"}>
+                                          {podium.category && (
+                                            <p className="t-eyebrow text-dust mb-2.5">
+                                              {CATEGORY_LABEL[podium.category]}
+                                            </p>
+                                          )}
+                                          <ol
+                                            className="border-t rule"
+                                            aria-label={
+                                              podium.category
+                                                ? `${event.name} podium, ${CATEGORY_LABEL[podium.category]}`
+                                                : `${event.name} podium`
+                                            }
                                           >
-                                            {p.rank}
-                                          </span>
-                                          <Link
-                                            href={`/athletes/${p.user_id}`}
-                                            className="min-w-0 truncate text-[1rem] text-midnight link-draw hover:text-terracotta transition-colors"
-                                          >
-                                            {p.user_name}
-                                          </Link>
-                                          <span className="text-right">
-                                            <span className="block t-numeral text-[1.25rem] text-midnight">
-                                              {p.time_display}
-                                            </span>
-                                            {p.prize_amount_cents > 0 && (
-                                              <span className="block t-numeral text-[0.9rem] text-dust mt-1">
-                                                {formatFee(p.prize_amount_cents)}
-                                              </span>
-                                            )}
-                                          </span>
-                                        </li>
+                                            {podium.rows.map(({ place: pos, row: p }) => (
+                                              <li
+                                                key={`${pos}-${p.user_id}`}
+                                                className="grid grid-cols-[1.75rem_1fr_auto] items-baseline gap-x-3 border-b rule py-3"
+                                              >
+                                                <span
+                                                  className={`t-numeral text-[1.25rem] ${
+                                                    pos === 1 ? "text-gold" : "text-midnight/45"
+                                                  }`}
+                                                >
+                                                  {pos}
+                                                </span>
+                                                <Link
+                                                  href={`/athletes/${p.user_id}`}
+                                                  className="min-w-0 truncate text-[1rem] text-midnight link-draw hover:text-terracotta transition-colors"
+                                                >
+                                                  {p.user_name}
+                                                </Link>
+                                                <span className="text-right">
+                                                  <span className="block t-numeral text-[1.25rem] text-midnight">
+                                                    {p.time_display}
+                                                  </span>
+                                                  {p.prize_amount_cents > 0 && (
+                                                    <span className="block t-numeral text-[0.9rem] text-dust mt-1">
+                                                      {formatFee(p.prize_amount_cents)}
+                                                    </span>
+                                                  )}
+                                                </span>
+                                              </li>
+                                            ))}
+                                          </ol>
+                                        </div>
                                       ))}
-                                    </ol>
+                                    </div>
                                   ) : (
                                     <p className="t-caption text-[0.98rem] text-midnight/55">
                                       Full results on the event page.

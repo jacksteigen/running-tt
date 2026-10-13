@@ -11,6 +11,8 @@ export interface RaceListItem {
   location: string;
   status: string;
   entryFeeCents: number;
+  /** Cash prize purse in cents, from purseCents(). Shown only above zero. */
+  prizeCents?: number;
   entered?: number;
 }
 
@@ -30,6 +32,7 @@ export default function RaceList({ races }: { races: RaceListItem[] }) {
     <ol className="border-t rule">
       {races.map((r) => {
         const d = dateParts(r.date);
+        const purse = r.prizeCents ?? 0;
         return (
           <li key={r.slug} className="border-b rule">
             <Link
@@ -53,6 +56,14 @@ export default function RaceList({ races }: { races: RaceListItem[] }) {
                   {[r.venue, r.location].filter((v) => v && !/TBC/i.test(v)).join(", ") ||
                     "Venue to be announced"}
                   {d.tbc ? "" : ` · ${formatEventDate(r.date, "medium")}`}
+                  {purse > 0 && (
+                    <>
+                      {" · "}
+                      <span className="whitespace-nowrap text-midnight">
+                        {formatFee(purse)} prize purse
+                      </span>
+                    </>
+                  )}
                 </p>
               </div>
               <div className="col-start-2 md:col-start-3 mt-4 md:mt-0 flex md:flex-col md:items-end gap-4 md:gap-1.5 text-sm text-midnight/60">

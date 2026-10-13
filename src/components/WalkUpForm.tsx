@@ -3,11 +3,13 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { HeatAvailability } from "@/lib/heats";
+import { CATEGORY_LABEL, RACE_CATEGORIES, type RaceCategory } from "@/lib/categories";
 import CountrySelect from "@/components/CountrySelect";
 
-/* Small pieces shared by the admin event screen: heat names, a heat picker
-   that shows space left, and the "that heat is full, are you sure?" round
-   trip. They live here because this is the leaf the others already import. */
+/* Small pieces shared by the admin screens: heat names, a heat picker that
+   shows space left, the "that heat is full, are you sure?" round trip, and
+   the Women or Men choice. They live here because this is the leaf the
+   others already import. */
 
 export type HeatOption = Pick<
   HeatAvailability,
@@ -32,6 +34,8 @@ interface ApiReply {
   code?: string;
   /** Set on a success that needs a word, e.g. "They had already paid online." */
   note?: string;
+  /** Set on a success that still needs fixing, e.g. no race category. */
+  warning?: string;
 }
 
 /**
@@ -115,6 +119,64 @@ export function HeatSelect({
   );
 }
 
+/**
+ * Women or Men as a pair of buttons, for the admin athlete forms. With
+ * allowUnset there is a third, "Not set", so a category can be cleared.
+ */
+export function CategoryChoice({
+  name,
+  value,
+  onChange,
+  labelClassName,
+  allowUnset = false,
+  describedBy,
+}: {
+  /** The radio group name; unique on the page. */
+  name: string;
+  value: RaceCategory | null;
+  onChange: (value: RaceCategory | null) => void;
+  labelClassName: string;
+  allowUnset?: boolean;
+  describedBy?: string;
+}) {
+  const options: { value: RaceCategory | null; label: string }[] = [
+    ...RACE_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABEL[c] })),
+    ...(allowUnset ? [{ value: null, label: "Not set" }] : []),
+  ];
+  return (
+    <fieldset aria-describedby={describedBy}>
+      <legend className={labelClassName}>Race category</legend>
+      <div
+        className={`grid ${
+          options.length === 3 ? "grid-cols-3" : "grid-cols-2"
+        } border border-stone/40 divide-x divide-stone/40`}
+      >
+        {options.map((opt) => {
+          const selected = value === opt.value;
+          return (
+            <label
+              key={opt.label}
+              className={`flex items-center justify-center min-h-11 px-3 text-sm cursor-pointer select-none transition-colors has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-inset has-[:focus-visible]:ring-terracotta ${
+                selected ? "bg-midnight text-white" : "bg-bone/50 hover:bg-bone"
+              }`}
+            >
+              <input
+                type="radio"
+                name={name}
+                value={opt.value ?? ""}
+                checked={selected}
+                onChange={() => onChange(opt.value)}
+                className="sr-only"
+              />
+              {opt.label}
+            </label>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
+}
+
 const inputCls =
   "w-full h-11 border border-stone/40 px-3 text-base sm:text-sm bg-bone/50 focus:outline-none focus:border-terracotta transition-colors";
 const labelCls = "block text-xs font-medium text-dust mb-1.5";
@@ -123,6 +185,7 @@ interface Fields {
   firstName: string;
   lastName: string;
   email: string;
+  raceCategory: RaceCategory | null;
   dateOfBirth: string;
   city: string;
   country: string;
@@ -132,6 +195,7 @@ const EMPTY: Fields = {
   firstName: "",
   lastName: "",
   email: "",
+  raceCategory: null,
   dateOfBirth: "",
   city: "",
   country: "Australia",
@@ -176,10 +240,11 @@ export default function WalkUpForm({
 
   async function enter(userId: string, name: string) {
     const heatNumber = withHeats ? Number(heat) : null;
+    // The category picked here fills in an existing account that has none.
     const data = await sendWithHeatCheck<ApiReply & { entryId?: string }>(
       "/api/admin/entries",
       "POST",
-      { eventId, userId, heatNumber, notify: true },
+      { eventId, userId, heatNumber, notify: true, raceCategory: form.raceCategory },
       "Add"
     );
     if (data === "cancelled") {
@@ -191,10 +256,11 @@ export default function WalkUpForm({
       return false;
     }
     setSuccess(
-      data.note
+      (data.note
         ? // They paid online while this was going on, so they keep the heat they booked.
           `${name} is on the start list${withHeats ? " in the heat they booked" : ""}. ${data.note}`
-        : `${name} is in${withHeats ? ` ${heatName(heats, heatNumber)}` : ""}. Their confirmation email is on its way.`
+        : `${name} is in${withHeats ? ` ${heatName(heats, heatNumber)}` : ""}. Their confirmation email is on its way.`) +
+        (data.warning ? ` ${data.warning}` : "")
     );
     setForm(EMPTY);
     setCreated(null);
@@ -214,6 +280,7 @@ export default function WalkUpForm({
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
       return setError("An email is needed so they can claim the account later.");
     }
+    if (!form.raceCategory) return setError("Pick Women or Men.");
     if (withHeats && !heat) return setError("Pick a heat.");
 
     setBusy(true);
@@ -229,6 +296,7 @@ export default function WalkUpForm({
           firstName: form.firstName.trim(),
           lastName: form.lastName.trim(),
           email: form.email.trim(),
+          raceCategory: form.raceCategory,
           dateOfBirth: form.dateOfBirth || undefined,
           city: form.city.trim() || undefined,
           country: form.country || undefined,
@@ -293,7 +361,7 @@ export default function WalkUpForm({
             className={inputCls}
           />
         </div>
-        <div className="sm:col-span-2">
+        <div>
           <label htmlFor="walkup-email" className={labelCls}>Email</label>
           <input
             id="walkup-email"
@@ -307,6 +375,12 @@ export default function WalkUpForm({
             className={inputCls}
           />
         </div>
+        <CategoryChoice
+          name="walkup-category"
+          value={form.raceCategory}
+          onChange={(v) => set("raceCategory", v)}
+          labelClassName={labelCls}
+        />
         <div>
           <label htmlFor="walkup-dob" className={labelCls}>
             Date of birth <span className="font-normal text-midnight/40">(optional, sets age group)</span>

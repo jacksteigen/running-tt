@@ -1,5 +1,6 @@
 import { generateId } from "@/lib/auth";
 import { ageGroupOn } from "@/lib/agegroups";
+import { toPrizeSplit, type RaceCategory } from "@/lib/categories";
 import { formatEventDate, isDateTbc } from "@/lib/dates";
 import { nowClockInMelbourne, todayInMelbourne } from "@/lib/events";
 import { sendAdminAlertEmail, sendBookingEmail } from "@/lib/email";
@@ -32,10 +33,15 @@ export interface BookableEvent extends HeatConfig {
   entry_fee_cents: number;
   max_entries: number | null;
   change_fee_cents: number | null;
+  /**
+   * As stored; read it with toPrizeSplit. "category" means every athlete
+   * needs a race category to book.
+   */
+  prize_split: string | null;
 }
 
 export const EVENT_BOOKING_COLUMNS = `id, slug, name, distance, date, time, venue, location, status,
-  entry_fee_cents, max_entries, change_fee_cents,
+  entry_fee_cents, max_entries, change_fee_cents, prize_split,
   first_heat_time, heat_interval_minutes, heat_count, heat_capacity`;
 
 export type BookingResult =
@@ -95,12 +101,22 @@ export async function createBooking(
     heatNumber,
   }: {
     event: BookableEvent;
-    user: { id: string; email: string; dateOfBirth: string | null };
+    user: {
+      id: string;
+      email: string;
+      dateOfBirth: string | null;
+      raceCategory: RaceCategory | null;
+    };
     heatNumber: number | null;
   }
 ): Promise<BookingResult> {
   const closed = bookingClosedReason(event);
   if (closed) return fail(400, "CLOSED", closed);
+
+  // Prize places paid per category: the athlete has to be in one to race.
+  if (toPrizeSplit(event.prize_split) === "category" && !user.raceCategory) {
+    return fail(409, "CATEGORY_REQUIRED", "Pick the category you race in before you book.");
+  }
 
   const withHeats = hasHeats(event);
   let heat: number | null = null;

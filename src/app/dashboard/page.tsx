@@ -13,11 +13,14 @@ import PhotoAlbum from "@/components/PhotoAlbum";
 import PBCard from "@/components/PBCard";
 import ResultsTable from "@/components/ResultsTable";
 import Countdown from "@/components/Countdown";
+import CategoryPrompt from "@/components/CategoryPrompt";
 import { dateParts, formatEventDate, isDateTbc } from "@/lib/dates";
 import { buildHeats, hasHeats, heatLabel, type HeatConfig } from "@/lib/heats";
 import { bookingRef } from "@/lib/bookings";
 import { formatFee } from "@/lib/money";
 import { todayInMelbourne } from "@/lib/events";
+import { CATEGORY_POSSESSIVE, placeFor } from "@/lib/categories";
+import { hasCategoryResults } from "@/lib/standings";
 
 export const metadata: Metadata = {
   title: "Dashboard · Running TT",
@@ -82,6 +85,11 @@ export default async function DashboardPage({
     event_name: string;
     event_slug: string;
     distance: string;
+    prize_split: string | null;
+    race_category: string | null;
+    category_rank: number | null;
+    age_group_award: number;
+    age_group_prize: string | null;
   }
 
   interface PBRow {
@@ -107,7 +115,8 @@ export default async function DashboardPage({
   // Fetch user's results
   const results = await db
     .prepare(
-      `SELECT r.*, ev.name as event_name, ev.slug as event_slug, ev.distance, ev.is_test
+      `SELECT r.*, ev.name as event_name, ev.slug as event_slug, ev.distance, ev.is_test,
+              ev.prize_split, ev.age_group_prize
        FROM results r
        JOIN events ev ON r.event_id = ev.id
        WHERE r.user_id = ?
@@ -115,6 +124,10 @@ export default async function DashboardPage({
     )
     .bind(user.id)
     .all() as unknown as { results: ResultRow[] };
+
+  // Once their category has counted in a race paid by category, only an admin
+  // changes it.
+  const categoryLocked = await hasCategoryResults(db, user.id);
 
   // Fetch personal bests
   const pbs = await db
@@ -199,7 +212,12 @@ export default async function DashboardPage({
   // Test runs show in the history, tagged, but are not part of the tally.
   const counted = results.results.filter((r) => !r.is_test);
   const totalRaces = counted.length;
-  const podiums = counted.filter((r) => r.rank <= 3).length;
+  // In a race paid by category, a podium is a place among the women or the men,
+  // and a finisher with no category has no place that counts.
+  const podiums = counted.filter((r) => {
+    const p = placeFor(r);
+    return p !== null && p <= 3;
+  }).length;
   const earnings = counted.reduce(
     (sum, r) => sum + (r.prize_amount_cents || 0),
     0
@@ -244,7 +262,12 @@ export default async function DashboardPage({
               <h1 className="t-display text-[2.9rem] sm:text-[4rem] md:text-[5rem] break-words">
                 Good to see you, <em className="text-bone/75">{firstName}.</em>
               </h1>
-              <p className="mt-4 text-[0.95rem] text-bone/55 break-all">{user.email}</p>
+              <p className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[0.95rem] text-bone/55">
+                <span className="break-all">{user.email}</span>
+                {user.raceCategory && (
+                  <span>Racing in the {CATEGORY_POSSESSIVE[user.raceCategory]} category</span>
+                )}
+              </p>
             </div>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 shrink-0">
               <Link
@@ -294,9 +317,21 @@ export default async function DashboardPage({
         </section>
       )}
 
+      {/* Category, for athletes who joined before we asked */}
+      {!user.raceCategory && !categoryLocked && (
+        <section className="bg-stone">
+          <div className="mx-auto max-w-6xl px-6 py-8 md:py-10">
+            <CategoryPrompt
+              heading="Which category do you race in?"
+              body="Some races pay prize money in women's and men's categories. Pick yours once and you are set for all of them."
+            />
+          </div>
+        </section>
+      )}
+
       {/* Dream brands, for athletes who have not told us yet */}
       {user.openToSponsorship !== 0 && !user.dreamBrands && (
-        <section className="bg-stone">
+        <section className={`bg-stone ${user.raceCategory || categoryLocked ? "" : "border-t rule"}`}>
           <div className="mx-auto max-w-6xl px-6 py-8 md:py-10 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
             <div className="max-w-2xl">
               <p className="t-headline text-[1.5rem] md:text-[1.8rem]">
@@ -558,7 +593,7 @@ export default async function DashboardPage({
               </div>
             </div>
             <div className="lg:col-span-8 space-y-8">
-              <ProfileForm user={user} />
+              <ProfileForm user={user} categoryLocked={categoryLocked} />
 
               <PhotoAlbum initialPhotos={albumPhotos} />
 

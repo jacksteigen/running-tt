@@ -89,12 +89,12 @@ export default async function WelcomePage({
           spread on desktop, held in place while the steps change. */}
       <div className="relative lg:col-span-5 bg-midnight text-bone overflow-hidden flex items-end min-h-[13rem] sm:min-h-[18rem] lg:min-h-0 lg:sticky lg:top-16 lg:self-start lg:h-[calc(100svh-4rem)]">
         <Image
-          src="/images/steigen-singlet-back.webp"
+          src="/images/harbour-race.webp"
           alt=""
           fill
           priority
           sizes="(min-width: 1024px) 42vw, 100vw"
-          className="object-cover object-center opacity-70 motion-safe:animate-slow-zoom"
+          className="object-cover object-[55%_35%] opacity-70 motion-safe:animate-slow-zoom"
           aria-hidden
         />
         <div
@@ -124,6 +124,7 @@ export default async function WelcomePage({
               city: user.city ?? "",
               country: user.country ?? "",
               bio: user.bio ?? "",
+              raceCategory: user.raceCategory,
             }}
             openEvent={
               offer

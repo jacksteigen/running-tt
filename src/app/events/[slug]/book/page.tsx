@@ -15,17 +15,20 @@ import { HOLD_MINUTES, getHeatAvailability, hasHeats, isValidClock } from "@/lib
 import { todayInMelbourne } from "@/lib/events";
 import { formatFee } from "@/lib/money";
 import { retrieveCheckoutSession } from "@/lib/stripe";
+import { toPrizeSplit } from "@/lib/categories";
+import { eventShareMetadata } from "@/lib/site";
 import HeatPicker, { type PickerClosedKind, type PickerViewer } from "@/components/HeatPicker";
+import CategoryPrompt from "@/components/CategoryPrompt";
 import { BookingSteps } from "@/components/BookingTicket";
 
 export const dynamic = "force-dynamic";
 
-type BookingEvent = BookableEvent & { description: string | null };
+type BookingEvent = BookableEvent & { description: string | null; prizes: string | null };
 
 async function loadEvent(slug: string) {
   const db = await getDB();
   return db
-    .prepare(`SELECT ${EVENT_BOOKING_COLUMNS}, description FROM events WHERE slug = ?`)
+    .prepare(`SELECT ${EVENT_BOOKING_COLUMNS}, description, prizes FROM events WHERE slug = ?`)
     .bind(slug)
     .first<BookingEvent>();
 }
@@ -40,6 +43,8 @@ export async function generateMetadata({
   return {
     title: event ? `Book your heat · ${event.name} · Running TT` : "Book your heat · Running TT",
     robots: { index: false, follow: false },
+    // A shared booking link previews as the race itself.
+    ...(event ? eventShareMetadata(event) : {}),
   };
 }
 
@@ -141,6 +146,13 @@ export default async function BookHeatPage({
   const wanted = Number(sp.heat);
   const initialHeat = Number.isInteger(wanted) && wanted >= 1 && wanted <= heats.length ? wanted : null;
   const free = event.entry_fee_cents <= 0;
+  // A race paid by category needs to know theirs before they can book. Once
+  // they answer, the page refreshes into the picker, keeping any ?heat=.
+  const needsCategory =
+    viewer === "ready" &&
+    !closed &&
+    toPrizeSplit(event.prize_split) === "category" &&
+    !session?.user.raceCategory;
   const price = free ? "Free" : `${formatFee(event.entry_fee_cents)} AUD`;
 
   return (
@@ -189,36 +201,47 @@ export default async function BookHeatPage({
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 pt-12 md:pt-16 pb-0 lg:pb-24">
-        <HeatPicker
-          eventId={event.id}
-          eventSlug={slug}
-          eventName={event.name}
-          entryFeeCents={event.entry_fee_cents}
-          initialHeats={heats.map((h) => ({
-            number: h.number,
-            label: h.label,
-            offsetMinutes: h.offsetMinutes,
-            capacity: h.capacity,
-            booked: h.booked,
-            remaining: h.remaining,
-            full: h.full,
-            closed: h.closed,
-            bookable: h.bookable,
-          }))}
-          initialHeat={initialHeat}
-          heldHeat={heldHeat}
-          heldSince={heldSince}
-          viewer={viewer}
-          closedReason={closed}
-          closedKind={closedKind(event)}
-          closedCta={closedCta(event)}
-          timesConfirmed={isValidClock(event.first_heat_time)}
-          intervalMinutes={event.heat_interval_minutes && event.heat_interval_minutes > 0 ? event.heat_interval_minutes : 15}
-          changeFeeText={changeFeeText(event.change_fee_cents)}
-          cancelled={sp.cancelled === "1"}
-        />
-      </section>
+      {needsCategory ? (
+        <section className="mx-auto max-w-6xl px-6 pt-12 md:pt-16 pb-20 lg:pb-24">
+          <div className="border-l-2 border-terracotta pl-5 md:pl-8 py-1">
+            <CategoryPrompt
+              heading="One thing before you book."
+              body="Prize money for this race is paid in women's and men's categories. Which do you race in?"
+            />
+          </div>
+        </section>
+      ) : (
+        <section className="mx-auto max-w-6xl px-6 pt-12 md:pt-16 pb-0 lg:pb-24">
+          <HeatPicker
+            eventId={event.id}
+            eventSlug={slug}
+            eventName={event.name}
+            entryFeeCents={event.entry_fee_cents}
+            initialHeats={heats.map((h) => ({
+              number: h.number,
+              label: h.label,
+              offsetMinutes: h.offsetMinutes,
+              capacity: h.capacity,
+              booked: h.booked,
+              remaining: h.remaining,
+              full: h.full,
+              closed: h.closed,
+              bookable: h.bookable,
+            }))}
+            initialHeat={initialHeat}
+            heldHeat={heldHeat}
+            heldSince={heldSince}
+            viewer={viewer}
+            closedReason={closed}
+            closedKind={closedKind(event)}
+            closedCta={closedCta(event)}
+            timesConfirmed={isValidClock(event.first_heat_time)}
+            intervalMinutes={event.heat_interval_minutes && event.heat_interval_minutes > 0 ? event.heat_interval_minutes : 15}
+            changeFeeText={changeFeeText(event.change_fee_cents)}
+            cancelled={sp.cancelled === "1"}
+          />
+        </section>
+      )}
     </>
   );
 }

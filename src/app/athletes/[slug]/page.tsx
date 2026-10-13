@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import PBCard from "@/components/PBCard";
 import ResultsTable from "@/components/ResultsTable";
 import { formatFee } from "@/lib/money";
+import { placeFor } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +115,11 @@ export default async function AthletePage({
     event_name: string;
     event_slug: string;
     distance: string;
+    prize_split: string | null;
+    race_category: string | null;
+    category_rank: number | null;
+    age_group_award: number;
+    age_group_prize: string | null;
   }
 
   const pbs = await db
@@ -126,7 +132,9 @@ export default async function AthletePage({
   const results = await db
     .prepare(
       `SELECT r.id, r.time_display, r.rank, r.verified, r.prize_amount_cents,
-              ev.name as event_name, ev.slug as event_slug, ev.distance, ev.is_test
+              r.race_category, r.category_rank, r.age_group_award,
+              ev.name as event_name, ev.slug as event_slug, ev.distance, ev.is_test,
+              ev.prize_split, ev.age_group_prize
        FROM results r
        JOIN events ev ON r.event_id = ev.id
        WHERE r.user_id = ?
@@ -203,8 +211,13 @@ export default async function AthletePage({
   // Test runs show in the history, tagged, but are not part of the tally.
   const counted = results.results.filter((r) => !r.is_test);
   const totalRaces = counted.length;
-  const podiums = counted.filter((r) => r.rank <= 3).length;
-  const wins = counted.filter((r) => r.rank === 1).length;
+  // In a race paid by category, a win or podium is among the women or the men,
+  // and a finisher with no category has no place that counts.
+  const podiums = counted.filter((r) => {
+    const p = placeFor(r);
+    return p !== null && p <= 3;
+  }).length;
+  const wins = counted.filter((r) => placeFor(r) === 1).length;
   const earnings = counted.reduce(
     (sum, r) => sum + (r.prize_amount_cents || 0),
     0
