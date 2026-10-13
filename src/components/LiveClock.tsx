@@ -2,30 +2,37 @@
 
 import { useEffect, useState } from "react";
 
-function pad(n: number) {
-  return String(n).padStart(2, "0");
+// Race time is Melbourne time, the same clock race days and heat cut-offs
+// run on, so every visitor sees the one trackside clock wherever they are.
+const ZONE = "Australia/Melbourne";
+const PLACE = "Melbourne";
+
+const clockFormat = new Intl.DateTimeFormat("en-AU", {
+  timeZone: ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
+function melbourneParts(date: Date) {
+  const parts = Object.fromEntries(
+    clockFormat.formatToParts(date).map((p) => [p.type, p.value])
+  );
+  return { hh: parts.hour, mm: parts.minute, ss: parts.second };
 }
 
-/** The visitor's own time, set like a trackside clock. */
+/** Melbourne time, set like a trackside clock. */
 export default function LiveClock() {
   const [now, setNow] = useState<Date | null>(null);
-  const [zone, setZone] = useState("");
 
   useEffect(() => {
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      setZone(tz.split("/").pop()?.replace(/_/g, " ") ?? "");
-    } catch {
-      setZone("");
-    }
     setNow(new Date());
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
 
-  const hh = now ? pad(now.getHours()) : "--";
-  const mm = now ? pad(now.getMinutes()) : "--";
-  const ss = now ? pad(now.getSeconds()) : "--";
+  const { hh, mm, ss } = now ? melbourneParts(now) : { hh: "--", mm: "--", ss: "--" };
 
   return (
     <div className="select-none" aria-hidden>
@@ -38,7 +45,7 @@ export default function LiveClock() {
       </div>
       <p className="t-eyebrow text-bone/55 mt-3 flex items-center gap-2">
         <span className="inline-block w-1.5 h-1.5 rounded-full bg-terracotta motion-safe:animate-pulse" />
-        Live{zone ? `, ${zone}` : ""}
+        Live, {PLACE}
       </p>
     </div>
   );
